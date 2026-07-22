@@ -1651,7 +1651,7 @@ function importData(file) {
 
             showNotification(`📂 Loaded ${state.machines.length} machines, ${state.parts.length} parts, ${state.productionLogs.length} logs, and ${state.operators.length} operators`, 'success');
         } catch (err) {
-            showNotification('⚠️ Failed to read file — make sure it\'s a valid JSON file', 'error');
+            showNotification(`⚠️ Failed to read file: ${err.message}`, 'error');
         }
     };
     reader.readAsText(file);
