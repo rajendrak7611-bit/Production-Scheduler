@@ -58,6 +58,10 @@
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4.5h6M4.5 7.5h6M4.5 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                     Production Log
                 </button>
+                <button class="tab-btn" data-view="inspections" id="tab-inspections">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 5v5M5 7.5h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.2"/></svg>
+                    Inspections
+                </button>
             </nav>
         </div>
         <div class="header-right">
@@ -370,6 +374,7 @@
                                 <th>Machine</th>
                                 <th style="width:110px">Cycle Time</th>
                                 <th style="width:110px">Setup Time</th>
+                                <th style="min-width:140px">Inspection Spec</th>
                                 <th style="width:60px">Total</th>
                                 <th style="width:30px"></th>
                             </tr>
@@ -382,6 +387,7 @@
                                 <td colspan="4" style="text-align:right">Totals:</td>
                                 <td id="part-form-total-cycle">0m</td>
                                 <td id="part-form-total-setup">0m</td>
+                                <td></td>
                                 <td id="part-form-total-time">0m</td>
                                 <td></td>
                             </tr>
@@ -649,6 +655,105 @@
     </div>
 
 
+
+    <!-- ===================== QUALITY INSPECTIONS VIEW ===================== -->
+    <div id="view-inspections" class="view">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M7 12l3 3 7-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Quality Inspections
+                </h2>
+                <p class="view-desc">Record quality checks, inspected quantities, and OK/NG parameters for scheduled operations.</p>
+            </div>
+            <div class="view-hero-actions">
+                <button class="btn btn-outline" id="btn-export-inspections-csv">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 10v2.5h10V10M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Export Inspections CSV
+                </button>
+            </div>
+        </div>
+        <section class="view-body" style="display: grid; grid-template-columns: 360px 1fr; gap: 24px; padding: 20px 24px;">
+            <!-- Form Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
+                <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px; font-weight: 600;">Log Quality Inspection</h3>
+
+                <div class="control-group">
+                    <label for="inspect-part-op">Select Operation</label>
+                    <select id="inspect-part-op" class="input" style="height: 38px;">
+                        <option value="">— Select Op —</option>
+                    </select>
+                </div>
+
+                <div id="inspect-spec-box" style="font-size: 0.75rem; background: var(--bg-surface); padding: 10px 12px; border-radius: var(--radius-md); border-left: 3px solid var(--accent-primary); color: var(--text-secondary); display: none; line-height: 1.4;">
+                    <strong>Inspection Spec:</strong> <span id="inspect-spec-text">No spec configured.</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="inspect-inspector">Inspector</label>
+                    <input type="text" id="inspect-inspector" class="input" placeholder="e.g. Quality Team A">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <div class="control-group">
+                        <label for="inspect-qty-inspected" style="font-size:0.75rem;">Inspected</label>
+                        <input type="number" id="inspect-qty-inspected" class="input" min="1" placeholder="0">
+                    </div>
+                    <div class="control-group">
+                        <label for="inspect-qty-ok" style="font-size:0.75rem;">OK Qty</label>
+                        <input type="number" id="inspect-qty-ok" class="input" min="0" placeholder="0">
+                    </div>
+                    <div class="control-group">
+                        <label for="inspect-qty-ng" style="font-size:0.75rem;">NG Qty</label>
+                        <input type="number" id="inspect-qty-ng" class="input" min="0" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="inspect-status">Inspection Status</label>
+                    <select id="inspect-status" class="input" style="height: 38px;">
+                        <option value="Pass">Pass</option>
+                        <option value="Fail">Fail</option>
+                        <option value="Conditional">Conditional Pass</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="inspect-notes">Remarks / Notes</label>
+                    <input type="text" id="inspect-notes" class="input" placeholder="e.g. Dimensions within tolerance limits">
+                </div>
+
+                <button class="btn btn-primary" id="btn-save-inspection" style="width: 100%; margin-top: 10px;">
+                    Save Inspection Report
+                </button>
+            </div>
+
+            <!-- Inspections Table Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600;">Inspection Report Log</h3>
+                <div style="max-height: 520px; overflow-y: auto;">
+                    <table class="table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 80px;">Date</th>
+                                <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Part & Op</th>
+                                <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Inspector</th>
+                                <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 70px;">Inspected</th>
+                                <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 60px;">OK</th>
+                                <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 60px;">NG</th>
+                                <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 80px;">Status</th>
+                                <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Remarks</th>
+                                <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 60px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inspection-tbody">
+                            <!-- Inspection rows rendered here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
 
     <!-- Tooltip -->
     <div class="tooltip" id="tooltip"></div>

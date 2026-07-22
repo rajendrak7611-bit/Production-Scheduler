@@ -141,6 +141,7 @@ function syncFormOperationsFromDOM() {
             op.machineId = mId ? parseInt(mId) : null;
             op.cycleTime = Math.max(0, parseFloat(tr.querySelector('.op-cycle').value) || 0);
             op.setupTime = Math.max(0, parseFloat(tr.querySelector('.op-setup').value) || 0);
+            op.inspectionSpecs = tr.querySelector('.op-spec-input').value.trim();
         }
     });
 }
@@ -251,6 +252,9 @@ function renderPartFormOps() {
                     <input type="number" step="0.1" class="input-sm time-input op-setup" min="0" value="${op.setupTime || 0}">
                     <span class="time-unit">min</span>
                 </td>
+                <td>
+                    <input type="text" class="input op-spec-input" value="${escapeHtml(op.inspectionSpecs || '')}" placeholder="e.g. Check dimension 10mm" style="width: 100%;">
+                </td>
                 <td class="row-total-cell" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
                     ${Number(processTime.toFixed(1))}m
                 </td>
@@ -334,6 +338,7 @@ function saveData() {
             operators: state.operators,
             productionLines: state.productionLines,
             users: state.users,
+            inspectionReports: state.inspectionReports,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) { /* localStorage might not be available */ }
@@ -349,17 +354,25 @@ function loadData() {
             const part = { ...p, color: getPartColor(i) };
             part.operations = (part.operations || []).map(op => ({
                 ...op,
-                quantity: op.quantity !== undefined ? op.quantity : part.quantity || 1
+                quantity: op.quantity !== undefined ? op.quantity : part.quantity || 1,
+                inspectionSpecs: op.inspectionSpecs || ''
             }));
             return part;
         });
-        state.partDatabase = data.partDatabase || [];
+        state.partDatabase = (data.partDatabase || []).map(p => ({
+            ...p,
+            operations: (p.operations || []).map(op => ({
+                ...op,
+                inspectionSpecs: op.inspectionSpecs || ''
+            }))
+        }));
         state.opsPerPart = data.opsPerPart || 5;
         state.productionLogs = data.productionLogs || [];
         state.operators = data.operators || [];
         state.productionLines = data.productionLines || [];
         state.users = data.users || [];
-        return state.machines.length > 0 || state.parts.length > 0 || state.partDatabase.length > 0 || state.productionLogs.length > 0 || state.operators.length > 0 || state.productionLines.length > 0 || state.users.length > 0;
+        state.inspectionReports = data.inspectionReports || [];
+        return state.machines.length > 0 || state.parts.length > 0 || state.partDatabase.length > 0 || state.productionLogs.length > 0 || state.operators.length > 0 || state.productionLines.length > 0 || state.users.length > 0 || state.inspectionReports.length > 0;
     } catch (e) { return false; }
 }
 
@@ -371,6 +384,7 @@ function clearAllData() {
     state.operators = [];
     state.productionLines = [];
     state.users = [];
+    state.inspectionReports = [];
     state.schedule = null;
     state.isScheduled = false;
     state.selectedPart = null;
@@ -382,6 +396,7 @@ function clearAllData() {
     renderOperatorList();
     renderProductionLines();
     renderUsers();
+    renderInspectionReports();
     updateCounts();
     showNotification('All data cleared', 'info');
 }
@@ -1664,6 +1679,217 @@ function exportLogsCSV() {
     document.body.removeChild(link);
 }
 
+// ==================== QUALITY INSPECTION REPORTS ====================
+
+function populateInspectionPartOpDropdown() {
+    const select = document.getElementById('inspect-part-op');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">— Select Op —</option>';
+
+    state.parts.forEach(part => {
+        part.operations.forEach((op, opIndex) => {
+            const machine = state.machines.find(m => m.id === op.machineId);
+            const machineName = machine ? machine.name : 'Unassigned';
+            const optValue = `${part.id}-${opIndex}`;
+            const optText = `${part.name} - Op ${opIndex + 1}: ${op.opName || 'Unnamed'} (on ${machineName})`;
+            
+            const opt = document.createElement('option');
+            opt.value = optValue;
+            opt.textContent = optText;
+            select.appendChild(opt);
+        });
+    });
+
+    // Reset spec block
+    const specBox = document.getElementById('inspect-spec-box');
+    if (specBox) specBox.style.display = 'none';
+}
+
+function handleInspectionPartOpChange() {
+    const partOpVal = document.getElementById('inspect-part-op').value;
+    const specBox = document.getElementById('inspect-spec-box');
+    const specText = document.getElementById('inspect-spec-text');
+    if (!specBox || !specText) return;
+
+    if (!partOpVal) {
+        specBox.style.display = 'none';
+        return;
+    }
+
+    const [partIdStr, opIndexStr] = partOpVal.split('-');
+    const partId = parseInt(partIdStr);
+    const opIndex = parseInt(opIndexStr);
+
+    const part = state.parts.find(p => p.id === partId);
+    const op = part ? part.operations[opIndex] : null;
+
+    if (op && op.inspectionSpecs) {
+        specText.textContent = op.inspectionSpecs;
+        specBox.style.display = 'block';
+    } else {
+        specText.textContent = 'No spec configured for this operation.';
+        specBox.style.display = 'block';
+    }
+}
+
+function renderInspectionReports() {
+    const tbody = document.getElementById('inspection-tbody');
+    if (!tbody) return;
+
+    if (!state.inspectionReports || state.inspectionReports.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">No quality inspections recorded yet.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = state.inspectionReports.map((report, index) => {
+        const part = state.parts.find(p => p.id === report.partId);
+        const partName = part ? part.name : 'Unknown Part';
+        const op = part ? part.operations[report.opIndex] : null;
+        const opName = op ? `Op ${report.opIndex + 1}: ${op.opName || 'Unnamed'}` : `Op ${report.opIndex + 1}`;
+
+        let badgeClass = 'badge-outline';
+        if (report.status === 'Pass') badgeClass = 'badge-success';
+        else if (report.status === 'Fail') badgeClass = 'badge-danger';
+        else if (report.status === 'Conditional') badgeClass = 'badge-warning';
+
+        return `
+            <tr>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${report.date}</td>
+                <td><strong>${escapeHtml(partName)}</strong><br><span style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(opName)}</span></td>
+                <td>${escapeHtml(report.inspector)}</td>
+                <td style="text-align: center; font-family: 'JetBrains Mono', monospace;">${report.qtyInspected}</td>
+                <td style="text-align: center; font-family: 'JetBrains Mono', monospace; color: var(--color-success); font-weight:600;">${report.qtyOk}</td>
+                <td style="text-align: center; font-family: 'JetBrains Mono', monospace; color: var(--color-error); font-weight:600;">${report.qtyNg}</td>
+                <td style="text-align: center;"><span class="badge ${badgeClass}">${report.status}</span></td>
+                <td style="font-size: 0.78rem; color: var(--text-secondary);">${escapeHtml(report.remarks || '—')}</td>
+                <td style="text-align: center;">
+                    <button class="btn-icon delete-inspection-btn" data-index="${index}" title="Delete inspection report" style="color: var(--color-error); padding: 2px;">
+                        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    tbody.querySelectorAll('.delete-inspection-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.index);
+            if (confirm('Delete this quality inspection report?')) {
+                state.inspectionReports.splice(idx, 1);
+                saveData();
+                renderInspectionReports();
+                showNotification('Inspection report deleted', 'info');
+            }
+        });
+    });
+}
+
+function saveInspectionReport() {
+    const partOpVal = document.getElementById('inspect-part-op').value;
+    const inspectorVal = document.getElementById('inspect-inspector').value.trim();
+    const qtyInspectedVal = parseInt(document.getElementById('inspect-qty-inspected').value);
+    const qtyOkVal = parseInt(document.getElementById('inspect-qty-ok').value);
+    const qtyNgVal = parseInt(document.getElementById('inspect-qty-ng').value);
+    const statusVal = document.getElementById('inspect-status').value;
+    const notesVal = document.getElementById('inspect-notes').value.trim();
+
+    if (!partOpVal) {
+        showNotification('⚠️ Please select a Part and Operation', 'error');
+        return;
+    }
+    if (!inspectorVal) {
+        showNotification('⚠️ Please enter Inspector name', 'error');
+        return;
+    }
+    if (isNaN(qtyInspectedVal) || qtyInspectedVal <= 0) {
+        showNotification('⚠️ Inspected quantity must be greater than 0', 'error');
+        return;
+    }
+    if (isNaN(qtyOkVal) || qtyOkVal < 0 || isNaN(qtyNgVal) || qtyNgVal < 0) {
+        showNotification('⚠️ OK and NG quantities cannot be negative', 'error');
+        return;
+    }
+    if (qtyOkVal + qtyNgVal !== qtyInspectedVal) {
+        showNotification('⚠️ Sum of OK Qty and NG Qty must equal Inspected Qty', 'error');
+        return;
+    }
+
+    const [partIdStr, opIndexStr] = partOpVal.split('-');
+    const partId = parseInt(partIdStr);
+    const opIndex = parseInt(opIndexStr);
+
+    const report = {
+        id: Date.now(),
+        partId,
+        opIndex,
+        date: new Date().toISOString().slice(0, 10),
+        inspector: inspectorVal,
+        qtyInspected: qtyInspectedVal,
+        qtyOk: qtyOkVal,
+        qtyNg: qtyNgVal,
+        status: statusVal,
+        remarks: notesVal
+    };
+
+    if (!state.inspectionReports) state.inspectionReports = [];
+    state.inspectionReports.push(report);
+    saveData();
+    renderInspectionReports();
+
+    // Reset input fields
+    document.getElementById('inspect-part-op').value = '';
+    document.getElementById('inspect-inspector').value = '';
+    document.getElementById('inspect-qty-inspected').value = '';
+    document.getElementById('inspect-qty-ok').value = '';
+    document.getElementById('inspect-qty-ng').value = '';
+    document.getElementById('inspect-notes').value = '';
+    document.getElementById('inspect-spec-box').style.display = 'none';
+
+    showNotification('✅ Inspection report saved successfully', 'success');
+}
+
+function exportInspectionsCSV() {
+    if (!state.inspectionReports || state.inspectionReports.length === 0) {
+        showNotification('⚠️ No inspection reports to export', 'error');
+        return;
+    }
+
+    let csv = 'Date,Part Name,Operation,Inspector,Inspected Qty,OK Qty,NG Qty,Status,Remarks\r\n';
+
+    state.inspectionReports.forEach(r => {
+        const part = state.parts.find(p => p.id === r.partId);
+        const partName = part ? part.name : 'Unknown Part';
+        const op = part ? part.operations[r.opIndex] : null;
+        const opName = op ? `Op ${r.opIndex + 1}: ${op.opName || 'Unnamed'}` : `Op ${r.opIndex + 1}`;
+
+        const row = [
+            r.date,
+            `"${partName.replace(/"/g, '""')}"`,
+            `"${opName.replace(/"/g, '""')}"`,
+            `"${r.inspector.replace(/"/g, '""')}"`,
+            r.qtyInspected,
+            r.qtyOk,
+            r.qtyNg,
+            r.status,
+            `"${(r.remarks || '').replace(/"/g, '""')}"`
+        ].join(',');
+        csv += row + '\r\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `inspection_reports_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 // ==================== VIEW SWITCHING ====================
 
 function switchView(viewName) {
@@ -1696,6 +1922,10 @@ function switchView(viewName) {
         populateLogPartOpDropdown();
         populateOperatorDropdown();
         renderProductionLogs();
+    } else if (viewName === 'inspections') {
+        subtitle.textContent = 'Quality Inspections — Record OK/NG reports per operation';
+        populateInspectionPartOpDropdown();
+        renderInspectionReports();
     } else {
         subtitle.textContent = 'Step 3 — Analyze your schedule';
     }
@@ -1780,6 +2010,7 @@ function exportData() {
                 machineId: op.machineId,
                 cycleTime: op.cycleTime,
                 setupTime: op.setupTime,
+                inspectionSpecs: op.inspectionSpecs || ''
             })),
         })),
         partDatabase: state.partDatabase.map(p => ({
@@ -1794,12 +2025,14 @@ function exportData() {
                 machineId: op.machineId,
                 cycleTime: op.cycleTime,
                 setupTime: op.setupTime,
+                inspectionSpecs: op.inspectionSpecs || ''
             })),
         })),
         productionLogs: state.productionLogs,
         operators: state.operators,
         productionLines: state.productionLines,
         users: state.users,
+        inspectionReports: state.inspectionReports || []
     };
 
     const json = JSON.stringify(exportObj, null, 2);
@@ -1841,15 +2074,23 @@ function importData(file) {
                 };
                 part.operations = (part.operations || []).map(op => ({
                     ...op,
-                    quantity: op.quantity !== undefined ? op.quantity : part.quantity || 1
+                    quantity: op.quantity !== undefined ? op.quantity : part.quantity || 1,
+                    inspectionSpecs: op.inspectionSpecs || ''
                 }));
                 return part;
             });
-            state.partDatabase = data.partDatabase || [];
+            state.partDatabase = (data.partDatabase || []).map(p => ({
+                ...p,
+                operations: (p.operations || []).map(op => ({
+                    ...op,
+                    inspectionSpecs: op.inspectionSpecs || ''
+                }))
+            }));
             state.productionLogs = data.productionLogs || [];
             state.operators = data.operators || [];
             state.productionLines = data.productionLines || [];
             state.users = data.users || [];
+            state.inspectionReports = data.inspectionReports || [];
             state.schedule = null;
             state.isScheduled = false;
             state.selectedPart = null;
@@ -1864,8 +2105,10 @@ function importData(file) {
             renderOperatorList();
             renderProductionLines();
             renderUsers();
+            renderInspectionReports();
             populateOperatorDropdown();
             populateLogPartOpDropdown();
+            populateInspectionPartOpDropdown();
             updateCounts();
 
             showNotification(`📂 Loaded ${state.machines.length} machines, ${state.parts.length} parts, ${state.productionLogs.length} logs, ${state.operators.length} operators, ${state.productionLines.length} lines, and ${state.users.length} users`, 'success');
@@ -2093,6 +2336,7 @@ function init() {
         renderOperatorList();
         renderProductionLines();
         renderUsers();
+        renderInspectionReports();
         updateCounts();
     }
 
@@ -2139,7 +2383,8 @@ function init() {
             opName: `Operation ${state.formOperations.length + 1}`,
             machineId: state.machines.length > 0 ? state.machines[0].id : null,
             cycleTime: 0,
-            setupTime: 0
+            setupTime: 0,
+            inspectionSpecs: ''
         });
         renderPartFormOps();
     });
@@ -2192,6 +2437,15 @@ function init() {
 
     // Save User
     document.getElementById('btn-save-user').addEventListener('click', saveUser);
+
+    // Save Quality Inspection
+    document.getElementById('btn-save-inspection').addEventListener('click', saveInspectionReport);
+
+    // Export Inspections to CSV
+    document.getElementById('btn-export-inspections-csv').addEventListener('click', exportInspectionsCSV);
+
+    // Dynamic specs selection change
+    document.getElementById('inspect-part-op').addEventListener('change', handleInspectionPartOpChange);
 
     // Export Logs to CSV
     document.getElementById('btn-export-log-csv').addEventListener('click', exportLogsCSV);
