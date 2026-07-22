@@ -1619,11 +1619,18 @@ function importData(file) {
             state.machines = data.machines || [];
             state.startDate = data.startDate || new Date().toISOString().slice(0, 16);
             state.opsPerPart = data.opsPerPart || 5;
-            state.parts = (data.parts || []).map((p, i) => ({
-                ...p,
-                quantity: p.quantity || 1,
-                color: getPartColor(i),
-            }));
+            state.parts = (data.parts || []).map((p, i) => {
+                const part = {
+                    ...p,
+                    quantity: p.quantity || 1,
+                    color: getPartColor(i),
+                };
+                part.operations = (part.operations || []).map(op => ({
+                    ...op,
+                    quantity: op.quantity !== undefined ? op.quantity : part.quantity || 1
+                }));
+                return part;
+            });
             state.partDatabase = data.partDatabase || [];
             state.productionLogs = data.productionLogs || [];
             state.operators = data.operators || [];
@@ -1638,6 +1645,8 @@ function importData(file) {
             renderPartsList();
             renderProductionLogs();
             renderOperatorList();
+            populateOperatorDropdown();
+            populateLogPartOpDropdown();
             updateCounts();
 
             showNotification(`📂 Loaded ${state.machines.length} machines, ${state.parts.length} parts, ${state.productionLogs.length} logs, and ${state.operators.length} operators`, 'success');
