@@ -466,7 +466,8 @@ function generateSampleData() {
     ];
 
     saveData();
-    document.getElementById('ops-per-part').value = state.opsPerPart;
+    const opsInput = document.getElementById('ops-per-part');
+    if (opsInput) opsInput.value = state.opsPerPart;
     renderMachineGrid();
     renderPartsList();
     renderOperatorList();
@@ -758,9 +759,14 @@ function renderDatabaseList() {
 }
 
 function updateCounts() {
-    document.getElementById('machine-count').textContent = `${state.machines.length} machine${state.machines.length !== 1 ? 's' : ''}`;
-    document.getElementById('part-count').textContent = `${state.parts.length} part${state.parts.length !== 1 ? 's' : ''}`;
-    
+    const machineCountEl = document.getElementById('machine-count');
+    if (machineCountEl) {
+        machineCountEl.textContent = `${state.machines.length} machine${state.machines.length !== 1 ? 's' : ''}`;
+    }
+    const partCountEl = document.getElementById('part-count');
+    if (partCountEl) {
+        partCountEl.textContent = `${state.parts.length} part${state.parts.length !== 1 ? 's' : ''}`;
+    }
     const opCountEl = document.getElementById('operator-count');
     if (opCountEl) {
         opCountEl.textContent = `${state.operators.length} operator${state.operators.length !== 1 ? 's' : ''}`;
@@ -1850,7 +1856,8 @@ function importData(file) {
             state.expandedParts.clear();
 
             saveData();
-            document.getElementById('ops-per-part').value = state.opsPerPart;
+            const opsInput = document.getElementById('ops-per-part');
+            if (opsInput) opsInput.value = state.opsPerPart;
             renderMachineGrid();
             renderPartsList();
             renderProductionLogs();
