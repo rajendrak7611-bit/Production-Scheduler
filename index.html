@@ -38,9 +38,9 @@
         </div>
         <div class="header-center">
             <nav class="view-tabs">
-                <button class="tab-btn active" data-view="machines" id="tab-machines">
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="4" width="11" height="7" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4 1.5v2.5M11 1.5v2.5M5 7.5h5M5 9.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                    Machines
+                <button class="tab-btn active" data-view="masters" id="tab-masters">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4.5h6M4.5 7.5h6M4.5 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    Master Data
                 </button>
                 <button class="tab-btn" data-view="parts" id="tab-parts">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M5 5.5h5M5 7.5h5M5 9.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
@@ -49,10 +49,6 @@
                 <button class="tab-btn" data-view="database" id="tab-database">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4.5h6M4.5 7.5h6M4.5 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                     Database
-                </button>
-                <button class="tab-btn" data-view="operators" id="tab-operators">
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M2.5 12.5a5 5 0 0 1 10 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                    Operators
                 </button>
                 <button class="tab-btn" data-view="schedule" id="tab-schedule">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="3" width="5" height="2.5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="4" y="7" width="7" height="2.5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="11" width="9" height="2.5" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
@@ -85,31 +81,152 @@
         </div>
     </header>
 
-    <!-- ===================== MACHINES VIEW ===================== -->
-    <div id="view-machines" class="view active">
+    <!-- ===================== MASTER DATA VIEW ===================== -->
+    <div id="view-masters" class="view active">
         <div class="view-hero">
             <div class="view-hero-content">
                 <h2 class="view-title">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M6 2v3M18 2v3M7 11h4M7 14h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="17" cy="12.5" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                    Machine Setup
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M9 17h6M9 12h6M9 7h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Master Data Setup
                 </h2>
-                <p class="view-desc">Define your machines. Each machine will be available for operation assignment in the Parts screen.</p>
+                <p class="view-desc">Configure your system master settings, including machines, operators, production lines, and system users.</p>
             </div>
             <div class="view-hero-actions">
-                <span class="badge badge-lg" id="machine-count">0 machines</span>
-                <button class="btn btn-primary" id="btn-add-machine">
-                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                    Add Machine
-                </button>
-                <button class="btn btn-ghost" id="btn-clear-machines">
-                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    Clear All
-                </button>
+                <nav class="sub-tabs" style="display: flex; gap: 8px; background: var(--bg-surface); padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); width: fit-content; margin-left: auto;">
+                    <button class="sub-tab-btn active" data-subtab="machines" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;">Machines</button>
+                    <button class="sub-tab-btn" data-subtab="operators" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Operators</button>
+                    <button class="sub-tab-btn" data-subtab="lines" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Production Lines</button>
+                    <button class="sub-tab-btn" data-subtab="users" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Users</button>
+                </nav>
             </div>
         </div>
-        <section class="view-body">
-            <div class="machine-list-simplified" id="machine-list">
-                <!-- Machine list rows rendered here -->
+        <section class="view-body" style="padding: 20px 24px;">
+            <!-- Sub-panel: Machines -->
+            <div id="subpanel-machines" class="subpanel active">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; width: 100%;">
+                    <h3 style="font-size: 1.1rem; color: var(--text-primary); font-weight: 600;">Configure Machines</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" id="btn-add-machine">
+                            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                            Add Machine
+                        </button>
+                        <button class="btn btn-ghost" id="btn-clear-machines">
+                            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            Clear All
+                        </button>
+                    </div>
+                </div>
+                <div class="machine-list-simplified" id="machine-list">
+                    <!-- Machine list rows rendered here -->
+                </div>
+            </div>
+
+            <!-- Sub-panel: Operators -->
+            <div id="subpanel-operators" class="subpanel" style="display: none;">
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; width: 100%;">
+                    <!-- Form Card -->
+                    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
+                        <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px; font-weight: 600;">Add New Operator</h3>
+                        <div class="control-group">
+                            <label for="operator-form-name">Operator Name</label>
+                            <input type="text" id="operator-form-name" class="input" placeholder="e.g. Alice Smith">
+                        </div>
+                        <button class="btn btn-primary" id="btn-save-operator" style="width: 100%; margin-top: 10px;">
+                            Save Operator
+                        </button>
+                    </div>
+
+                    <!-- Operators List Card -->
+                    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                        <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600;">Registered Operators</h3>
+                        <div class="machine-grid" id="operator-list" style="max-height: 400px; overflow-y: auto;">
+                            <!-- Operator rows rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub-panel: Production Lines -->
+            <div id="subpanel-lines" class="subpanel" style="display: none;">
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; width: 100%;">
+                    <!-- Form Card -->
+                    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
+                        <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px; font-weight: 600;">Add Production Line</h3>
+                        <div class="control-group">
+                            <label for="line-form-name">Line Name</label>
+                            <input type="text" id="line-form-name" class="input" placeholder="e.g. Assembly Line A">
+                        </div>
+                        <div class="control-group">
+                            <label for="line-form-code">Line Code</label>
+                            <input type="text" id="line-form-code" class="input" placeholder="e.g. L-A">
+                        </div>
+                        <div class="control-group">
+                            <label for="line-form-desc">Description</label>
+                            <input type="text" id="line-form-desc" class="input" placeholder="e.g. Final manual welding assembly line">
+                        </div>
+                        <button class="btn btn-primary" id="btn-save-line" style="width: 100%; margin-top: 10px;">
+                            Save Production Line
+                        </button>
+                    </div>
+
+                    <!-- Lines List Card -->
+                    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                        <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600;">Active Production Lines</h3>
+                        <div class="machine-grid" id="line-list" style="max-height: 400px; overflow-y: auto;">
+                            <!-- Production Lines rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub-panel: Users -->
+            <div id="subpanel-users" class="subpanel" style="display: none;">
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; width: 100%;">
+                    <!-- Form Card -->
+                    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
+                        <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px; font-weight: 600;">Add System User</h3>
+                        <div class="control-group">
+                            <label for="user-form-username">Username</label>
+                            <input type="text" id="user-form-username" class="input" placeholder="e.g. alice_s">
+                        </div>
+                        <div class="control-group">
+                            <label for="user-form-fullname">Full Name</label>
+                            <input type="text" id="user-form-fullname" class="input" placeholder="e.g. Alice Smith">
+                        </div>
+                        <div class="control-group">
+                            <label for="user-form-role">User Role</label>
+                            <select id="user-form-role" class="input" style="height: 38px;">
+                                <option value="Admin">Admin</option>
+                                <option value="Planner">Planner</option>
+                                <option value="Operator">Operator</option>
+                                <option value="Viewer">Viewer</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="btn-save-user" style="width: 100%; margin-top: 10px;">
+                            Save User
+                        </button>
+                    </div>
+
+                    <!-- Users List Card -->
+                    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                        <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600;">Configured System Users</h3>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            <table class="table" style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Username</th>
+                                        <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Full Name</th>
+                                        <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Role</th>
+                                        <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 60px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-tbody">
+                                    <!-- User rows rendered here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
         <div class="view-footer">
@@ -531,44 +648,7 @@
         </section>
     </div>
 
-    <!-- ===================== OPERATORS VIEW ===================== -->
-    <div id="view-operators" class="view">
-        <div class="view-hero">
-            <div class="view-hero-content">
-                <h2 class="view-title">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                    Operator Setup
-                </h2>
-                <p class="view-desc">Configure the master list of operators available for production logging.</p>
-            </div>
-            <div class="view-hero-actions">
-                <span class="badge badge-lg" id="operator-count">0 operators</span>
-            </div>
-        </div>
-        <section class="view-body" style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; padding: 20px 24px;">
-            <!-- Form Card -->
-            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
-                <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px;">Add New Operator</h3>
-                
-                <div class="control-group">
-                    <label for="operator-form-name">Operator Name</label>
-                    <input type="text" id="operator-form-name" class="input" placeholder="e.g. Alice Smith">
-                </div>
 
-                <button class="btn btn-primary" id="btn-save-operator" style="width: 100%; margin-top: 10px;">
-                    Save Operator
-                </button>
-            </div>
-
-            <!-- Operators List Card -->
-            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
-                <h3 style="font-size: 1rem; color: var(--text-primary);">Registered Operators</h3>
-                <div class="machine-grid" id="operator-list" style="max-height: 400px; overflow-y: auto;">
-                    <!-- Operator rows rendered here -->
-                </div>
-            </div>
-        </section>
-    </div>
 
     <!-- Tooltip -->
     <div class="tooltip" id="tooltip"></div>

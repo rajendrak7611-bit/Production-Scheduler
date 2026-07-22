@@ -24,6 +24,9 @@ const state = {
     formOperations: [],
     productionLogs: [],
     operators: [],
+    productionLines: [],
+    users: [],
+    currentMasterSubTab: 'machines',
 };
 
 // ==================== COLOR PALETTE ====================
@@ -57,7 +60,7 @@ function openMachineForm(id = null) {
 
 function closeMachineForm() {
     state.editingMachineId = null;
-    switchView('machines');
+    switchView('masters');
 }
 
 function saveMachineForm() {
@@ -329,6 +332,8 @@ function saveData() {
             opsPerPart: state.opsPerPart,
             productionLogs: state.productionLogs,
             operators: state.operators,
+            productionLines: state.productionLines,
+            users: state.users,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) { /* localStorage might not be available */ }
@@ -352,7 +357,9 @@ function loadData() {
         state.opsPerPart = data.opsPerPart || 5;
         state.productionLogs = data.productionLogs || [];
         state.operators = data.operators || [];
-        return state.machines.length > 0 || state.parts.length > 0 || state.partDatabase.length > 0 || state.productionLogs.length > 0 || state.operators.length > 0;
+        state.productionLines = data.productionLines || [];
+        state.users = data.users || [];
+        return state.machines.length > 0 || state.parts.length > 0 || state.partDatabase.length > 0 || state.productionLogs.length > 0 || state.operators.length > 0 || state.productionLines.length > 0 || state.users.length > 0;
     } catch (e) { return false; }
 }
 
@@ -362,6 +369,8 @@ function clearAllData() {
     state.partDatabase = [];
     state.productionLogs = [];
     state.operators = [];
+    state.productionLines = [];
+    state.users = [];
     state.schedule = null;
     state.isScheduled = false;
     state.selectedPart = null;
@@ -371,6 +380,8 @@ function clearAllData() {
     renderPartsList();
     renderProductionLogs();
     renderOperatorList();
+    renderProductionLines();
+    renderUsers();
     updateCounts();
     showNotification('All data cleared', 'info');
 }
@@ -435,12 +446,34 @@ function generateSampleData() {
         });
     }
 
+    // Default Operators
+    state.operators = [
+        { id: 1, name: 'Alice Smith', present: true, availableHours: 8 },
+        { id: 2, name: 'Bob Jones', present: true, availableHours: 8 },
+        { id: 3, name: 'Charlie Brown', present: true, availableHours: 6 },
+    ];
+
+    // Default Production Lines
+    state.productionLines = [
+        { id: 1, name: 'Assembly Line A', code: 'L-A', description: 'Main mechanical assembly line' },
+        { id: 2, name: 'Packaging Line B', code: 'L-B', description: 'Final product packaging line' },
+    ];
+
+    // Default Users
+    state.users = [
+        { id: 1, username: 'admin', fullName: 'System Administrator', role: 'Admin' },
+        { id: 2, username: 'john_planner', fullName: 'John Doe', role: 'Planner' },
+    ];
+
     saveData();
     document.getElementById('ops-per-part').value = state.opsPerPart;
     renderMachineGrid();
     renderPartsList();
+    renderOperatorList();
+    renderProductionLines();
+    renderUsers();
     updateCounts();
-    showNotification('✨ Sample data loaded: 20 machines, 50 parts, 5 ops each', 'success');
+    showNotification('✨ Sample data loaded: 20 machines, 50 parts, 3 operators, 2 lines, 2 users', 'success');
 }
 
 // ==================== SCHEDULING ALGORITHMS ====================
@@ -1242,6 +1275,176 @@ function populateOperatorDropdown() {
     });
 }
 
+function switchMasterSubView(subTab) {
+    state.currentMasterSubTab = subTab;
+    document.querySelectorAll('.subpanel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--text-muted)';
+    });
+
+    const activePanel = document.getElementById(`subpanel-${subTab}`);
+    if (activePanel) activePanel.style.display = 'block';
+
+    const activeBtn = document.querySelector(`.sub-tab-btn[data-subtab="${subTab}"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.style.background = 'var(--bg-card)';
+        activeBtn.style.color = 'var(--text-primary)';
+    }
+}
+
+function renderProductionLines() {
+    const list = document.getElementById('line-list');
+    if (!list) return;
+
+    if (state.productionLines.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1; padding:30px; text-align: center;">
+                <span style="font-size:0.82rem;color:var(--text-dimmed)">No production lines configured. Add a production line.</span>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = state.productionLines.map((line, idx) => `
+        <div class="machine-card" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; min-width: 220px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="machine-num">#${idx + 1}</span>
+                    <span style="font-weight:600; color:var(--text-primary);">${escapeHtml(line.name)}</span>
+                </div>
+                <button class="btn-icon delete-line-btn" data-id="${line.id}" title="Remove Production Line" style="color:var(--color-error); padding: 2px;">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; border-top: 1px dashed var(--border-subtle); padding-top: 8px;">
+                <div>Code: <strong style="color: var(--text-primary); font-family: monospace;">${escapeHtml(line.code || '—')}</strong></div>
+                <div>${escapeHtml(line.description || 'No description provided.')}</div>
+            </div>
+        </div>
+    `).join('');
+
+    // Bind delete events
+    list.querySelectorAll('.delete-line-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = parseInt(btn.dataset.id);
+            const line = state.productionLines.find(l => l.id === id);
+            if (line && confirm(`Remove production line "${line.name}"?`)) {
+                state.productionLines = state.productionLines.filter(l => l.id !== id);
+                saveData();
+                renderProductionLines();
+                showNotification('Production line removed', 'info');
+            }
+        });
+    });
+}
+
+function saveProductionLine() {
+    const nameInput = document.getElementById('line-form-name');
+    const codeInput = document.getElementById('line-form-code');
+    const descInput = document.getElementById('line-form-desc');
+
+    const name = nameInput.value.trim();
+    const code = codeInput.value.trim();
+    const description = descInput.value.trim();
+
+    if (!name) {
+        showNotification('⚠️ Please enter a Production Line Name', 'error');
+        return;
+    }
+
+    if (state.productionLines.some(l => l.name.toLowerCase() === name.toLowerCase())) {
+        showNotification('⚠️ A production line with this name already exists', 'error');
+        return;
+    }
+
+    const id = state.productionLines.length > 0 ? Math.max(...state.productionLines.map(l => l.id)) + 1 : 1;
+    state.productionLines.push({ id, name, code, description });
+    saveData();
+
+    nameInput.value = '';
+    codeInput.value = '';
+    descInput.value = '';
+    renderProductionLines();
+    showNotification('✅ Production line added successfully', 'success');
+}
+
+function renderUsers() {
+    const tbody = document.getElementById('user-tbody');
+    if (!tbody) return;
+
+    if (state.users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">No system users configured yet.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = state.users.map((user, idx) => `
+        <tr>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${escapeHtml(user.username)}</td>
+            <td><strong>${escapeHtml(user.fullName)}</strong></td>
+            <td><span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(user.role)}</span></td>
+            <td style="text-align: center;">
+                <button class="btn-icon delete-user-btn" data-id="${user.id}" title="Delete User" style="color: var(--color-error); padding: 2px;">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    // Bind delete events
+    tbody.querySelectorAll('.delete-user-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = parseInt(btn.dataset.id);
+            const user = state.users.find(u => u.id === id);
+            if (user && confirm(`Remove system user "${user.username}"?`)) {
+                state.users = state.users.filter(u => u.id !== id);
+                saveData();
+                renderUsers();
+                showNotification('User removed', 'info');
+            }
+        });
+    });
+}
+
+function saveUser() {
+    const usernameInput = document.getElementById('user-form-username');
+    const fullnameInput = document.getElementById('user-form-fullname');
+    const roleSelect = document.getElementById('user-form-role');
+
+    const username = usernameInput.value.trim();
+    const fullName = fullnameInput.value.trim();
+    const role = roleSelect.value;
+
+    if (!username) {
+        showNotification('⚠️ Please enter a Username', 'error');
+        return;
+    }
+    if (!fullName) {
+        showNotification('⚠️ Please enter Full Name', 'error');
+        return;
+    }
+
+    if (state.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+        showNotification('⚠️ A user with this username already exists', 'error');
+        return;
+    }
+
+    const id = state.users.length > 0 ? Math.max(...state.users.map(u => u.id)) + 1 : 1;
+    state.users.push({ id, username, fullName, role });
+    saveData();
+
+    usernameInput.value = '';
+    fullnameInput.value = '';
+    renderUsers();
+    showNotification('✅ System user added successfully', 'success');
+}
+
 // ==================== PRODUCTION LOGS ====================
 
 function populateLogPartOpDropdown() {
@@ -1464,16 +1667,18 @@ function switchView(viewName) {
     document.querySelector(`.tab-btn[data-view="${viewName}"]`).classList.add('active');
 
     const subtitle = document.getElementById('header-subtitle');
-    if (viewName === 'machines') {
-        subtitle.textContent = 'Step 1 — Define your machines';
+    if (viewName === 'masters') {
+        subtitle.textContent = 'Master Setup — Configure system settings';
+        renderMachineGrid();
+        renderOperatorList();
+        renderProductionLines();
+        renderUsers();
+        switchMasterSubView(state.currentMasterSubTab);
     } else if (viewName === 'parts') {
         subtitle.textContent = 'Step 2 — Define parts & operations';
     } else if (viewName === 'database') {
         subtitle.textContent = 'Master Data — Manage Part Templates';
         renderDatabaseList();
-    } else if (viewName === 'operators') {
-        subtitle.textContent = 'Operators — Manage operator database';
-        renderOperatorList();
     } else if (viewName === 'production-log') {
         subtitle.textContent = 'Production Log — Track actual production work';
         // Set default date to today
@@ -1586,6 +1791,8 @@ function exportData() {
         })),
         productionLogs: state.productionLogs,
         operators: state.operators,
+        productionLines: state.productionLines,
+        users: state.users,
     };
 
     const json = JSON.stringify(exportObj, null, 2);
@@ -1634,6 +1841,8 @@ function importData(file) {
             state.partDatabase = data.partDatabase || [];
             state.productionLogs = data.productionLogs || [];
             state.operators = data.operators || [];
+            state.productionLines = data.productionLines || [];
+            state.users = data.users || [];
             state.schedule = null;
             state.isScheduled = false;
             state.selectedPart = null;
@@ -1645,11 +1854,13 @@ function importData(file) {
             renderPartsList();
             renderProductionLogs();
             renderOperatorList();
+            renderProductionLines();
+            renderUsers();
             populateOperatorDropdown();
             populateLogPartOpDropdown();
             updateCounts();
 
-            showNotification(`📂 Loaded ${state.machines.length} machines, ${state.parts.length} parts, ${state.productionLogs.length} logs, and ${state.operators.length} operators`, 'success');
+            showNotification(`📂 Loaded ${state.machines.length} machines, ${state.parts.length} parts, ${state.productionLogs.length} logs, ${state.operators.length} operators, ${state.productionLines.length} lines, and ${state.users.length} users`, 'success');
         } catch (err) {
             showNotification(`⚠️ Failed to read file: ${err.message}`, 'error');
         }
@@ -1833,7 +2044,7 @@ function exportScheduleCSV() {
 function runScheduleAction() {
     if (state.machines.length === 0) {
         showNotification('⚠️ Add at least one machine first', 'error');
-        switchView('machines');
+        switchView('masters');
         return;
     }
     if (state.parts.length === 0) {
@@ -1872,6 +2083,8 @@ function init() {
         renderPartsList();
         renderProductionLogs();
         renderOperatorList();
+        renderProductionLines();
+        renderUsers();
         updateCounts();
     }
 
@@ -1880,9 +2093,14 @@ function init() {
         tab.addEventListener('click', () => switchView(tab.dataset.view));
     });
 
+    // Sub-tab switching inside Master Setup
+    document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchMasterSubView(btn.dataset.subtab));
+    });
+
     // Navigation buttons between views
     document.getElementById('btn-goto-parts').addEventListener('click', () => switchView('parts'));
-    document.getElementById('btn-goto-machines').addEventListener('click', () => switchView('machines'));
+    document.getElementById('btn-goto-machines').addEventListener('click', () => switchView('masters'));
     document.getElementById('btn-goto-schedule').addEventListener('click', runScheduleAction);
 
     // Add machine
@@ -1960,6 +2178,12 @@ function init() {
 
     // Save Operator
     document.getElementById('btn-save-operator').addEventListener('click', saveOperator);
+
+    // Save Production Line
+    document.getElementById('btn-save-line').addEventListener('click', saveProductionLine);
+
+    // Save User
+    document.getElementById('btn-save-user').addEventListener('click', saveUser);
 
     // Export Logs to CSV
     document.getElementById('btn-export-log-csv').addEventListener('click', exportLogsCSV);
