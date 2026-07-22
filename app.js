@@ -1664,7 +1664,8 @@ function switchView(viewName) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
     document.getElementById(`view-${viewName}`).classList.add('active');
-    document.querySelector(`.tab-btn[data-view="${viewName}"]`).classList.add('active');
+    const activeTab = document.querySelector(`.tab-btn[data-view="${viewName}"]`);
+    if (activeTab) activeTab.classList.add('active');
 
     const subtitle = document.getElementById('header-subtitle');
     if (viewName === 'masters') {
