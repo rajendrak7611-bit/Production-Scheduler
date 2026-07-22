@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production Scheduler — 20 Machines × 50 Parts</title>
+    <meta name="description" content="Interactive production scheduling with manual data entry for machines, parts, and operations with cycle time and setup time.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- SheetJS for Excel Import -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Ambient Background -->
+    <div class="ambient-bg"></div>
+
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <rect x="2" y="6" width="8" height="4" rx="1.5" fill="#818cf8"/>
+                        <rect x="12" y="6" width="14" height="4" rx="1.5" fill="#6366f1" opacity="0.6"/>
+                        <rect x="2" y="12" width="14" height="4" rx="1.5" fill="#a78bfa"/>
+                        <rect x="18" y="12" width="8" height="4" rx="1.5" fill="#8b5cf6" opacity="0.6"/>
+                        <rect x="2" y="18" width="10" height="4" rx="1.5" fill="#c4b5fd"/>
+                        <rect x="14" y="18" width="12" height="4" rx="1.5" fill="#7c3aed" opacity="0.6"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>Production Scheduler</h1>
+                    <span class="logo-subtitle" id="header-subtitle">Setup · Enter your data</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-center">
+            <nav class="view-tabs">
+                <button class="tab-btn active" data-view="machines" id="tab-machines">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="4" width="11" height="7" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4 1.5v2.5M11 1.5v2.5M5 7.5h5M5 9.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    Machines
+                </button>
+                <button class="tab-btn" data-view="parts" id="tab-parts">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M5 5.5h5M5 7.5h5M5 9.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    Parts
+                </button>
+                <button class="tab-btn" data-view="database" id="tab-database">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4.5h6M4.5 7.5h6M4.5 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    Database
+                </button>
+                <button class="tab-btn" data-view="operators" id="tab-operators">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M2.5 12.5a5 5 0 0 1 10 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    Operators
+                </button>
+                <button class="tab-btn" data-view="schedule" id="tab-schedule">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="3" width="5" height="2.5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="4" y="7" width="7" height="2.5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="11" width="9" height="2.5" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+                    Schedule
+                </button>
+                <button class="tab-btn" data-view="production-log" id="tab-production-log">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4.5h6M4.5 7.5h6M4.5 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    Production Log
+                </button>
+            </nav>
+        </div>
+        <div class="header-right">
+            <button id="btn-sample" class="btn btn-ghost" title="Fill with sample data">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2v4h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.4 9.5a5.5 5.5 0 1 0 1.2-5.4L2 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Sample Data
+            </button>
+            <button id="btn-export" class="btn btn-ghost" title="Save data to file">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 10v2.5h10V10M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Save File
+            </button>
+            <button id="btn-import" class="btn btn-ghost" title="Load data from file">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 10v2.5h10V10M7.5 10V2M4.5 5l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Load File
+            </button>
+            <input type="file" id="file-import" accept=".json" style="display:none">
+            <button id="btn-schedule" class="btn btn-primary">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3.5 7.5L6.5 10.5L11.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Run Schedule
+            </button>
+        </div>
+    </header>
+
+    <!-- ===================== MACHINES VIEW ===================== -->
+    <div id="view-machines" class="view active">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M6 2v3M18 2v3M7 11h4M7 14h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="17" cy="12.5" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                    Machine Setup
+                </h2>
+                <p class="view-desc">Define your machines. Each machine will be available for operation assignment in the Parts screen.</p>
+            </div>
+            <div class="view-hero-actions">
+                <span class="badge badge-lg" id="machine-count">0 machines</span>
+                <button class="btn btn-primary" id="btn-add-machine">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    Add Machine
+                </button>
+                <button class="btn btn-ghost" id="btn-clear-machines">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Clear All
+                </button>
+            </div>
+        </div>
+        <section class="view-body">
+            <div class="machine-list-simplified" id="machine-list">
+                <!-- Machine list rows rendered here -->
+            </div>
+        </section>
+        <div class="view-footer">
+            <button class="btn btn-primary btn-lg" id="btn-goto-parts">
+                Next: Define Parts
+                <svg width="14" height="14" viewBox="0 0 14 14"><path d="M5 3l5 4-5 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===================== MACHINE FORM VIEW ===================== -->
+    <div id="view-machine-form" class="view">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title" id="machine-form-title">Add Machine</h2>
+                <p class="view-desc">Enter the details for this machine.</p>
+            </div>
+        </div>
+        <section class="view-body" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+            <div style="background: var(--bg-card); padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+                <div class="control-group" style="margin-bottom: 24px;">
+                    <label for="machine-form-name">Machine Name</label>
+                    <input type="text" id="machine-form-name" class="input" placeholder="e.g. CNC Lathe">
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button class="btn btn-ghost" id="btn-cancel-machine">Cancel</button>
+                    <button class="btn btn-primary" id="btn-save-machine">Save Machine</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== PARTS VIEW ===================== -->
+    <div id="view-parts" class="view">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M7 8h10M7 12h10M7 16h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Parts &amp; Operations
+                </h2>
+                <p class="view-desc">Add parts and define each operation — assign a machine, cycle time, and setup time.</p>
+            </div>
+            <div class="view-hero-actions">
+                <span class="badge badge-lg" id="part-count">0 parts</span>
+
+                <button class="btn btn-outline" id="btn-add-db-part" style="margin-right: 8px;">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    Add from Database
+                </button>
+                <button class="btn btn-primary" id="btn-add-part">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    Add Part
+                </button>
+                <button class="btn btn-ghost" id="btn-clear-parts">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Clear All
+                </button>
+            </div>
+        </div>
+        <section class="view-body">
+            <div class="parts-list-simplified" id="parts-list">
+                <!-- Simplified part summary rows rendered here -->
+            </div>
+        </section>
+        <div class="view-footer">
+            <button class="btn btn-ghost btn-lg" id="btn-goto-machines">
+                <svg width="14" height="14" viewBox="0 0 14 14"><path d="M9 3l-5 4 5 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Back: Machines
+            </button>
+            <button class="btn btn-primary btn-lg" id="btn-goto-schedule">
+                Run Schedule
+                <svg width="14" height="14" viewBox="0 0 14 14"><path d="M5 3l5 4-5 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===================== DATABASE VIEW ===================== -->
+    <div id="view-database" class="view">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M7 8h10M7 12h10M7 16h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Part Database
+                </h2>
+                <p class="view-desc">Define standard parts and operations. These master templates can be easily added to any schedule.</p>
+            </div>
+            <div class="view-hero-actions">
+                <span class="badge badge-lg" id="db-part-count">0 master parts</span>
+                
+                <input type="file" id="excel-upload" accept=".xlsx, .xls, .csv" style="display: none;">
+                <button class="btn btn-outline" id="btn-import-excel" style="margin-right: 8px;">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M4.5 4.5L7 2l2.5 2.5M3 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Import from Excel
+                </button>
+                <button class="btn btn-primary" id="btn-create-db-part">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    Create Master Part
+                </button>
+            </div>
+        </div>
+        <section class="view-body">
+            <div class="parts-list-simplified" id="database-parts-list">
+                <!-- Database part rows rendered here -->
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== PART FORM VIEW ===================== -->
+    <div id="view-part-form" class="view">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title" id="part-form-title">Add Part</h2>
+                <p class="view-desc">Define the part details and its operations routing.</p>
+            </div>
+        </div>
+        <section class="view-body" style="max-width: 900px; margin: 0 auto; padding: 30px 20px;">
+            <div style="background: var(--bg-card); padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+                <div style="display: flex; gap: 20px; margin-bottom: 24px;">
+                    <div class="control-group" style="flex: 1;">
+                        <label for="part-form-name">Part Name</label>
+                        <input type="text" id="part-form-name" class="input" placeholder="e.g. Engine Block">
+                    </div>
+                    <div class="control-group" style="width: 120px;">
+                        <label for="part-form-qty">Quantity</label>
+                        <input type="number" id="part-form-qty" class="input" min="1" value="1">
+                    </div>
+                    <div class="control-group" style="width: 100px;">
+                        <label for="part-form-priority">Priority</label>
+                        <input type="number" id="part-form-priority" class="input" min="1" max="10" value="5" title="1 is Highest, 10 is Lowest">
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 16px; font-size: 1rem; color: var(--text-primary);">Operations</h3>
+                <div class="part-ops">
+                    <table class="ops-table">
+                        <thead>
+                            <tr>
+                                <th style="width:50px">Op</th>
+                                <th style="width:80px">Priority</th>
+                                <th style="min-width:120px">Operation Name</th>
+                                <th>Machine</th>
+                                <th style="width:110px">Cycle Time</th>
+                                <th style="width:110px">Setup Time</th>
+                                <th style="width:60px">Total</th>
+                                <th style="width:30px"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="part-form-ops-tbody">
+                            <!-- Operations rendered here -->
+                        </tbody>
+                        <tfoot>
+                            <tr class="ops-total-row">
+                                <td colspan="4" style="text-align:right">Totals:</td>
+                                <td id="part-form-total-cycle">0m</td>
+                                <td id="part-form-total-setup">0m</td>
+                                <td id="part-form-total-time">0m</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div style="margin-top: 12px;">
+                        <button class="btn btn-sm btn-ghost" id="btn-add-form-op" style="color:var(--accent-primary)">
+                            <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            Add Operation
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-subtle);">
+                    <button class="btn btn-ghost" id="btn-cancel-part">Cancel</button>
+                    <button class="btn btn-primary" id="btn-save-part">Save Part</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== SCHEDULE VIEW ===================== -->
+    <div id="view-schedule" class="view">
+        <!-- Algorithm Controls -->
+        <div class="schedule-controls">
+            <div class="control-group">
+                <label for="algorithm-select">Algorithm</label>
+                <div class="select-wrapper">
+                    <select id="algorithm-select">
+                        <option value="balanced">Load Balanced (Dynamic)</option>
+                        <option value="spt">Shortest Processing Time</option>
+                        <option value="lpt">Longest Processing Time</option>
+                        <option value="fifo">First Come First Served</option>
+                        <option value="critical">Critical Path First</option>
+                    </select>
+                    <svg class="select-chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="schedule-start">Start Date & Time</label>
+                <input type="datetime-local" id="schedule-start" class="input">
+            </div>
+            <div class="control-group" style="margin-left: auto;">
+                <label>&nbsp;</label>
+                <button class="btn btn-outline" id="btn-export-csv" style="height: 38px;">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-right: 6px;"><path d="M7 2V9M7 9L4.5 6.5M7 9L9.5 6.5M3 11.5H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Export to Excel
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard KPIs -->
+        <section class="dashboard" id="dashboard">
+            <div class="kpi-card">
+                <div class="kpi-icon-wrapper makespan">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M11 6V11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kpi-info"><span class="kpi-label">Makespan</span><span class="kpi-value" id="kpi-makespan">—</span></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon-wrapper utilization">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="12" width="3" height="7" rx="1" fill="currentColor" opacity="0.4"/><rect x="8" y="8" width="3" height="11" rx="1" fill="currentColor" opacity="0.6"/><rect x="13" y="5" width="3" height="14" rx="1" fill="currentColor" opacity="0.8"/><rect x="18" y="3" width="3" height="16" rx="1" fill="currentColor"/></svg>
+                </div>
+                <div class="kpi-info"><span class="kpi-label">Avg Utilization</span><span class="kpi-value" id="kpi-utilization">—</span></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon-wrapper operations">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M11 2V5M11 17V20M2 11H5M17 11H20M4.9 4.9L7 7M15 15L17.1 17.1M17.1 4.9L15 7M7 15L4.9 17.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <div class="kpi-info"><span class="kpi-label">Scheduled Ops</span><span class="kpi-value" id="kpi-operations">—</span></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon-wrapper idle">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M18 11A7 7 0 1 1 11 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M18 4V8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kpi-info"><span class="kpi-label">Total Idle Time</span><span class="kpi-value" id="kpi-idle">—</span></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon-wrapper components">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
+                </div>
+                <div class="kpi-info"><span class="kpi-label">Parts</span><span class="kpi-value" id="kpi-parts">—</span></div>
+            </div>
+        </section>
+
+        <!-- Gantt Chart -->
+        <section class="gantt-section">
+            <div class="section-header">
+                <h2>
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="3" width="6" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="5" y="8" width="8" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="3" y="13" width="10" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+                    Production Timeline
+                </h2>
+                <div class="gantt-controls">
+                    <div class="search-wrapper">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                        <input type="text" id="component-search" placeholder="Search part…">
+                    </div>
+                    <div class="zoom-controls">
+                        <button id="btn-zoom-out" class="btn-icon" title="Zoom out">
+                            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                        <span class="zoom-level" id="zoom-label">100%</span>
+                        <button id="btn-zoom-in" class="btn-icon" title="Zoom in">
+                            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                        <button id="btn-zoom-fit" class="btn-icon btn-fit" title="Fit to view">
+                            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 5V2C1 1.4 1.4 1 2 1H5M9 1H12C12.6 1 13 1.4 13 2V5M13 9V12C13 12.6 12.6 13 12 13H9M5 13H2C1.4 13 1 12.6 1 12V9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="gantt-container" id="gantt-container">
+                <div class="gantt-corner"></div>
+                <div class="gantt-timeline-wrapper">
+                    <div class="gantt-timeline" id="gantt-timeline"></div>
+                </div>
+                <div class="gantt-labels" id="gantt-labels"></div>
+                <div class="gantt-viewport" id="gantt-viewport">
+                    <div class="gantt-canvas" id="gantt-canvas"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Panels -->
+        <section class="bottom-panels">
+            <div class="panel component-panel">
+                <div class="section-header">
+                    <h2>
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.3"/><path d="M6 6h6M6 9h6M6 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                        Part Details
+                    </h2>
+                </div>
+                <div class="component-table-wrapper">
+                    <table id="component-table">
+                        <thead>
+                            <tr>
+                                <th>Part</th>
+                                <th>Setup</th>
+                                <th>Cycle</th>
+                                <th>Total</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Ops</th>
+                            </tr>
+                        </thead>
+                        <tbody id="component-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="panel machine-panel">
+                <div class="section-header">
+                    <h2>
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="10" width="2.5" height="6" rx="1" fill="currentColor" opacity="0.3"/><rect x="6" y="7" width="2.5" height="9" rx="1" fill="currentColor" opacity="0.5"/><rect x="10" y="4" width="2.5" height="12" rx="1" fill="currentColor" opacity="0.7"/><rect x="14" y="2" width="2.5" height="14" rx="1" fill="currentColor"/></svg>
+                        Machine Utilization
+                    </h2>
+                </div>
+                <div class="machine-bars-wrapper">
+                    <div class="machine-bars" id="machine-bars"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== PRODUCTION LOG VIEW ===================== -->
+    <div id="view-production-log" class="view">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Production Log
+                </h2>
+                <p class="view-desc">Record actual production progress, operators, shifts, and hours spent on scheduled parts.</p>
+            </div>
+            <div class="view-hero-actions">
+                <button class="btn btn-outline" id="btn-export-log-csv">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2V9M7 9L4.5 6.5M7 9L9.5 6.5M3 11.5H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Export Logs
+                </button>
+            </div>
+        </div>
+        <section class="view-body" style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; padding: 20px 24px;">
+            <!-- Form Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
+                <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px;">Log Production Work</h3>
+                
+                <div class="control-group">
+                    <label for="log-part-op">Scheduled Part & Op</label>
+                    <div class="select-wrapper">
+                        <select id="log-part-op">
+                            <option value="">— Select Op —</option>
+                        </select>
+                        <svg class="select-chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="log-date">Production Date</label>
+                    <input type="date" id="log-date" class="input">
+                </div>
+
+                <div class="control-group">
+                    <label for="log-operator">Operator</label>
+                    <div class="select-wrapper">
+                        <select id="log-operator">
+                            <option value="">— Select Operator —</option>
+                        </select>
+                        <svg class="select-chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="log-shift">Shift</label>
+                    <div class="select-wrapper">
+                        <select id="log-shift">
+                            <option value="Shift 1">Shift 1 (Morning)</option>
+                            <option value="Shift 2">Shift 2 (Afternoon)</option>
+                            <option value="Shift 3">Shift 3 (Night)</option>
+                        </select>
+                        <svg class="select-chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px;">
+                    <div class="control-group" style="flex: 1;">
+                        <label for="log-hours">Actual Hours</label>
+                        <input type="number" id="log-hours" class="input" min="0.1" step="0.1" placeholder="e.g. 4.5">
+                    </div>
+                    <div class="control-group" style="flex: 1;">
+                        <label for="log-qty">Qty Completed</label>
+                        <input type="number" id="log-qty" class="input" min="1" step="1" placeholder="e.g. 10">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="btn-save-log" style="width: 100%; margin-top: 10px;">
+                    Add Log Entry
+                </button>
+            </div>
+
+            <!-- Logs List Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                <h3 style="font-size: 1rem; color: var(--text-primary);">Logged Production Entries</h3>
+                <div class="component-table-wrapper" style="margin: 0; max-height: 500px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Part (Op)</th>
+                                <th>Machine</th>
+                                <th>Operator</th>
+                                <th>Shift</th>
+                                <th>Hours</th>
+                                <th>Qty</th>
+                                <th style="width: 50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-tbody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">No production logs recorded yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== OPERATORS VIEW ===================== -->
+    <div id="view-operators" class="view">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Operator Setup
+                </h2>
+                <p class="view-desc">Configure the master list of operators available for production logging.</p>
+            </div>
+            <div class="view-hero-actions">
+                <span class="badge badge-lg" id="operator-count">0 operators</span>
+            </div>
+        </div>
+        <section class="view-body" style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; padding: 20px 24px;">
+            <!-- Form Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
+                <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px;">Add New Operator</h3>
+                
+                <div class="control-group">
+                    <label for="operator-form-name">Operator Name</label>
+                    <input type="text" id="operator-form-name" class="input" placeholder="e.g. Alice Smith">
+                </div>
+
+                <button class="btn btn-primary" id="btn-save-operator" style="width: 100%; margin-top: 10px;">
+                    Save Operator
+                </button>
+            </div>
+
+            <!-- Operators List Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                <h3 style="font-size: 1rem; color: var(--text-primary);">Registered Operators</h3>
+                <div class="machine-grid" id="operator-list" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Operator rows rendered here -->
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Tooltip -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <!-- Add from Database Modal -->
+    <div id="db-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 16px; font-size: 1.1rem;">Select Part from Database</h3>
+            <div id="db-modal-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px;"></div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn btn-ghost" id="btn-close-db-modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notification-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
