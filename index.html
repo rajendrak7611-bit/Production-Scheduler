@@ -926,7 +926,7 @@
 
     <!-- Tool Spec Modal -->
     <div id="tool-spec-modal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 850px; width: 90%;">
+        <div class="modal-content" style="max-width: 1050px; width: 95%;">
             <h3 style="margin-bottom: 12px; font-size: 1.1rem; font-weight: 600;" id="tool-spec-modal-title">Configure Tool Specifications</h3>
             <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">Define up to 10 tooling requirements for this routing operation.</p>
             <div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
@@ -934,11 +934,13 @@
                     <thead>
                         <tr style="background: var(--bg-surface);">
                             <th style="width: 50px; text-align: center;">Sl.No.</th>
-                            <th style="width: 150px; text-align: left;">Sub Opn</th>
+                            <th style="width: 120px; text-align: left;">Sub Opn</th>
                             <th style="text-align: left;">Tool</th>
-                            <th style="width: 180px;">Holder spec</th>
-                            <th style="width: 110px;">Length</th>
-                            <th style="width: 180px;">Insert spec</th>
+                            <th style="width: 130px;">Holder spec</th>
+                            <th style="width: 90px;">Length</th>
+                            <th style="width: 130px;">Insert spec</th>
+                            <th style="width: 90px;">RPM</th>
+                            <th style="width: 90px;">Feed</th>
                         </tr>
                     </thead>
                     <tbody id="tool-spec-modal-tbody">
@@ -968,6 +970,6 @@
     <div class="notification-container" id="notification-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
-    <script src="app_v7.js?v=3"></script>
+    <script src="app_v7.js?v=4"></script>
 </body>
 </html>

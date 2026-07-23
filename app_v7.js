@@ -149,7 +149,9 @@ function isToolSpecItemConfigured(item) {
            (item.tool && item.tool.trim() !== '') ||
            (item.holder && item.holder.trim() !== '') ||
            (item.length && item.length.trim() !== '') ||
-           (item.insert && item.insert.trim() !== '');
+           (item.insert && item.insert.trim() !== '') ||
+           (item.rpm && item.rpm.trim() !== '') ||
+           (item.feed && item.feed.trim() !== '');
 }
 
 // ==================== CHECKLIST SPEC MODAL ====================
@@ -237,7 +239,7 @@ function openToolSpecModal(opIdx) {
 
     const list = [];
     for (let i = 0; i < 10; i++) {
-        const item = op.toolSpec[i] || { subOpn: '', tool: '', holder: '', length: '', insert: '' };
+        const item = op.toolSpec[i] || { subOpn: '', tool: '', holder: '', length: '', insert: '', rpm: '', feed: '' };
         list.push(item);
     }
     op.toolSpec = list;
@@ -247,19 +249,25 @@ function openToolSpecModal(opIdx) {
         <tr>
             <td style="text-align: center; font-weight: 600; color: var(--text-muted);">${idx + 1}</td>
             <td>
-                <input type="text" class="input tool-subOpn-input" value="${escapeHtml(item.subOpn || '')}" placeholder="e.g. Boring" style="font-size: 0.8rem; height: 32px;">
+                <input type="text" class="input tool-subOpn-input" value="${escapeHtml(item.subOpn || '')}" style="font-size: 0.8rem; height: 32px;">
             </td>
             <td>
-                <input type="text" class="input tool-name-input" value="${escapeHtml(item.tool || '')}" placeholder="e.g. Roughing Boring Bar" style="font-size: 0.8rem; height: 32px;">
+                <input type="text" class="input tool-name-input" value="${escapeHtml(item.tool || '')}" style="font-size: 0.8rem; height: 32px;">
             </td>
             <td>
-                <input type="text" class="input tool-holder-input" value="${escapeHtml(item.holder || '')}" placeholder="e.g. BT50-FMA25.4-45" style="font-size: 0.8rem; height: 32px; text-align: center;">
+                <input type="text" class="input tool-holder-input" value="${escapeHtml(item.holder || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
             </td>
             <td>
-                <input type="text" class="input tool-length-input" value="${escapeHtml(item.length || '')}" placeholder="e.g. 150 mm" style="font-size: 0.8rem; height: 32px; text-align: center;">
+                <input type="text" class="input tool-length-input" value="${escapeHtml(item.length || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
             </td>
             <td>
-                <input type="text" class="input tool-insert-input" value="${escapeHtml(item.insert || '')}" placeholder="e.g. WNMG 080408" style="font-size: 0.8rem; height: 32px; text-align: center;">
+                <input type="text" class="input tool-insert-input" value="${escapeHtml(item.insert || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
+            </td>
+            <td>
+                <input type="text" class="input tool-rpm-input" value="${escapeHtml(item.rpm || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
+            </td>
+            <td>
+                <input type="text" class="input tool-feed-input" value="${escapeHtml(item.feed || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
             </td>
         </tr>
     `).join('');
@@ -286,7 +294,9 @@ function saveToolSpecModal() {
         const holder = tr.querySelector('.tool-holder-input').value.trim();
         const length = tr.querySelector('.tool-length-input').value.trim();
         const insert = tr.querySelector('.tool-insert-input').value.trim();
-        list.push({ subOpn, tool, holder, length, insert });
+        const rpm = tr.querySelector('.tool-rpm-input').value.trim();
+        const feed = tr.querySelector('.tool-feed-input').value.trim();
+        list.push({ subOpn, tool, holder, length, insert, rpm, feed });
     });
 
     op.toolSpec = list;
