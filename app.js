@@ -193,6 +193,7 @@ function savePartForm() {
         renderDatabaseList();
     } else {
         renderPartsList();
+        renderCompletionSummary();
         updateCounts();
     }
 }
@@ -339,6 +340,7 @@ function removePart(id) {
     state.parts.forEach((p, i) => { p.color = getPartColor(i); });
     saveData();
     renderPartsList();
+    renderCompletionSummary();
     updateCounts();
 }
 
@@ -1478,6 +1480,7 @@ function renderProductionLogs() {
                 <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">No production logs recorded yet.</td>
             </tr>
         `;
+        renderCompletionSummary();
         return;
     }
     
@@ -1533,6 +1536,66 @@ function renderProductionLogs() {
             showNotification('Log entry deleted and quantity restored', 'info');
         });
     });
+
+    renderCompletionSummary();
+}
+
+function renderCompletionSummary() {
+    const tbody = document.getElementById('completion-summary-tbody');
+    if (!tbody) return;
+
+    if (state.parts.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No parts added. Add parts first.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    let rowsHtml = '';
+    state.parts.forEach(part => {
+        part.operations.forEach((op, opIndex) => {
+            const completed = state.productionLogs
+                .filter(log => log.partId === part.id && log.opIndex === opIndex)
+                .reduce((sum, log) => sum + log.qty, 0);
+
+            const total = part.quantity || 1;
+            const remaining = Math.max(0, total - completed);
+            const pct = Math.min(100, Math.round((completed / total) * 100));
+
+            let barColor = 'var(--accent-primary)';
+            let statusText = 'In Progress';
+            if (completed >= total) {
+                barColor = 'var(--color-success)';
+                statusText = 'Completed';
+            } else if (completed === 0) {
+                barColor = 'var(--border-subtle)';
+                statusText = 'Not Started';
+            }
+
+            rowsHtml += `
+                <tr>
+                    <td><strong>${escapeHtml(part.name)}</strong></td>
+                    <td>Op ${opIndex + 1}: ${escapeHtml(op.opName || 'Unnamed')}</td>
+                    <td style="text-align: center; font-family: 'JetBrains Mono', monospace;">${total}</td>
+                    <td style="text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${completed > 0 ? 'var(--accent-primary)' : 'var(--text-muted)'}">${completed}</td>
+                    <td style="text-align: center; font-family: 'JetBrains Mono', monospace; color: ${remaining > 0 ? 'var(--text-primary)' : 'var(--text-muted)'}">${remaining}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="flex: 1; background: var(--bg-surface); height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border-subtle);">
+                                <div style="background: ${barColor}; width: ${pct}%; height: 100%;"></div>
+                            </div>
+                            <span style="font-size: 0.72rem; font-family: 'JetBrains Mono', monospace; min-width: 32px; text-align: right;">${pct}%</span>
+                            <span class="badge ${completed >= total ? 'badge-success' : (completed > 0 ? 'badge-outline' : 'badge-ghost')}" style="font-size: 0.65rem; padding: 2px 6px;">${statusText}</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+    });
+
+    tbody.innerHTML = rowsHtml;
 }
 
 function saveProductionLog() {

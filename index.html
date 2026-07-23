@@ -652,6 +652,30 @@
                 </div>
             </div>
         </section>
+
+        <!-- Operation-wise Completion Summary Section -->
+        <section style="padding: 0 24px 24px 24px;">
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600;">Operation-wise Part Completion Summary</h3>
+                <div style="overflow-x: auto;">
+                    <table class="table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Part Name</th>
+                                <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Operation</th>
+                                <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 150px;">Total Qty Required</th>
+                                <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 150px;">Qty Completed</th>
+                                <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 150px;">Qty Remaining</th>
+                                <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 220px;">Completion Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="completion-summary-tbody">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
     </div>
 
 
