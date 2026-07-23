@@ -2017,6 +2017,9 @@ function renderInspectionReports() {
                     <button class="btn-icon load-inspection-btn" data-id="${report.id}" title="Retrieve inspection details" style="color: var(--accent-primary); padding: 2px; margin-right: 6px;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     </button>
+                    <button class="btn-icon export-single-btn" data-id="${report.id}" title="Export this instance to Excel" style="color: var(--color-success); padding: 2px; margin-right: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    </button>
                     <button class="btn-icon delete-inspection-btn" data-index="${index}" title="Delete inspection report" style="color: var(--color-error); padding: 2px;">
                         <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
@@ -2041,6 +2044,13 @@ function renderInspectionReports() {
         btn.addEventListener('click', () => {
             const id = parseInt(btn.dataset.id);
             loadInspectionReport(id);
+        });
+    });
+
+    tbody.querySelectorAll('.export-single-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = parseInt(btn.dataset.id);
+            exportSingleReportCSV(id);
         });
     });
 }
@@ -2315,6 +2325,66 @@ function exportCurrentReportCSV() {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.setAttribute('download', `${part.name.replace(/[\/\\?%*:|"<>\s]/g, '_')}_Op${opIndex + 1}_InspectionReport.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportSingleReportCSV(reportId) {
+    const report = state.inspectionReports.find(r => r.id === reportId);
+    if (!report) return;
+
+    const part = state.parts.find(p => p.id === report.partId);
+    const partName = part ? part.name : 'Unknown Part';
+    const op = part ? part.operations[report.opIndex] : null;
+    const opName = op ? `Op ${report.opIndex + 1}: ${op.opName || 'Unnamed'}` : `Op ${report.opIndex + 1}`;
+
+    const checklist = (op && op.inspectionChecklist) ? op.inspectionChecklist.filter(isChecklistItemConfigured) : [];
+
+    let csv = `Inspection Report Details\r\n`;
+    csv += `Part Name,${partName}\r\n`;
+    csv += `Operation,${opName}\r\n`;
+    csv += `Date,${report.date}\r\n`;
+    csv += `Inspector,${report.inspector}\r\n`;
+    csv += `Qty Inspected,${report.qtyInspected}\r\n`;
+    csv += `Qty OK,${report.qtyOk}\r\n`;
+    csv += `Qty NG,${report.qtyNg}\r\n`;
+    csv += `Overall Status,${report.status}\r\n`;
+    csv += `Remarks,${report.remarks || 'None'}\r\n\r\n`;
+
+    csv += 'Parameter Sl.No,Parameter Desc,Nominal Dimen,Lo Tol,Hi Tol,Comp 1,Comp 2,Comp 3,Comp 4,Comp 5,Comp 6,Comp 7,Comp 8,Comp 9,Comp 10\r\n';
+
+    if (checklist.length === 0) {
+        csv += '—,No active specifications checklist configured for this operation.,—,—,—,,,,,,,,,,\r\n';
+    } else {
+        checklist.forEach((item, idx) => {
+            const measurements = (report.measurements && report.measurements[idx]) ? report.measurements[idx] : [];
+            const row = [
+                idx + 1,
+                `"${(item.desc || 'Parameter').replace(/"/g, '""')}"`,
+                item.dimen !== null && item.dimen !== undefined ? item.dimen : '—',
+                item.loTol !== null && item.loTol !== undefined ? item.loTol : '—',
+                item.hiTol !== null && item.hiTol !== undefined ? item.hiTol : '—',
+                measurements[0] !== null && measurements[0] !== undefined ? measurements[0] : '',
+                measurements[1] !== null && measurements[1] !== undefined ? measurements[1] : '',
+                measurements[2] !== null && measurements[2] !== undefined ? measurements[2] : '',
+                measurements[3] !== null && measurements[3] !== undefined ? measurements[3] : '',
+                measurements[4] !== null && measurements[4] !== undefined ? measurements[4] : '',
+                measurements[5] !== null && measurements[5] !== undefined ? measurements[5] : '',
+                measurements[6] !== null && measurements[6] !== undefined ? measurements[6] : '',
+                measurements[7] !== null && measurements[7] !== undefined ? measurements[7] : '',
+                measurements[8] !== null && measurements[8] !== undefined ? measurements[8] : '',
+                measurements[9] !== null && measurements[9] !== undefined ? measurements[9] : ''
+            ].join(',');
+            csv += row + '\r\n';
+        });
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const dateFormatted = report.date.replace(/[-]/g, '');
+    link.setAttribute('download', `${partName.replace(/[\/\\?%*:|"<>\s]/g, '_')}_Op${report.opIndex + 1}_Inspection_${dateFormatted}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
