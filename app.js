@@ -2252,6 +2252,74 @@ function exportInspectionsCSV() {
     document.body.removeChild(link);
 }
 
+function exportCurrentReportCSV() {
+    const partOpVal = document.getElementById('inspect-part-op').value;
+    if (!partOpVal) {
+        showNotification('⚠️ Please select an operation with a configured checklist first', 'error');
+        return;
+    }
+
+    const [partIdStr, opIndexStr] = partOpVal.split('-');
+    const partId = parseInt(partIdStr);
+    const opIndex = parseInt(opIndexStr);
+
+    const part = state.parts.find(p => p.id === partId);
+    const op = part ? part.operations[opIndex] : null;
+
+    if (!op || !op.inspectionChecklist || !op.inspectionChecklist.some(isChecklistItemConfigured)) {
+        showNotification('⚠️ No active checklist configured to export', 'error');
+        return;
+    }
+
+    const inspector = document.getElementById('inspect-inspector').value.trim() || 'Unassigned';
+    const qtyInspected = document.getElementById('inspect-qty-inspected').value || '0';
+    const qtyOk = document.getElementById('inspect-qty-ok').value || '0';
+    const qtyNg = document.getElementById('inspect-qty-ng').value || '0';
+    const status = document.getElementById('inspect-status').value;
+    const remarks = document.getElementById('inspect-notes').value.trim() || 'None';
+    const dateStr = new Date().toISOString().slice(0, 10);
+
+    let csv = `Inspection Report Details\r\n`;
+    csv += `Part Name,${part.name}\r\n`;
+    csv += `Operation,Op ${opIndex + 1}: ${op.opName || 'Unnamed'}\r\n`;
+    csv += `Date,${dateStr}\r\n`;
+    csv += `Inspector,${inspector}\r\n`;
+    csv += `Qty Inspected,${qtyInspected}\r\n`;
+    csv += `Qty OK,${qtyOk}\r\n`;
+    csv += `Qty NG,${qtyNg}\r\n`;
+    csv += `Overall Status,${status}\r\n`;
+    csv += `Remarks,${remarks}\r\n\r\n`;
+
+    csv += 'Parameter Sl.No,Parameter Desc,Nominal Dimen,Lo Tol,Hi Tol,Comp 1,Comp 2,Comp 3,Comp 4,Comp 5,Comp 6,Comp 7,Comp 8,Comp 9,Comp 10\r\n';
+
+    const activeChecklist = op.inspectionChecklist.filter(isChecklistItemConfigured);
+    activeChecklist.forEach((item, idx) => {
+        const comps = [];
+        for (let c = 1; c <= 10; c++) {
+            const input = document.querySelector(`.inspect-comp-input[data-row="${op.inspectionChecklist.indexOf(item)}"][data-col="${c}"]`);
+            comps.push(input && input.value.trim() !== '' ? input.value : '');
+        }
+
+        const row = [
+            idx + 1,
+            `"${(item.desc || 'Parameter').replace(/"/g, '""')}"`,
+            item.dimen !== null && item.dimen !== undefined ? item.dimen : '—',
+            item.loTol !== null && item.loTol !== undefined ? item.loTol : '—',
+            item.hiTol !== null && item.hiTol !== undefined ? item.hiTol : '—',
+            ...comps
+        ].join(',');
+        csv += row + '\r\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `${part.name.replace(/[\/\\?%*:|"<>\s]/g, '_')}_Op${opIndex + 1}_InspectionReport.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 // ==================== VIEW SWITCHING ====================
 
 function switchView(viewName) {
@@ -2810,8 +2878,10 @@ function init() {
     document.getElementById('btn-save-inspection').addEventListener('click', saveInspectionReport);
     document.getElementById('btn-clear-inspection').addEventListener('click', clearInspectionForm);
 
-    // Export Inspections to CSV
+    // Export Inspections to CSV (All)
     document.getElementById('btn-export-inspections-csv').addEventListener('click', exportInspectionsCSV);
+    // Export Current Active Report to Excel
+    document.getElementById('btn-export-current-report-csv').addEventListener('click', exportCurrentReportCSV);
 
     // Dynamic specs selection change
     document.getElementById('inspect-part-op').addEventListener('change', handleInspectionPartOpChange);
