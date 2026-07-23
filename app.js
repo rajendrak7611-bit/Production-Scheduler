@@ -1951,8 +1951,8 @@ function validateChecklistInputs() {
         const hiTol = parseFloat(input.dataset.hitol);
 
         if (!isNaN(dimen)) {
-            const min = dimen + (isNaN(loTol) ? 0 : loTol);
-            const max = dimen + (isNaN(hiTol) ? 0 : hiTol);
+            const min = dimen - Math.abs(isNaN(loTol) ? 0 : loTol);
+            const max = dimen + Math.abs(isNaN(hiTol) ? 0 : hiTol);
             
             if (val < min || val > max) {
                 input.style.background = 'var(--color-error-light, #fee2e2)';
