@@ -30,6 +30,7 @@ const state = {
     inspectionReports: [],
     editingSpecOpIdx: null,
     activeInspectionReportId: null,
+    editingToolOpIdx: null,
 };
 
 // ==================== COLOR PALETTE ====================
@@ -142,6 +143,14 @@ function isChecklistItemConfigured(item) {
     return hasDesc || hasDimen || hasLoTol || hasHiTol;
 }
 
+function isToolSpecItemConfigured(item) {
+    if (!item) return false;
+    return (item.tool && item.tool.trim() !== '') ||
+           (item.holder && item.holder.trim() !== '') ||
+           (item.length && item.length.trim() !== '') ||
+           (item.insert && item.insert.trim() !== '');
+}
+
 // ==================== CHECKLIST SPEC MODAL ====================
 
 function openChecklistSpecModal(opIdx) {
@@ -212,6 +221,73 @@ function saveChecklistSpecModal() {
     closeChecklistSpecModal();
     renderPartFormOps();
     showNotification('📋 Specifications saved to operation routing', 'success');
+}
+
+function openToolSpecModal(opIdx) {
+    state.editingToolOpIdx = opIdx;
+    const op = state.formOperations[opIdx];
+    if (!op) return;
+
+    document.getElementById('tool-spec-modal-title').textContent = `Configure Tool Specifications - Op ${opIdx + 1}: ${op.opName || 'Unnamed'}`;
+
+    if (!op.toolSpec || !Array.isArray(op.toolSpec)) {
+        op.toolSpec = [];
+    }
+
+    const list = [];
+    for (let i = 0; i < 10; i++) {
+        const item = op.toolSpec[i] || { tool: '', holder: '', length: '', insert: '' };
+        list.push(item);
+    }
+    op.toolSpec = list;
+
+    const tbody = document.getElementById('tool-spec-modal-tbody');
+    tbody.innerHTML = list.map((item, idx) => `
+        <tr>
+            <td style="text-align: center; font-weight: 600; color: var(--text-muted);">${idx + 1}</td>
+            <td>
+                <input type="text" class="input tool-name-input" value="${escapeHtml(item.tool || '')}" placeholder="e.g. Roughing Boring Bar" style="font-size: 0.8rem; height: 32px;">
+            </td>
+            <td>
+                <input type="text" class="input tool-holder-input" value="${escapeHtml(item.holder || '')}" placeholder="e.g. BT50-FMA25.4-45" style="font-size: 0.8rem; height: 32px; text-align: center;">
+            </td>
+            <td>
+                <input type="text" class="input tool-length-input" value="${escapeHtml(item.length || '')}" placeholder="e.g. 150 mm" style="font-size: 0.8rem; height: 32px; text-align: center;">
+            </td>
+            <td>
+                <input type="text" class="input tool-insert-input" value="${escapeHtml(item.insert || '')}" placeholder="e.g. WNMG 080408" style="font-size: 0.8rem; height: 32px; text-align: center;">
+            </td>
+        </tr>
+    `).join('');
+
+    document.getElementById('tool-spec-modal').classList.add('active');
+}
+
+function closeToolSpecModal() {
+    state.editingToolOpIdx = null;
+    document.getElementById('tool-spec-modal').classList.remove('active');
+}
+
+function saveToolSpecModal() {
+    const opIdx = state.editingToolOpIdx;
+    if (opIdx === null || opIdx === undefined) return;
+    const op = state.formOperations[opIdx];
+    if (!op) return;
+
+    const list = [];
+    const rows = document.querySelectorAll('#tool-spec-modal-tbody tr');
+    rows.forEach(tr => {
+        const tool = tr.querySelector('.tool-name-input').value.trim();
+        const holder = tr.querySelector('.tool-holder-input').value.trim();
+        const length = tr.querySelector('.tool-length-input').value.trim();
+        const insert = tr.querySelector('.tool-insert-input').value.trim();
+        list.push({ tool, holder, length, insert });
+    });
+
+    op.toolSpec = list;
+    closeToolSpecModal();
+    renderPartFormOps();
+    showNotification('🛠️ Tool specifications saved to operation routing', 'success');
 }
 
 function syncFormOperationsFromDOM() {
@@ -342,6 +418,12 @@ function renderPartFormOps() {
                         <span>${(op.inspectionChecklist && op.inspectionChecklist.some(isChecklistItemConfigured)) ? '📋 Configured' : '📋 Configure'}</span>
                     </button>
                 </td>
+                <td>
+                    <button class="btn btn-sm btn-ghost btn-configure-tools" data-idx="${idx}" style="color: var(--accent-primary); border: 1px solid var(--border-subtle); padding: 4px 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.72rem; height: 30px;">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3h6v6H3V3z" stroke="currentColor" stroke-width="1.2"/><path d="M5 2v1M7 2v1M5 9v1M7 9v1M2 5h1M2 7h1M9 5h1M9 7h1" stroke="currentColor" stroke-width="1.2"/></svg>
+                        <span>${(op.toolSpec && op.toolSpec.some(isToolSpecItemConfigured)) ? '🛠️ Configured' : '🛠️ Configure'}</span>
+                    </button>
+                </td>
                 <td class="row-total-cell" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
                     ${Number(processTime.toFixed(1))}m
                 </td>
@@ -384,6 +466,14 @@ function renderPartFormOps() {
             const idx = parseInt(btn.dataset.idx);
             syncFormOperationsFromDOM();
             openChecklistSpecModal(idx);
+        });
+    });
+    tbody.querySelectorAll('.btn-configure-tools').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const idx = parseInt(btn.dataset.idx);
+            syncFormOperationsFromDOM();
+            openToolSpecModal(idx);
         });
     });
 }
@@ -2872,6 +2962,12 @@ function init() {
     });
     document.getElementById('btn-save-spec-modal').addEventListener('click', () => {
         saveChecklistSpecModal();
+    });
+    document.getElementById('btn-close-tool-spec-modal').addEventListener('click', () => {
+        closeToolSpecModal();
+    });
+    document.getElementById('btn-save-tool-spec-modal').addEventListener('click', () => {
+        saveToolSpecModal();
     });
 
     // Form buttons

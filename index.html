@@ -375,6 +375,7 @@
                                 <th style="width:110px">Cycle Time</th>
                                 <th style="width:110px">Setup Time</th>
                                 <th style="min-width:140px">Inspection Spec</th>
+                                <th style="min-width:140px">Tool Spec</th>
                                 <th style="width:60px">Total</th>
                                 <th style="width:30px"></th>
                             </tr>
@@ -855,6 +856,34 @@
             <div style="display: flex; justify-content: flex-end; gap: 12px;">
                 <button class="btn btn-ghost" id="btn-close-spec-modal">Cancel</button>
                 <button class="btn btn-primary" id="btn-save-spec-modal">Save Specifications</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tool Spec Modal -->
+    <div id="tool-spec-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 850px; width: 90%;">
+            <h3 style="margin-bottom: 12px; font-size: 1.1rem; font-weight: 600;" id="tool-spec-modal-title">Configure Tool Specifications</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">Define up to 10 tooling requirements for this routing operation.</p>
+            <div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+                <table class="table" style="width: 100%; border-collapse: collapse; margin: 0;">
+                    <thead>
+                        <tr style="background: var(--bg-surface);">
+                            <th style="width: 50px; text-align: center;">Sl.No.</th>
+                            <th style="text-align: left;">Tool</th>
+                            <th style="width: 200px;">Holder spec</th>
+                            <th style="width: 120px;">Length</th>
+                            <th style="width: 200px;">Insert spec</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tool-spec-modal-tbody">
+                        <!-- 10 rows generated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn btn-ghost" id="btn-close-tool-spec-modal">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-tool-spec-modal">Save Specifications</button>
             </div>
         </div>
     </div>
