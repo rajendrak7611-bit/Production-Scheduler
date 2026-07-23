@@ -62,6 +62,10 @@
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 5v5M5 7.5h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.2"/></svg>
                     Inspections
                 </button>
+                <button class="tab-btn" data-view="tool-monitor" id="tab-tool-monitor">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M4 2v4a3 3 0 0 0 3 3h1a3 3 0 0 0 3-3V2M7.5 9v4M5 13h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M2.5 4h10M3.5 2h8" stroke="currentColor" stroke-width="1.2"/></svg>
+                    Tool Monitor
+                </button>
             </nav>
         </div>
         <div class="header-right">
@@ -886,6 +890,130 @@
                         </thead>
                         <tbody id="inspection-tbody">
                             <!-- Inspection rows rendered here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== TOOL MONITOR VIEW ===================== -->
+    <div id="view-tool-monitor" class="view">
+        <div class="view-hero">
+            <div class="view-hero-content">
+                <h2 class="view-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 2v4a3 3 0 0 0 3 3h1a3 3 0 0 0 3-3V2M7.5 9v4M5 13h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.5"/></svg>
+                    Tool Monitor
+                </h2>
+                <p class="view-desc">Monitor insert life, track target vs actual components produced, and log insert changes.</p>
+            </div>
+            <div class="view-hero-actions">
+                <button class="btn btn-outline" id="btn-export-tool-monitor-csv">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2V9M7 9L4.5 6.5M7 9L9.5 6.5M3 11.5H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Export Logs
+                </button>
+            </div>
+        </div>
+        
+        <section class="view-body" style="display: grid; grid-template-columns: 360px 1fr; gap: 24px; padding: 20px 24px; margin-bottom: 24px;">
+            <!-- Entry Form Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="font-size: 1rem; color: var(--text-primary); margin: 0;">Log Insert Replacement</h3>
+                    <button class="btn btn-ghost" id="btn-clear-tool-monitor" style="padding: 4px 8px; font-size: 0.75rem;">Clear / New</button>
+                </div>
+                
+                <div class="control-group">
+                    <label for="tm-part-op">Scheduled Part & Op</label>
+                    <div class="select-wrapper">
+                        <select id="tm-part-op">
+                            <option value="">— Select Op —</option>
+                        </select>
+                        <svg class="select-chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="tm-insert-spec">Insert Specification</label>
+                    <div class="select-wrapper">
+                        <select id="tm-insert-spec">
+                            <option value="">— Select Insert Spec —</option>
+                        </select>
+                        <svg class="select-chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px;">
+                    <div class="control-group" style="flex: 1;">
+                        <label for="tm-target-life">Target Life (Nos)</label>
+                        <input type="number" id="tm-target-life" class="input" min="1" step="1" placeholder="e.g. 500">
+                    </div>
+                    <div class="control-group" style="flex: 1;">
+                        <label for="tm-actual-life">Actual Life (Nos)</label>
+                        <input type="number" id="tm-actual-life" class="input" min="0" step="1" placeholder="e.g. 480">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="tm-inserts-used">No. of Inserts Used</label>
+                    <input type="number" id="tm-inserts-used" class="input" min="1" step="1" placeholder="e.g. 1" value="1">
+                </div>
+
+                <div class="control-group">
+                    <label for="tm-date">Replacement Date</label>
+                    <input type="date" id="tm-date" class="input">
+                </div>
+
+                <div style="display: flex; gap: 12px;">
+                    <div class="control-group" style="flex: 1;">
+                        <label for="tm-operator">Operator</label>
+                        <div class="select-wrapper">
+                            <select id="tm-operator">
+                                <option value="">— Operator —</option>
+                            </select>
+                            <svg class="select-chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                    </div>
+                    <div class="control-group" style="flex: 1;">
+                        <label for="tm-shift">Shift</label>
+                        <div class="select-wrapper">
+                            <select id="tm-shift">
+                                <option value="Shift 1">Shift 1 (M)</option>
+                                <option value="Shift 2">Shift 2 (A)</option>
+                                <option value="Shift 3">Shift 3 (N)</option>
+                            </select>
+                            <svg class="select-chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="btn-save-tool-monitor" style="width: 100%; margin-top: 10px;">
+                    Save Tool Log
+                </button>
+            </div>
+
+            <!-- List Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                <h3 style="font-size: 1rem; color: var(--text-primary); margin: 0;">Tool Life Logs</h3>
+                <div class="component-table-wrapper" style="margin: 0; max-height: 500px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Part (Op)</th>
+                                <th>Insert Spec</th>
+                                <th>Target Life</th>
+                                <th>Actual Life</th>
+                                <th>Inserts Used</th>
+                                <th>Operator</th>
+                                <th>Shift</th>
+                                <th style="width: 50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tool-monitor-tbody">
+                            <tr>
+                                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">No tooling logs recorded yet.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

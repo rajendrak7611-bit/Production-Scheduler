@@ -31,6 +31,8 @@ const state = {
     editingSpecOpIdx: null,
     activeInspectionReportId: null,
     editingToolOpIdx: null,
+    toolMonitorLogs: [],
+    activeToolMonitorId: null
 };
 
 // ==================== COLOR PALETTE ====================
@@ -540,6 +542,7 @@ function saveData() {
             productionLines: state.productionLines,
             users: state.users,
             inspectionReports: state.inspectionReports,
+            toolMonitorLogs: state.toolMonitorLogs
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) { /* localStorage might not be available */ }
@@ -573,7 +576,8 @@ function loadData() {
         state.productionLines = data.productionLines || [];
         state.users = data.users || [];
         state.inspectionReports = data.inspectionReports || [];
-        return state.machines.length > 0 || state.parts.length > 0 || state.partDatabase.length > 0 || state.productionLogs.length > 0 || state.operators.length > 0 || state.productionLines.length > 0 || state.users.length > 0 || state.inspectionReports.length > 0;
+        state.toolMonitorLogs = data.toolMonitorLogs || [];
+        return state.machines.length > 0 || state.parts.length > 0 || state.partDatabase.length > 0 || state.productionLogs.length > 0 || state.operators.length > 0 || state.productionLines.length > 0 || state.users.length > 0 || state.inspectionReports.length > 0 || state.toolMonitorLogs.length > 0;
     } catch (e) { return false; }
 }
 
@@ -586,6 +590,7 @@ function clearAllData() {
     state.productionLines = [];
     state.users = [];
     state.inspectionReports = [];
+    state.toolMonitorLogs = [];
     state.schedule = null;
     state.isScheduled = false;
     state.selectedPart = null;
@@ -598,6 +603,7 @@ function clearAllData() {
     renderProductionLines();
     renderUsers();
     renderInspectionReports();
+    renderToolMonitorLogs();
     updateCounts();
     showNotification('All data cleared', 'info');
 }
@@ -2611,6 +2617,14 @@ function switchView(viewName) {
         subtitle.textContent = 'Quality Inspections — Record OK/NG reports per operation';
         populateInspectionPartOpDropdown();
         renderInspectionReports();
+    } else if (viewName === 'tool-monitor') {
+        subtitle.textContent = 'Tool Monitor — Track insert replacement & tool life';
+        const dateInput = document.getElementById('tm-date');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().slice(0, 10);
+        }
+        populateToolMonitorDropdowns();
+        renderToolMonitorLogs();
     } else {
         subtitle.textContent = 'Step 3 — Analyze your schedule';
     }
@@ -3150,6 +3164,12 @@ function init() {
     // Dynamic specs selection change
     document.getElementById('inspect-part-op').addEventListener('change', handleInspectionPartOpChange);
 
+    // Tool Monitor view event bindings
+    document.getElementById('tm-part-op').addEventListener('change', handleToolPartOpChange);
+    document.getElementById('btn-save-tool-monitor').addEventListener('click', saveToolMonitorLog);
+    document.getElementById('btn-clear-tool-monitor').addEventListener('click', clearToolMonitorForm);
+    document.getElementById('btn-export-tool-monitor-csv').addEventListener('click', exportToolMonitorCSV);
+
     // Export Logs to CSV
     document.getElementById('btn-export-log-csv').addEventListener('click', exportLogsCSV);
 
@@ -3229,6 +3249,226 @@ function init() {
             document.getElementById('component-search').value = '';
         }
     });
+}
+
+// ==================== TOOL MONITOR VIEW LOGIC ====================
+
+function populateToolMonitorDropdowns() {
+    const partOpSelect = document.getElementById('tm-part-op');
+    if (!partOpSelect) return;
+    
+    const currentVal = partOpSelect.value;
+    partOpSelect.innerHTML = '<option value="">— Select Op —</option>';
+    
+    state.parts.forEach(part => {
+        part.operations.forEach((op, opIdx) => {
+            const opName = op.opName || `Unnamed`;
+            const opt = document.createElement('option');
+            opt.value = `${part.id}-${opIdx}`;
+            opt.textContent = `${part.name} - Op ${opIdx + 1}: ${opName}`;
+            partOpSelect.appendChild(opt);
+        });
+    });
+    
+    if (currentVal) partOpSelect.value = currentVal;
+    
+    const opSelect = document.getElementById('tm-operator');
+    if (opSelect) {
+        const currentOp = opSelect.value;
+        opSelect.innerHTML = '<option value="">— Operator —</option>';
+        state.operators.forEach(op => {
+            const opt = document.createElement('option');
+            opt.value = op.name;
+            opt.textContent = op.name;
+            opSelect.appendChild(opt);
+        });
+        if (currentOp) opSelect.value = currentOp;
+    }
+}
+
+function handleToolPartOpChange(e) {
+    const val = e.target.value;
+    const specSelect = document.getElementById('tm-insert-spec');
+    if (!specSelect) return;
+    
+    specSelect.innerHTML = '<option value="">— Select Insert Spec —</option>';
+    
+    if (!val) return;
+    
+    const [partIdStr, opIndexStr] = val.split('-');
+    const partId = parseInt(partIdStr);
+    const opIndex = parseInt(opIndexStr);
+    const part = state.parts.find(p => p.id === partId);
+    const op = part ? part.operations[opIndex] : null;
+    
+    if (op && op.toolSpec && Array.isArray(op.toolSpec)) {
+        op.toolSpec.forEach(tool => {
+            if (tool.insert && tool.insert.trim() !== '') {
+                const opt = document.createElement('option');
+                opt.value = tool.insert.trim();
+                opt.textContent = `${tool.insert.trim()} (${tool.tool || 'Unnamed tool'})`;
+                specSelect.appendChild(opt);
+            }
+        });
+    }
+}
+
+function renderToolMonitorLogs() {
+    const tbody = document.getElementById('tool-monitor-tbody');
+    if (!tbody) return;
+    
+    if (!state.toolMonitorLogs || state.toolMonitorLogs.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">No tooling logs recorded yet.</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = state.toolMonitorLogs.map((log, index) => {
+        const part = state.parts.find(p => p.id === log.partId);
+        const partName = part ? part.name : 'Unknown Part';
+        const op = part ? part.operations[log.opIndex] : null;
+        const opName = op ? `Op ${log.opIndex + 1}: ${op.opName || 'Unnamed'}` : `Op ${log.opIndex + 1}`;
+        
+        return `
+            <tr>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${log.date}</td>
+                <td><strong>${escapeHtml(partName)}</strong><br><span style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(opName)}</span></td>
+                <td><span class="badge badge-outline">${escapeHtml(log.insertSpec)}</span></td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${log.targetLife}</td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${log.actualLife}</td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; text-align: center;">${log.insertsUsed}</td>
+                <td>${escapeHtml(log.operator)}</td>
+                <td><span class="badge badge-sm">${escapeHtml(log.shift)}</span></td>
+                <td style="text-align: center;">
+                    <button class="btn-icon delete-tool-log-btn" data-index="${index}" title="Delete log entry" style="color: var(--color-error); padding: 2px;">
+                        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    tbody.querySelectorAll('.delete-tool-log-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.index);
+            state.toolMonitorLogs.splice(idx, 1);
+            saveData();
+            renderToolMonitorLogs();
+            showNotification('Tool replacement log deleted successfully', 'info');
+        });
+    });
+}
+
+function saveToolMonitorLog() {
+    const partOpVal = document.getElementById('tm-part-op').value;
+    const insertSpec = document.getElementById('tm-insert-spec').value;
+    const targetLife = parseInt(document.getElementById('tm-target-life').value);
+    const actualLife = parseInt(document.getElementById('tm-actual-life').value);
+    const insertsUsed = parseInt(document.getElementById('tm-inserts-used').value);
+    const dateVal = document.getElementById('tm-date').value;
+    const operatorVal = document.getElementById('tm-operator').value;
+    const shiftVal = document.getElementById('tm-shift').value;
+    
+    if (!partOpVal) {
+        showNotification('⚠️ Please select a Part and Operation', 'error');
+        return;
+    }
+    if (!insertSpec) {
+        showNotification('⚠️ Please select an Insert Specification', 'error');
+        return;
+    }
+    if (isNaN(targetLife) || targetLife <= 0) {
+        showNotification('⚠️ Please enter a valid Target Life', 'error');
+        return;
+    }
+    if (isNaN(actualLife) || actualLife < 0) {
+        showNotification('⚠️ Please enter a valid Actual Life', 'error');
+        return;
+    }
+    if (isNaN(insertsUsed) || insertsUsed <= 0) {
+        showNotification('⚠️ Please enter inserts used count', 'error');
+        return;
+    }
+    if (!dateVal) {
+        showNotification('⚠️ Please select a Date', 'error');
+        return;
+    }
+    if (!operatorVal) {
+        showNotification('⚠️ Please select Operator', 'error');
+        return;
+    }
+    
+    const [partIdStr, opIndexStr] = partOpVal.split('-');
+    const partId = parseInt(partIdStr);
+    const opIndex = parseInt(opIndexStr);
+    
+    const newLog = {
+        id: Date.now(),
+        partId,
+        opIndex,
+        insertSpec,
+        targetLife,
+        actualLife,
+        insertsUsed,
+        date: dateVal,
+        operator: operatorVal,
+        shift: shiftVal
+    };
+    
+    state.toolMonitorLogs.push(newLog);
+    saveData();
+    renderToolMonitorLogs();
+    clearToolMonitorForm();
+    showNotification('✅ Tool monitor log saved successfully', 'success');
+}
+
+function clearToolMonitorForm() {
+    document.getElementById('tm-part-op').value = '';
+    document.getElementById('tm-insert-spec').innerHTML = '<option value="">— Select Insert Spec —</option>';
+    document.getElementById('tm-target-life').value = '';
+    document.getElementById('tm-actual-life').value = '';
+    document.getElementById('tm-inserts-used').value = '1';
+    document.getElementById('tm-operator').value = '';
+}
+
+function exportToolMonitorCSV() {
+    if (!state.toolMonitorLogs || state.toolMonitorLogs.length === 0) {
+        showNotification('⚠️ No tooling log entries to export', 'error');
+        return;
+    }
+    
+    let csv = 'Date,Part Name,Operation,Insert Spec,Target Life,Actual Life,Inserts Used,Operator,Shift\r\n';
+    
+    state.toolMonitorLogs.forEach(log => {
+        const part = state.parts.find(p => p.id === log.partId);
+        const partName = part ? part.name : 'Unknown Part';
+        const op = part ? part.operations[log.opIndex] : null;
+        const opName = op ? `Op ${log.opIndex + 1}: ${op.opName || 'Unnamed'}` : `Op ${log.opIndex + 1}`;
+        
+        const row = [
+            log.date,
+            `"${partName.replace(/"/g, '""')}"`,
+            `"${opName.replace(/"/g, '""')}"`,
+            `"${log.insertSpec.replace(/"/g, '""')}"`,
+            log.targetLife,
+            log.actualLife,
+            log.insertsUsed,
+            `"${log.operator.replace(/"/g, '""')}"`,
+            `"${log.shift.replace(/"/g, '""')}"`
+        ].join(',');
+        csv += row + '\r\n';
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `tool_life_logs_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 document.addEventListener('DOMContentLoaded', init);
