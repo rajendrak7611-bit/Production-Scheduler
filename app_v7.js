@@ -238,7 +238,7 @@ function openToolSpecModal(opIdx) {
     }
 
     const list = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 15; i++) {
         const item = op.toolSpec[i] || { subOpn: '', tool: '', holder: '', length: '', insert: '', rpm: '', feed: '' };
         list.push(item);
     }
