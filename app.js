@@ -1719,6 +1719,47 @@ function exportLogsCSV() {
     document.body.removeChild(link);
 }
 
+function exportSummaryCSV() {
+    if (state.parts.length === 0) {
+        showNotification('⚠️ No parts to export summary for', 'error');
+        return;
+    }
+
+    let csv = 'Part Name,Operation,Total Qty Required,Qty Completed,Qty Remaining,Completion Pct,Status\r\n';
+
+    state.parts.forEach(part => {
+        part.operations.forEach((op, opIndex) => {
+            const completed = state.productionLogs
+                .filter(log => log.partId === part.id && log.opIndex === opIndex)
+                .reduce((sum, log) => sum + log.qty, 0);
+
+            const total = part.quantity || 1;
+            const remaining = Math.max(0, total - completed);
+            const pct = Math.min(100, Math.round((completed / total) * 100));
+            const statusText = completed >= total ? 'Completed' : (completed === 0 ? 'Not Started' : 'In Progress');
+
+            const row = [
+                `"${part.name.replace(/"/g, '""')}"`,
+                `"Op ${opIndex + 1}: ${(op.opName || 'Unnamed').replace(/"/g, '""')}"`,
+                total,
+                completed,
+                remaining,
+                `${pct}%`,
+                statusText
+            ].join(',');
+            csv += row + '\r\n';
+        });
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `operation_completion_summary_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 // ==================== QUALITY INSPECTION REPORTS ====================
 
 function populateInspectionPartOpDropdown() {
@@ -2498,6 +2539,9 @@ function init() {
 
     // Export Logs to CSV
     document.getElementById('btn-export-log-csv').addEventListener('click', exportLogsCSV);
+
+    // Export Summary to CSV
+    document.getElementById('btn-export-summary-csv').addEventListener('click', exportSummaryCSV);
 
     // Load from file
     document.getElementById('btn-import').addEventListener('click', () => {
