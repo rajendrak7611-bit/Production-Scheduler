@@ -1212,14 +1212,11 @@ function renderOperatorList() {
                 </button>
             </div>
             <div style="display: flex; gap: 12px; align-items: center; width: 100%; justify-content: space-between; border-top: 1px dashed var(--border-subtle); padding-top: 8px;">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <input type="checkbox" id="op-chk-${op.id}" class="op-present-chk" data-id="${op.id}" ${op.present !== false ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;">
-                    <label for="op-chk-${op.id}" style="font-size: 0.75rem; font-weight: 500; color: ${op.present !== false ? 'var(--color-success)' : 'var(--text-dimmed)'}; cursor: pointer;">
-                        ${op.present !== false ? 'Present' : 'Absent'}
-                    </label>
+                <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-secondary);">
+                    Available Time:
                 </div>
                 <div style="display: flex; align-items: center; gap: 4px;">
-                    <input type="number" class="op-hours-input input" data-id="${op.id}" min="0" max="24" step="0.5" value="${op.availableHours !== undefined ? op.availableHours : 8}" ${op.present !== false ? '' : 'disabled'} style="width: 55px; text-align: center; padding: 2px 4px; font-size: 0.75rem; height: 26px;">
+                    <input type="number" class="op-hours-input input" data-id="${op.id}" min="0" max="24" step="0.5" value="${op.availableHours !== undefined ? op.availableHours : 8}" style="width: 55px; text-align: center; padding: 2px 4px; font-size: 0.75rem; height: 26px;">
                     <span style="font-size: 0.7rem; color: var(--text-dimmed);">hrs</span>
                 </div>
             </div>
@@ -1241,22 +1238,6 @@ function renderOperatorList() {
         });
     });
 
-    // Bind toggle events
-    list.querySelectorAll('.op-present-chk').forEach(chk => {
-        chk.addEventListener('change', (e) => {
-            const id = parseInt(chk.dataset.id);
-            const present = e.target.checked;
-            const op = state.operators.find(o => o.id === id);
-            if (op) {
-                op.present = present;
-                op.availableHours = present ? 8 : 0;
-                saveData();
-                renderOperatorList();
-                populateOperatorDropdown();
-            }
-        });
-    });
-
     // Bind hours change events
     list.querySelectorAll('.op-hours-input').forEach(input => {
         input.addEventListener('change', (e) => {
@@ -1265,7 +1246,6 @@ function renderOperatorList() {
             const op = state.operators.find(o => o.id === id);
             if (op) {
                 op.availableHours = hours;
-                op.present = hours > 0;
                 saveData();
                 renderOperatorList();
                 populateOperatorDropdown();
@@ -1307,7 +1287,7 @@ function populateOperatorDropdown() {
     select.innerHTML = '<option value="">— Select Operator —</option>';
 
     state.operators.forEach(op => {
-        if (op.present !== false && (op.availableHours || 0) > 0) {
+        if ((op.availableHours || 0) > 0) {
             const opt = document.createElement('option');
             opt.value = op.name;
             opt.textContent = `${op.name} (${op.availableHours}h available)`;
