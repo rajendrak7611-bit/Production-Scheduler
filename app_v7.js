@@ -1877,7 +1877,7 @@ function exportLogsCSV() {
         return;
     }
     
-    let csv = 'Date,Part Name,Operation,Machine,Operator,Shift,Actual Hours,Qty Completed,Total Idle Hours,Idle Reasons\r\n';
+    let csv = 'Date,Part Name,Operation,Machine,Operator,Shift,Actual Hours,Qty Completed,Total Idle Hours,Setting,Setup,No power,No load,No operator,Maint,Tool Issue,Quality issue,No setter,Misc\r\n';
     
     state.productionLogs.forEach(log => {
         const part = state.parts.find(p => p.id === log.partId);
@@ -1888,7 +1888,17 @@ function exportLogsCSV() {
         const machineName = machine ? machine.name : 'Unassigned';
 
         const totalIdle = log.idleLogs ? log.idleLogs.reduce((sum, item) => sum + item.hours, 0) : 0;
-        const idleReasons = log.idleLogs ? log.idleLogs.map(item => `${item.hours}h: ${item.reason}`).join(' | ') : '';
+        
+        const reasons = ["Setting", "Setup", "No power", "No load", "No operator", "Maint", "Tool Issue", "Quality issue", "No setter", "Misc"];
+        const reasonHours = {};
+        reasons.forEach(r => reasonHours[r] = 0);
+        if (log.idleLogs) {
+            log.idleLogs.forEach(item => {
+                if (reasonHours[item.reason] !== undefined) {
+                    reasonHours[item.reason] += item.hours;
+                }
+            });
+        }
         
         const row = [
             log.date,
@@ -1900,7 +1910,7 @@ function exportLogsCSV() {
             log.hours,
             log.qty,
             totalIdle,
-            `"${idleReasons.replace(/"/g, '""')}"`
+            ...reasons.map(r => reasonHours[r] > 0 ? reasonHours[r] : '')
         ].join(',');
         csv += row + '\r\n';
     });
