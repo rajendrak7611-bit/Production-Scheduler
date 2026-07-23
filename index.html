@@ -622,6 +622,24 @@
                     </div>
                 </div>
 
+                <div class="control-group" style="margin-top: 10px; margin-bottom: 10px;">
+                    <label style="font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 6px;">Idle Hours & Reasons</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <input type="number" id="log-idle-hours-1" class="input" min="0" step="0.1" placeholder="Hours" style="width: 100px;">
+                            <input type="text" id="log-idle-reason-1" class="input" placeholder="Reason for idleness (e.g. Power failure)" style="flex: 1;">
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <input type="number" id="log-idle-hours-2" class="input" min="0" step="0.1" placeholder="Hours" style="width: 100px;">
+                            <input type="text" id="log-idle-reason-2" class="input" placeholder="Reason for idleness" style="flex: 1;">
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <input type="number" id="log-idle-hours-3" class="input" min="0" step="0.1" placeholder="Hours" style="width: 100px;">
+                            <input type="text" id="log-idle-reason-3" class="input" placeholder="Reason for idleness" style="flex: 1;">
+                        </div>
+                    </div>
+                </div>
+
                 <button class="btn btn-primary" id="btn-save-log" style="width: 100%; margin-top: 10px;">
                     Add Log Entry
                 </button>

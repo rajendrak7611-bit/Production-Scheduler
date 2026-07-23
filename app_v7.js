@@ -1667,7 +1667,17 @@ function renderProductionLogs() {
                 <td><span class="badge badge-outline">${escapeHtml(machineName)}</span></td>
                 <td>${escapeHtml(log.operator)}</td>
                 <td><span class="badge badge-sm">${escapeHtml(log.shift)}</span></td>
-                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${log.hours}h</td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">
+                    ${log.hours}h
+                    ${(() => {
+                        if (log.idleLogs && log.idleLogs.length > 0) {
+                            const totalIdle = log.idleLogs.reduce((sum, item) => sum + item.hours, 0);
+                            const reasonsTip = log.idleLogs.map(item => `${item.hours}h: ${item.reason}`).join(', ');
+                            return `<br><span style="font-size: 0.7rem; color: var(--color-error); font-weight: 500; cursor: help;" title="${escapeHtml(reasonsTip)}">⚠️ Idle: ${Number(totalIdle.toFixed(1))}h</span>`;
+                        }
+                        return '';
+                    })()}
+                </td>
                 <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${log.qty}</td>
                 <td style="text-align: center;">
                     <button class="btn-icon delete-log-btn" data-index="${index}" title="Delete log entry" style="color: var(--color-error); padding: 2px;">
@@ -1818,6 +1828,15 @@ function saveProductionLog() {
 
     op.quantity = Math.max(0, opQty - qtyVal);
     
+    const idleLogs = [];
+    for (let i = 1; i <= 3; i++) {
+        const hrs = parseFloat(document.getElementById(`log-idle-hours-${i}`).value);
+        const reason = document.getElementById(`log-idle-reason-${i}`).value.trim();
+        if (!isNaN(hrs) && hrs > 0) {
+            idleLogs.push({ hours: hrs, reason: reason || 'Unspecified' });
+        }
+    }
+
     const newLog = {
         id: Date.now(),
         partId,
@@ -1826,7 +1845,8 @@ function saveProductionLog() {
         operator: operatorVal,
         shift: shiftVal,
         hours: hoursVal,
-        qty: qtyVal
+        qty: qtyVal,
+        idleLogs: idleLogs
     };
     
     state.productionLogs.push(newLog);
@@ -1843,6 +1863,10 @@ function saveProductionLog() {
     document.getElementById('log-part-op').value = '';
     document.getElementById('log-hours').value = '';
     document.getElementById('log-qty').value = '';
+    for (let i = 1; i <= 3; i++) {
+        document.getElementById(`log-idle-hours-${i}`).value = '';
+        document.getElementById(`log-idle-reason-${i}`).value = '';
+    }
     
     showNotification('✅ Production log added and quantity updated successfully', 'success');
 }
@@ -1853,7 +1877,7 @@ function exportLogsCSV() {
         return;
     }
     
-    let csv = 'Date,Part Name,Operation,Machine,Operator,Shift,Actual Hours,Qty Completed\r\n';
+    let csv = 'Date,Part Name,Operation,Machine,Operator,Shift,Actual Hours,Qty Completed,Total Idle Hours,Idle Reasons\r\n';
     
     state.productionLogs.forEach(log => {
         const part = state.parts.find(p => p.id === log.partId);
@@ -1862,6 +1886,9 @@ function exportLogsCSV() {
         const opName = op ? `Op ${log.opIndex + 1}: ${op.opName || 'Unnamed'}` : `Op ${log.opIndex + 1}`;
         const machine = op ? state.machines.find(m => m.id === op.machineId) : null;
         const machineName = machine ? machine.name : 'Unassigned';
+
+        const totalIdle = log.idleLogs ? log.idleLogs.reduce((sum, item) => sum + item.hours, 0) : 0;
+        const idleReasons = log.idleLogs ? log.idleLogs.map(item => `${item.hours}h: ${item.reason}`).join(' | ') : '';
         
         const row = [
             log.date,
@@ -1871,7 +1898,9 @@ function exportLogsCSV() {
             `"${log.operator.replace(/"/g, '""')}"`,
             `"${log.shift.replace(/"/g, '""')}"`,
             log.hours,
-            log.qty
+            log.qty,
+            totalIdle,
+            `"${idleReasons.replace(/"/g, '""')}"`
         ].join(',');
         csv += row + '\r\n';
     });
