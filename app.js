@@ -1211,15 +1211,6 @@ function renderOperatorList() {
                     <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
             </div>
-            <div style="display: flex; gap: 12px; align-items: center; width: 100%; justify-content: space-between; border-top: 1px dashed var(--border-subtle); padding-top: 8px;">
-                <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-secondary);">
-                    Available Time:
-                </div>
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <input type="number" class="op-hours-input input" data-id="${op.id}" min="0" max="24" step="0.5" value="${op.availableHours !== undefined ? op.availableHours : 8}" style="width: 55px; text-align: center; padding: 2px 4px; font-size: 0.75rem; height: 26px;">
-                    <span style="font-size: 0.7rem; color: var(--text-dimmed);">hrs</span>
-                </div>
-            </div>
         </div>
     `).join('');
 
@@ -1234,21 +1225,6 @@ function renderOperatorList() {
                 renderOperatorList();
                 updateCounts();
                 showNotification('Operator removed', 'info');
-            }
-        });
-    });
-
-    // Bind hours change events
-    list.querySelectorAll('.op-hours-input').forEach(input => {
-        input.addEventListener('change', (e) => {
-            const id = parseInt(input.dataset.id);
-            const hours = Math.max(0, Math.min(24, parseFloat(e.target.value) || 0));
-            const op = state.operators.find(o => o.id === id);
-            if (op) {
-                op.availableHours = hours;
-                saveData();
-                renderOperatorList();
-                populateOperatorDropdown();
             }
         });
     });
@@ -1287,15 +1263,13 @@ function populateOperatorDropdown() {
     select.innerHTML = '<option value="">— Select Operator —</option>';
 
     state.operators.forEach(op => {
-        if ((op.availableHours || 0) > 0) {
-            const opt = document.createElement('option');
-            opt.value = op.name;
-            opt.textContent = `${op.name} (${op.availableHours}h available)`;
-            if (op.name === currentVal) {
-                opt.selected = true;
-            }
-            select.appendChild(opt);
+        const opt = document.createElement('option');
+        opt.value = op.name;
+        opt.textContent = op.name;
+        if (op.name === currentVal) {
+            opt.selected = true;
         }
+        select.appendChild(opt);
     });
 }
 
