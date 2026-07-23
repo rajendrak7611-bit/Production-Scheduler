@@ -132,6 +132,15 @@ function closePartForm() {
     switchView(isDb ? 'database' : 'parts');
 }
 
+function isChecklistItemConfigured(item) {
+    if (!item) return false;
+    const hasDesc = item.desc && item.desc.trim() !== '';
+    const hasDimen = item.dimen !== null && item.dimen !== undefined && !isNaN(item.dimen);
+    const hasLoTol = item.loTol !== null && item.loTol !== undefined && !isNaN(item.loTol);
+    const hasHiTol = item.hiTol !== null && item.hiTol !== undefined && !isNaN(item.hiTol);
+    return hasDesc || hasDimen || hasLoTol || hasHiTol;
+}
+
 // ==================== CHECKLIST SPEC MODAL ====================
 
 function openChecklistSpecModal(opIdx) {
@@ -329,7 +338,7 @@ function renderPartFormOps() {
                 <td>
                     <button class="btn btn-sm btn-ghost btn-configure-specs" data-idx="${idx}" style="color: var(--accent-primary); border: 1px solid var(--border-subtle); padding: 4px 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.72rem; height: 30px;">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="2" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4.5h3M4.5 6.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                        <span>${(op.inspectionChecklist && op.inspectionChecklist.some(r => r.desc || r.dimen)) ? '📋 Configured' : '📋 Configure'}</span>
+                        <span>${(op.inspectionChecklist && op.inspectionChecklist.some(isChecklistItemConfigured)) ? '📋 Configured' : '📋 Configure'}</span>
                     </button>
                 </td>
                 <td class="row-total-cell" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
@@ -1869,7 +1878,7 @@ function handleInspectionPartOpChange() {
     const part = state.parts.find(p => p.id === partId);
     const op = part ? part.operations[opIndex] : null;
 
-    if (!op || !op.inspectionChecklist || !op.inspectionChecklist.some(r => r.desc || r.dimen)) {
+    if (!op || !op.inspectionChecklist || !op.inspectionChecklist.some(isChecklistItemConfigured)) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="15" style="text-align: center; color: var(--text-muted); padding: 40px;">⚠️ No specifications configured for this operation. Add parameters in the Part Form modal first.</td>
@@ -1880,7 +1889,7 @@ function handleInspectionPartOpChange() {
 
     // Render the active rows
     tbody.innerHTML = op.inspectionChecklist.map((item, idx) => {
-        if (!item.desc && !item.dimen) return ''; // Skip empty rows
+        if (!isChecklistItemConfigured(item)) return ''; // Skip empty rows
 
         const dimenText = item.dimen !== null && item.dimen !== undefined ? item.dimen : '—';
         const loText = item.loTol !== null && item.loTol !== undefined ? item.loTol : '—';
