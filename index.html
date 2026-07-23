@@ -703,7 +703,7 @@
                 </button>
             </div>
         </div>
-        <section class="view-body" style="display: grid; grid-template-columns: 360px 1fr; gap: 24px; padding: 20px 24px;">
+        <section class="view-body" style="display: grid; grid-template-columns: 360px 1fr; gap: 24px; padding: 20px 24px; margin-bottom: 24px;">
             <!-- Form Card -->
             <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
                 <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px; font-weight: 600;">Log Quality Inspection</h3>
@@ -713,10 +713,6 @@
                     <select id="inspect-part-op" class="input" style="height: 38px;">
                         <option value="">— Select Op —</option>
                     </select>
-                </div>
-
-                <div id="inspect-spec-box" style="font-size: 0.75rem; background: var(--bg-surface); padding: 10px 12px; border-radius: var(--radius-md); border-left: 3px solid var(--accent-primary); color: var(--text-secondary); display: none; line-height: 1.4;">
-                    <strong>Inspection Spec:</strong> <span id="inspect-spec-text">No spec configured.</span>
                 </div>
 
                 <div class="control-group">
@@ -758,10 +754,46 @@
                 </button>
             </div>
 
-            <!-- Inspections Table Card -->
+            <!-- Checklist Logging Grid Card -->
+            <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px; min-height: 400px; height: fit-content; overflow: hidden;">
+                <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600; margin: 0;">Component Inspection Checklist & Measurements</h3>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Enter measured values for up to 10 components (Comp1 to Comp10). Values out of tolerance will be highlighted.</p>
+                <div style="overflow-x: auto; flex: 1; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+                    <table class="table" style="width: 100%; border-collapse: collapse; min-width: 1200px;">
+                        <thead>
+                            <tr style="background: var(--bg-surface);">
+                                <th style="width: 50px; text-align: center;">Sl.</th>
+                                <th style="min-width: 150px; text-align: left;">Desc</th>
+                                <th style="width: 80px; text-align: center;">Dimen</th>
+                                <th style="width: 65px; text-align: center;">Lo Tol</th>
+                                <th style="width: 65px; text-align: center;">Hi Tol</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 1</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 2</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 3</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 4</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 5</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 6</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 7</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 8</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 9</th>
+                                <th style="width: 75px; text-align: center; background: var(--bg-surface-elevated);">Comp 10</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inspect-checklist-tbody">
+                            <tr>
+                                <td colspan="15" style="text-align: center; color: var(--text-muted); padding: 40px;">Select an active part and operation to enter specifications and component checks.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Inspections History Table Card (Full Width Bottom) -->
+        <section style="padding: 0 24px 24px 24px;">
             <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
-                <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600;">Inspection Report Log</h3>
-                <div style="max-height: 520px; overflow-y: auto;">
+                <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600; margin: 0;">Inspection Report Log</h3>
+                <div style="max-height: 400px; overflow-y: auto;">
                     <table class="table" style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr>
@@ -787,6 +819,34 @@
 
     <!-- Tooltip -->
     <div class="tooltip" id="tooltip"></div>
+
+    <!-- Checklist Specs Modal -->
+    <div id="spec-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 750px; width: 90%;">
+            <h3 style="margin-bottom: 12px; font-size: 1.1rem; font-weight: 600;">Configure Inspection Specifications Checklist</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">Define up to 10 parameters (nominal dimension and tolerances) to be checked for this operation.</p>
+            <div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+                <table class="table" style="width: 100%; border-collapse: collapse; margin: 0;">
+                    <thead>
+                        <tr style="background: var(--bg-surface);">
+                            <th style="width: 50px; text-align: center;">Sl.No.</th>
+                            <th style="text-align: left;">Parameter Description (Desc)</th>
+                            <th style="width: 120px;">Dimen (Nominal)</th>
+                            <th style="width: 100px;">Lo Tol.</th>
+                            <th style="width: 100px;">Hi Tol.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="spec-modal-tbody">
+                        <!-- 10 rows generated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn btn-ghost" id="btn-close-spec-modal">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-spec-modal">Save Specifications</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Add from Database Modal -->
     <div id="db-modal" class="modal-overlay">

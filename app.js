@@ -27,6 +27,8 @@ const state = {
     productionLines: [],
     users: [],
     currentMasterSubTab: 'machines',
+    inspectionReports: [],
+    editingSpecOpIdx: null,
 };
 
 // ==================== COLOR PALETTE ====================
@@ -130,6 +132,78 @@ function closePartForm() {
     switchView(isDb ? 'database' : 'parts');
 }
 
+// ==================== CHECKLIST SPEC MODAL ====================
+
+function openChecklistSpecModal(opIdx) {
+    state.editingSpecOpIdx = opIdx;
+    const op = state.formOperations[opIdx];
+    if (!op) return;
+
+    if (!op.inspectionChecklist || !Array.isArray(op.inspectionChecklist)) {
+        op.inspectionChecklist = [];
+    }
+    
+    const list = [];
+    for (let i = 0; i < 10; i++) {
+        const item = op.inspectionChecklist[i] || { desc: '', dimen: '', loTol: '', hiTol: '' };
+        list.push(item);
+    }
+    op.inspectionChecklist = list;
+
+    const tbody = document.getElementById('spec-modal-tbody');
+    tbody.innerHTML = list.map((item, idx) => `
+        <tr>
+            <td style="text-align: center; font-weight: 600; color: var(--text-muted);">${idx + 1}</td>
+            <td>
+                <input type="text" class="input spec-desc-input" value="${escapeHtml(item.desc || '')}" placeholder="e.g. Length" style="font-size: 0.8rem; height: 32px;">
+            </td>
+            <td>
+                <input type="number" step="0.001" class="input spec-dimen-input" value="${item.dimen !== undefined && item.dimen !== null ? item.dimen : ''}" placeholder="0.00" style="font-size: 0.8rem; height: 32px; text-align: center;">
+            </td>
+            <td>
+                <input type="number" step="0.001" class="input spec-loTol-input" value="${item.loTol !== undefined && item.loTol !== null ? item.loTol : ''}" placeholder="-0.00" style="font-size: 0.8rem; height: 32px; text-align: center;">
+            </td>
+            <td>
+                <input type="number" step="0.001" class="input spec-hiTol-input" value="${item.hiTol !== undefined && item.hiTol !== null ? item.hiTol : ''}" placeholder="+0.00" style="font-size: 0.8rem; height: 32px; text-align: center;">
+            </td>
+        </tr>
+    `).join('');
+
+    document.getElementById('spec-modal').classList.add('active');
+}
+
+function closeChecklistSpecModal() {
+    state.editingSpecOpIdx = null;
+    document.getElementById('spec-modal').classList.remove('active');
+}
+
+function saveChecklistSpecModal() {
+    const opIdx = state.editingSpecOpIdx;
+    if (opIdx === null || opIdx === undefined) return;
+    const op = state.formOperations[opIdx];
+    if (!op) return;
+
+    const list = [];
+    const rows = document.querySelectorAll('#spec-modal-tbody tr');
+    rows.forEach(tr => {
+        const desc = tr.querySelector('.spec-desc-input').value.trim();
+        const dimenVal = tr.querySelector('.spec-dimen-input').value;
+        const loTolVal = tr.querySelector('.spec-loTol-input').value;
+        const hiTolVal = tr.querySelector('.spec-hiTol-input').value;
+
+        const dimen = dimenVal !== '' ? parseFloat(dimenVal) : null;
+        const loTol = loTolVal !== '' ? parseFloat(loTolVal) : null;
+        const hiTol = hiTolVal !== '' ? parseFloat(hiTolVal) : null;
+
+        list.push({ desc, dimen, loTol, hiTol });
+    });
+
+    op.inspectionChecklist = list;
+    closeChecklistSpecModal();
+    renderPartFormOps();
+    showNotification('📋 Specifications saved to operation routing', 'success');
+}
+
 function syncFormOperationsFromDOM() {
     document.querySelectorAll('#part-form-ops-tbody tr').forEach(tr => {
         const idx = parseInt(tr.dataset.idx);
@@ -141,7 +215,6 @@ function syncFormOperationsFromDOM() {
             op.machineId = mId ? parseInt(mId) : null;
             op.cycleTime = Math.max(0, parseFloat(tr.querySelector('.op-cycle').value) || 0);
             op.setupTime = Math.max(0, parseFloat(tr.querySelector('.op-setup').value) || 0);
-            op.inspectionSpecs = tr.querySelector('.op-spec-input').value.trim();
         }
     });
 }
@@ -254,7 +327,10 @@ function renderPartFormOps() {
                     <span class="time-unit">min</span>
                 </td>
                 <td>
-                    <input type="text" class="input op-spec-input" value="${escapeHtml(op.inspectionSpecs || '')}" placeholder="e.g. Check dimension 10mm" style="width: 100%;">
+                    <button class="btn btn-sm btn-ghost btn-configure-specs" data-idx="${idx}" style="color: var(--accent-primary); border: 1px solid var(--border-subtle); padding: 4px 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.72rem; height: 30px;">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="2" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4.5h3M4.5 6.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        <span>${(op.inspectionChecklist && op.inspectionChecklist.some(r => r.desc || r.dimen)) ? '📋 Configured' : '📋 Configure'}</span>
+                    </button>
                 </td>
                 <td class="row-total-cell" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
                     ${Number(processTime.toFixed(1))}m
@@ -290,6 +366,14 @@ function renderPartFormOps() {
             syncFormOperationsFromDOM();
             state.formOperations.splice(parseInt(btn.dataset.idx), 1);
             renderPartFormOps();
+        });
+    });
+    tbody.querySelectorAll('.btn-configure-specs').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const idx = parseInt(btn.dataset.idx);
+            syncFormOperationsFromDOM();
+            openChecklistSpecModal(idx);
         });
     });
 }
@@ -1766,12 +1850,15 @@ function populateInspectionPartOpDropdown() {
 
 function handleInspectionPartOpChange() {
     const partOpVal = document.getElementById('inspect-part-op').value;
-    const specBox = document.getElementById('inspect-spec-box');
-    const specText = document.getElementById('inspect-spec-text');
-    if (!specBox || !specText) return;
+    const tbody = document.getElementById('inspect-checklist-tbody');
+    if (!tbody) return;
 
     if (!partOpVal) {
-        specBox.style.display = 'none';
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="15" style="text-align: center; color: var(--text-muted); padding: 40px;">Select an active part and operation to enter specifications and component checks.</td>
+            </tr>
+        `;
         return;
     }
 
@@ -1782,12 +1869,103 @@ function handleInspectionPartOpChange() {
     const part = state.parts.find(p => p.id === partId);
     const op = part ? part.operations[opIndex] : null;
 
-    if (op) {
-        specText.textContent = op.inspectionSpecs || 'No text spec configured.';
-        specBox.style.display = 'block';
-    } else {
-        specText.textContent = 'No spec configured for this operation.';
-        specBox.style.display = 'block';
+    if (!op || !op.inspectionChecklist || !op.inspectionChecklist.some(r => r.desc || r.dimen)) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="15" style="text-align: center; color: var(--text-muted); padding: 40px;">⚠️ No specifications configured for this operation. Add parameters in the Part Form modal first.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    // Render the active rows
+    tbody.innerHTML = op.inspectionChecklist.map((item, idx) => {
+        if (!item.desc && !item.dimen) return ''; // Skip empty rows
+
+        const dimenText = item.dimen !== null && item.dimen !== undefined ? item.dimen : '—';
+        const loText = item.loTol !== null && item.loTol !== undefined ? item.loTol : '—';
+        const hiText = item.hiTol !== null && item.hiTol !== undefined ? item.hiTol : '—';
+
+        // Generate 10 input fields for Comp 1 to Comp 10
+        let compInputsHtml = '';
+        for (let c = 1; c <= 10; c++) {
+            compInputsHtml += `
+                <td style="padding: 4px; text-align: center;">
+                    <input type="number" step="0.001" class="input inspect-comp-input" 
+                        data-row="${idx}" data-col="${c}" 
+                        data-dimen="${item.dimen !== null ? item.dimen : ''}" 
+                        data-lotol="${item.loTol !== null ? item.loTol : ''}" 
+                        data-hitol="${item.hiTol !== null ? item.hiTol : ''}"
+                        placeholder="—" style="font-size: 0.75rem; text-align: center; padding: 2px 4px; height: 26px; min-width: 60px;">
+                </td>
+            `;
+        }
+
+        return `
+            <tr data-row="${idx}">
+                <td style="text-align: center; font-weight: 600; color: var(--text-muted);">${idx + 1}</td>
+                <td><strong>${escapeHtml(item.desc || 'Parameter')}</strong></td>
+                <td style="text-align: center; font-family: 'JetBrains Mono', monospace;">${dimenText}</td>
+                <td style="text-align: center; font-family: 'JetBrains Mono', monospace; color: var(--color-error);">${loText}</td>
+                <td style="text-align: center; font-family: 'JetBrains Mono', monospace; color: var(--color-success);">${hiText}</td>
+                ${compInputsHtml}
+            </tr>
+        `;
+    }).join('');
+
+    // Attach validation listeners
+    tbody.querySelectorAll('.inspect-comp-input').forEach(input => {
+        input.addEventListener('input', () => {
+            validateChecklistInputs();
+        });
+    });
+}
+
+function validateChecklistInputs() {
+    let hasFailures = false;
+    let anyFilled = false;
+    const inputs = document.querySelectorAll('.inspect-comp-input');
+    
+    inputs.forEach(input => {
+        const valStr = input.value.trim();
+        if (valStr === '') {
+            input.style.background = '';
+            input.style.color = '';
+            input.style.borderColor = '';
+            return;
+        }
+
+        anyFilled = true;
+        const val = parseFloat(valStr);
+        const dimen = parseFloat(input.dataset.dimen);
+        const loTol = parseFloat(input.dataset.lotol);
+        const hiTol = parseFloat(input.dataset.hitol);
+
+        if (!isNaN(dimen)) {
+            const min = dimen + (isNaN(loTol) ? 0 : loTol);
+            const max = dimen + (isNaN(hiTol) ? 0 : hiTol);
+            
+            if (val < min || val > max) {
+                input.style.background = 'var(--color-error-light, #fee2e2)';
+                input.style.color = 'var(--color-error, #ef4444)';
+                input.style.borderColor = '#f87171';
+                hasFailures = true;
+            } else {
+                input.style.background = 'var(--color-success-light, #dcfce7)';
+                input.style.color = 'var(--color-success, #22c55e)';
+                input.style.borderColor = '#86efac';
+            }
+        }
+    });
+
+    // Auto-update status select if there is a failure detected
+    const statusSelect = document.getElementById('inspect-status');
+    if (statusSelect) {
+        if (hasFailures) {
+            statusSelect.value = 'Fail';
+        } else if (anyFilled) {
+            statusSelect.value = 'Pass';
+        }
     }
 }
 
@@ -1881,6 +2059,18 @@ function saveInspectionReport() {
     const partId = parseInt(partIdStr);
     const opIndex = parseInt(opIndexStr);
 
+    // Collect measurements
+    const measurements = {};
+    document.querySelectorAll('.inspect-comp-input').forEach(input => {
+        const row = input.dataset.row;
+        const col = input.dataset.col;
+        const val = input.value.trim() !== '' ? parseFloat(input.value) : null;
+        if (!measurements[row]) {
+            measurements[row] = [];
+        }
+        measurements[row][col - 1] = val;
+    });
+
     const report = {
         id: Date.now(),
         partId,
@@ -1891,7 +2081,8 @@ function saveInspectionReport() {
         qtyOk: qtyOkVal,
         qtyNg: qtyNgVal,
         status: statusVal,
-        remarks: notesVal
+        remarks: notesVal,
+        measurements
     };
 
     if (!state.inspectionReports) state.inspectionReports = [];
@@ -1906,7 +2097,7 @@ function saveInspectionReport() {
     document.getElementById('inspect-qty-ok').value = '';
     document.getElementById('inspect-qty-ng').value = '';
     document.getElementById('inspect-notes').value = '';
-    document.getElementById('inspect-spec-box').style.display = 'none';
+    handleInspectionPartOpChange();
 
     showNotification('✅ Inspection report saved successfully', 'success');
 }
@@ -1917,7 +2108,7 @@ function exportInspectionsCSV() {
         return;
     }
 
-    let csv = 'Date,Part Name,Operation,Inspector,Inspected Qty,OK Qty,NG Qty,Status,Remarks\r\n';
+    let csv = 'Date,Part Name,Operation,Inspector,Inspected Qty,OK Qty,NG Qty,Overall Status,Remarks,Parameter Sl.No,Parameter Desc,Nominal Dimen,Lo Tol,Hi Tol,Comp 1,Comp 2,Comp 3,Comp 4,Comp 5,Comp 6,Comp 7,Comp 8,Comp 9,Comp 10\r\n';
 
     state.inspectionReports.forEach(r => {
         const part = state.parts.find(p => p.id === r.partId);
@@ -1925,18 +2116,55 @@ function exportInspectionsCSV() {
         const op = part ? part.operations[r.opIndex] : null;
         const opName = op ? `Op ${r.opIndex + 1}: ${op.opName || 'Unnamed'}` : `Op ${r.opIndex + 1}`;
 
-        const row = [
-            r.date,
-            `"${partName.replace(/"/g, '""')}"`,
-            `"${opName.replace(/"/g, '""')}"`,
-            `"${r.inspector.replace(/"/g, '""')}"`,
-            r.qtyInspected,
-            r.qtyOk,
-            r.qtyNg,
-            r.status,
-            `"${(r.remarks || '').replace(/"/g, '""')}"`
-        ].join(',');
-        csv += row + '\r\n';
+        const checklist = (op && op.inspectionChecklist) ? op.inspectionChecklist.filter(item => item.desc || item.dimen) : [];
+
+        if (checklist.length === 0) {
+            const row = [
+                r.date,
+                `"${partName.replace(/"/g, '""')}"`,
+                `"${opName.replace(/"/g, '""')}"`,
+                `"${r.inspector.replace(/"/g, '""')}"`,
+                r.qtyInspected,
+                r.qtyOk,
+                r.qtyNg,
+                r.status,
+                `"${(r.remarks || '').replace(/"/g, '""')}"`,
+                '—', '—', '—', '—', '—',
+                '','','','','','','','','',''
+            ].join(',');
+            csv += row + '\r\n';
+        } else {
+            checklist.forEach((item, idx) => {
+                const measurements = (r.measurements && r.measurements[idx]) ? r.measurements[idx] : [];
+                const row = [
+                    r.date,
+                    `"${partName.replace(/"/g, '""')}"`,
+                    `"${opName.replace(/"/g, '""')}"`,
+                    `"${r.inspector.replace(/"/g, '""')}"`,
+                    r.qtyInspected,
+                    r.qtyOk,
+                    r.qtyNg,
+                    r.status,
+                    `"${(r.remarks || '').replace(/"/g, '""')}"`,
+                    idx + 1,
+                    `"${(item.desc || 'Parameter').replace(/"/g, '""')}"`,
+                    item.dimen !== null && item.dimen !== undefined ? item.dimen : '—',
+                    item.loTol !== null && item.loTol !== undefined ? item.loTol : '—',
+                    item.hiTol !== null && item.hiTol !== undefined ? item.hiTol : '—',
+                    measurements[0] !== null && measurements[0] !== undefined ? measurements[0] : '',
+                    measurements[1] !== null && measurements[1] !== undefined ? measurements[1] : '',
+                    measurements[2] !== null && measurements[2] !== undefined ? measurements[2] : '',
+                    measurements[3] !== null && measurements[3] !== undefined ? measurements[3] : '',
+                    measurements[4] !== null && measurements[4] !== undefined ? measurements[4] : '',
+                    measurements[5] !== null && measurements[5] !== undefined ? measurements[5] : '',
+                    measurements[6] !== null && measurements[6] !== undefined ? measurements[6] : '',
+                    measurements[7] !== null && measurements[7] !== undefined ? measurements[7] : '',
+                    measurements[8] !== null && measurements[8] !== undefined ? measurements[8] : '',
+                    measurements[9] !== null && measurements[9] !== undefined ? measurements[9] : ''
+                ].join(',');
+                csv += row + '\r\n';
+            });
+        }
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2424,6 +2652,12 @@ function init() {
     document.getElementById('btn-add-db-part').addEventListener('click', openAddFromDatabaseModal);
     document.getElementById('btn-close-db-modal').addEventListener('click', () => {
         document.getElementById('db-modal').classList.remove('active');
+    });
+    document.getElementById('btn-close-spec-modal').addEventListener('click', () => {
+        closeChecklistSpecModal();
+    });
+    document.getElementById('btn-save-spec-modal').addEventListener('click', () => {
+        saveChecklistSpecModal();
     });
 
     // Form buttons
