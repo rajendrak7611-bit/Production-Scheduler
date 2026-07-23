@@ -1643,7 +1643,7 @@ function renderProductionLogs() {
     if (!state.productionLogs || state.productionLogs.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">No production logs recorded yet.</td>
+                <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">No production logs recorded yet.</td>
             </tr>
         `;
         renderCompletionSummary();
@@ -1651,7 +1651,6 @@ function renderProductionLogs() {
     }
     
     tbody.innerHTML = state.productionLogs.map((log, index) => {
-        // Find part/op names
         const part = state.parts.find(p => p.id === log.partId);
         const partName = part ? part.name : 'Unknown Part';
         const op = part ? part.operations[log.opIndex] : null;
@@ -1679,6 +1678,8 @@ function renderProductionLogs() {
                     })()}
                 </td>
                 <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${log.qty}</td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${log.targetQty !== undefined ? log.targetQty : '—'}</td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${log.efficiency !== undefined ? log.efficiency + '%' : '—'}</td>
                 <td style="text-align: center;">
                     <button class="btn-icon delete-log-btn" data-index="${index}" title="Delete log entry" style="color: var(--color-error); padding: 2px;">
                         <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1774,6 +1775,37 @@ function renderCompletionSummary() {
     tbody.innerHTML = rowsHtml;
 }
 
+function recalculateLogTargetAndEfficiency() {
+    const partOpVal = document.getElementById('log-part-op').value;
+    const hoursVal = parseFloat(document.getElementById('log-hours').value) || 0;
+    const qtyVal = parseInt(document.getElementById('log-qty').value) || 0;
+
+    let cycleTime = 0;
+    if (partOpVal) {
+        const [partIdStr, opIndexStr] = partOpVal.split('-');
+        const partId = parseInt(partIdStr);
+        const opIndex = parseInt(opIndexStr);
+        const part = state.parts.find(p => p.id === partId);
+        const op = part ? part.operations[opIndex] : null;
+        if (op) {
+            cycleTime = parseFloat(op.cycleTime) || 0;
+        }
+    }
+
+    let targetQty = 0;
+    if (cycleTime > 0 && hoursVal > 0) {
+        targetQty = Math.round((hoursVal * 60) / cycleTime);
+    }
+
+    let efficiency = 0;
+    if (qtyVal > 0 && targetQty > 0) {
+        efficiency = Math.round((targetQty / qtyVal) * 100);
+    }
+
+    document.getElementById('log-target-qty').textContent = targetQty;
+    document.getElementById('log-efficiency').textContent = qtyVal > 0 ? `${efficiency}%` : '0%';
+}
+
 function saveProductionLog() {
     const partOpVal = document.getElementById('log-part-op').value;
     const dateVal = document.getElementById('log-date').value;
@@ -1837,6 +1869,9 @@ function saveProductionLog() {
         }
     }
 
+    const targetQty = parseInt(document.getElementById('log-target-qty').textContent) || 0;
+    const efficiency = parseInt(document.getElementById('log-efficiency').textContent) || 0;
+
     const newLog = {
         id: Date.now(),
         partId,
@@ -1846,7 +1881,9 @@ function saveProductionLog() {
         shift: shiftVal,
         hours: hoursVal,
         qty: qtyVal,
-        idleLogs: idleLogs
+        idleLogs: idleLogs,
+        targetQty: targetQty,
+        efficiency: efficiency
     };
     
     state.productionLogs.push(newLog);
@@ -1863,6 +1900,8 @@ function saveProductionLog() {
     document.getElementById('log-part-op').value = '';
     document.getElementById('log-hours').value = '';
     document.getElementById('log-qty').value = '';
+    document.getElementById('log-target-qty').textContent = '0';
+    document.getElementById('log-efficiency').textContent = '0%';
     for (let i = 1; i <= 3; i++) {
         document.getElementById(`log-idle-hours-${i}`).value = '';
         document.getElementById(`log-idle-reason-${i}`).value = '';
@@ -1877,7 +1916,7 @@ function exportLogsCSV() {
         return;
     }
     
-    let csv = 'Date,Part Name,Operation,Machine,Operator,Shift,Actual Hours,Qty Completed,Total Idle Hours,Setting,Setup,No power,No load,No operator,Maint,Tool Issue,Quality issue,No setter,Misc\r\n';
+    let csv = 'Date,Part Name,Operation,Machine,Operator,Shift,Actual Hours,Actual Qty,Target Qty,Efficiency,Total Idle Hours,Setting,Setup,No power,No load,No operator,Maint,Tool Issue,Quality issue,No setter,Misc\r\n';
     
     state.productionLogs.forEach(log => {
         const part = state.parts.find(p => p.id === log.partId);
@@ -1909,6 +1948,8 @@ function exportLogsCSV() {
             `"${log.shift.replace(/"/g, '""')}"`,
             log.hours,
             log.qty,
+            log.targetQty !== undefined ? log.targetQty : 0,
+            log.efficiency !== undefined ? log.efficiency + '%' : '0%',
             totalIdle,
             ...reasons.map(r => reasonHours[r] > 0 ? reasonHours[r] : '')
         ].join(',');
@@ -3074,6 +3115,9 @@ function init() {
 
     // Save Production Log Entry
     document.getElementById('btn-save-log').addEventListener('click', saveProductionLog);
+    document.getElementById('log-hours').addEventListener('input', recalculateLogTargetAndEfficiency);
+    document.getElementById('log-qty').addEventListener('input', recalculateLogTargetAndEfficiency);
+    document.getElementById('log-part-op').addEventListener('change', recalculateLogTargetAndEfficiency);
 
     // Save Operator
     document.getElementById('btn-save-operator').addEventListener('click', saveOperator);
