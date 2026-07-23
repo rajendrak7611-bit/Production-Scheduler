@@ -29,6 +29,7 @@ const state = {
     currentMasterSubTab: 'machines',
     inspectionReports: [],
     editingSpecOpIdx: null,
+    activeInspectionReportId: null,
 };
 
 // ==================== COLOR PALETTE ====================
@@ -2013,6 +2014,9 @@ function renderInspectionReports() {
                 <td style="text-align: center;"><span class="badge ${badgeClass}">${report.status}</span></td>
                 <td style="font-size: 0.78rem; color: var(--text-secondary);">${escapeHtml(report.remarks || '—')}</td>
                 <td style="text-align: center;">
+                    <button class="btn-icon load-inspection-btn" data-id="${report.id}" title="Retrieve inspection details" style="color: var(--accent-primary); padding: 2px; margin-right: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
                     <button class="btn-icon delete-inspection-btn" data-index="${index}" title="Delete inspection report" style="color: var(--color-error); padding: 2px;">
                         <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
@@ -2032,14 +2036,68 @@ function renderInspectionReports() {
             }
         });
     });
+
+    tbody.querySelectorAll('.load-inspection-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = parseInt(btn.dataset.id);
+            loadInspectionReport(id);
+        });
+    });
+}
+
+function loadInspectionReport(id) {
+    const report = state.inspectionReports.find(r => r.id === id);
+    if (!report) return;
+
+    state.activeInspectionReportId = report.id;
+
+    // Populate inputs
+    document.getElementById('inspect-part-op').value = `${report.partId}-${report.opIndex}`;
+    document.getElementById('inspect-inspector').value = report.inspector;
+    document.getElementById('inspect-qty-inspected').value = report.qtyInspected;
+    document.getElementById('inspect-qty-ok').value = report.qtyOk;
+    document.getElementById('inspect-qty-ng').value = report.qtyNg;
+    document.getElementById('inspect-status').value = report.status;
+    document.getElementById('inspect-notes').value = report.remarks || '';
+
+    // Render checklist
+    handleInspectionPartOpChange();
+
+    // Fill measurements
+    if (report.measurements) {
+        Object.keys(report.measurements).forEach(rowIdx => {
+            const rowVals = report.measurements[rowIdx];
+            rowVals.forEach((val, colIdx) => {
+                const input = document.querySelector(`.inspect-comp-input[data-row="${rowIdx}"][data-col="${colIdx + 1}"]`);
+                if (input) {
+                    input.value = val !== null && val !== undefined ? val : '';
+                }
+            });
+        });
+    }
+
+    validateChecklistInputs();
+    showNotification('📋 Inspection report retrieved successfully', 'success');
+}
+
+function clearInspectionForm() {
+    state.activeInspectionReportId = null;
+    document.getElementById('inspect-part-op').value = '';
+    document.getElementById('inspect-inspector').value = '';
+    document.getElementById('inspect-qty-inspected').value = '';
+    document.getElementById('inspect-qty-ok').value = '';
+    document.getElementById('inspect-qty-ng').value = '';
+    document.getElementById('inspect-status').value = 'Pass';
+    document.getElementById('inspect-notes').value = '';
+    handleInspectionPartOpChange();
 }
 
 function saveInspectionReport() {
     const partOpVal = document.getElementById('inspect-part-op').value;
     const inspectorVal = document.getElementById('inspect-inspector').value.trim();
-    const qtyInspectedVal = parseInt(document.getElementById('inspect-qty-inspected').value);
-    const qtyOkVal = parseInt(document.getElementById('inspect-qty-ok').value);
-    const qtyNgVal = parseInt(document.getElementById('inspect-qty-ng').value);
+    const qtyInspectedVal = parseInt(document.getElementById('inspect-qty-inspected').value) || 0;
+    const qtyOkVal = parseInt(document.getElementById('inspect-qty-ok').value) || 0;
+    const qtyNgVal = parseInt(document.getElementById('inspect-qty-ng').value) || 0;
     const statusVal = document.getElementById('inspect-status').value;
     const notesVal = document.getElementById('inspect-notes').value.trim();
 
@@ -2051,11 +2109,11 @@ function saveInspectionReport() {
         showNotification('⚠️ Please enter Inspector name', 'error');
         return;
     }
-    if (isNaN(qtyInspectedVal) || qtyInspectedVal <= 0) {
+    if (qtyInspectedVal <= 0) {
         showNotification('⚠️ Inspected quantity must be greater than 0', 'error');
         return;
     }
-    if (isNaN(qtyOkVal) || qtyOkVal < 0 || isNaN(qtyNgVal) || qtyNgVal < 0) {
+    if (qtyOkVal < 0 || qtyNgVal < 0) {
         showNotification('⚠️ OK and NG quantities cannot be negative', 'error');
         return;
     }
@@ -2080,35 +2138,44 @@ function saveInspectionReport() {
         measurements[row][col - 1] = val;
     });
 
-    const report = {
-        id: Date.now(),
-        partId,
-        opIndex,
-        date: new Date().toISOString().slice(0, 10),
-        inspector: inspectorVal,
-        qtyInspected: qtyInspectedVal,
-        qtyOk: qtyOkVal,
-        qtyNg: qtyNgVal,
-        status: statusVal,
-        remarks: notesVal,
-        measurements
-    };
+    if (state.activeInspectionReportId !== null) {
+        // Update existing report
+        const report = state.inspectionReports.find(r => r.id === state.activeInspectionReportId);
+        if (report) {
+            report.partId = partId;
+            report.opIndex = opIndex;
+            report.inspector = inspectorVal;
+            report.qtyInspected = qtyInspectedVal;
+            report.qtyOk = qtyOkVal;
+            report.qtyNg = qtyNgVal;
+            report.status = statusVal;
+            report.remarks = notesVal;
+            report.measurements = measurements;
+            showNotification('✅ Inspection report updated successfully', 'success');
+        }
+    } else {
+        // Create new report
+        const report = {
+            id: Date.now(),
+            partId,
+            opIndex,
+            date: new Date().toISOString().slice(0, 10),
+            inspector: inspectorVal,
+            qtyInspected: qtyInspectedVal,
+            qtyOk: qtyOkVal,
+            qtyNg: qtyNgVal,
+            status: statusVal,
+            remarks: notesVal,
+            measurements
+        };
+        if (!state.inspectionReports) state.inspectionReports = [];
+        state.inspectionReports.push(report);
+        showNotification('✅ Inspection report saved successfully', 'success');
+    }
 
-    if (!state.inspectionReports) state.inspectionReports = [];
-    state.inspectionReports.push(report);
     saveData();
     renderInspectionReports();
-
-    // Reset input fields
-    document.getElementById('inspect-part-op').value = '';
-    document.getElementById('inspect-inspector').value = '';
-    document.getElementById('inspect-qty-inspected').value = '';
-    document.getElementById('inspect-qty-ok').value = '';
-    document.getElementById('inspect-qty-ng').value = '';
-    document.getElementById('inspect-notes').value = '';
-    handleInspectionPartOpChange();
-
-    showNotification('✅ Inspection report saved successfully', 'success');
+    clearInspectionForm();
 }
 
 function exportInspectionsCSV() {
@@ -2741,6 +2808,7 @@ function init() {
 
     // Save Quality Inspection
     document.getElementById('btn-save-inspection').addEventListener('click', saveInspectionReport);
+    document.getElementById('btn-clear-inspection').addEventListener('click', clearInspectionForm);
 
     // Export Inspections to CSV
     document.getElementById('btn-export-inspections-csv').addEventListener('click', exportInspectionsCSV);
