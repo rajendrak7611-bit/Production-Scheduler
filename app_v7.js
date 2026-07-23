@@ -145,7 +145,8 @@ function isChecklistItemConfigured(item) {
 
 function isToolSpecItemConfigured(item) {
     if (!item) return false;
-    return (item.tool && item.tool.trim() !== '') ||
+    return (item.subOpn && item.subOpn.trim() !== '') ||
+           (item.tool && item.tool.trim() !== '') ||
            (item.holder && item.holder.trim() !== '') ||
            (item.length && item.length.trim() !== '') ||
            (item.insert && item.insert.trim() !== '');
@@ -236,7 +237,7 @@ function openToolSpecModal(opIdx) {
 
     const list = [];
     for (let i = 0; i < 10; i++) {
-        const item = op.toolSpec[i] || { tool: '', holder: '', length: '', insert: '' };
+        const item = op.toolSpec[i] || { subOpn: '', tool: '', holder: '', length: '', insert: '' };
         list.push(item);
     }
     op.toolSpec = list;
@@ -245,6 +246,9 @@ function openToolSpecModal(opIdx) {
     tbody.innerHTML = list.map((item, idx) => `
         <tr>
             <td style="text-align: center; font-weight: 600; color: var(--text-muted);">${idx + 1}</td>
+            <td>
+                <input type="text" class="input tool-subOpn-input" value="${escapeHtml(item.subOpn || '')}" placeholder="e.g. Boring" style="font-size: 0.8rem; height: 32px;">
+            </td>
             <td>
                 <input type="text" class="input tool-name-input" value="${escapeHtml(item.tool || '')}" placeholder="e.g. Roughing Boring Bar" style="font-size: 0.8rem; height: 32px;">
             </td>
@@ -277,11 +281,12 @@ function saveToolSpecModal() {
     const list = [];
     const rows = document.querySelectorAll('#tool-spec-modal-tbody tr');
     rows.forEach(tr => {
+        const subOpn = tr.querySelector('.tool-subOpn-input').value.trim();
         const tool = tr.querySelector('.tool-name-input').value.trim();
         const holder = tr.querySelector('.tool-holder-input').value.trim();
         const length = tr.querySelector('.tool-length-input').value.trim();
         const insert = tr.querySelector('.tool-insert-input').value.trim();
-        list.push({ tool, holder, length, insert });
+        list.push({ subOpn, tool, holder, length, insert });
     });
 
     op.toolSpec = list;
