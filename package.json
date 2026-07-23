@@ -2,10 +2,10 @@
   "name": "scheduling-app",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "app_v7.js",
   "scripts": {
     "dev": "vite",
-    "build": "mkdir -p dist && cp index.html dist/ && cp app.js dist/ && cp style.css dist/"
+    "build": "mkdir -p dist && cp index.html dist/ && cp app_v7.js dist/ && cp style.css dist/"
   },
   "keywords": [],
   "author": "",
