@@ -1799,7 +1799,7 @@ function recalculateLogTargetAndEfficiency() {
 
     let efficiency = 0;
     if (qtyVal > 0 && targetQty > 0) {
-        efficiency = Math.round((targetQty / qtyVal) * 100);
+        efficiency = Math.round((qtyVal / targetQty) * 100);
     }
 
     document.getElementById('log-target-qty').textContent = targetQty;
