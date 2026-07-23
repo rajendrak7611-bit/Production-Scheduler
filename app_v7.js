@@ -3298,7 +3298,7 @@ function handleToolPartOpChange(e) {
     const [partIdStr, opIndexStr] = val.split('-');
     const partId = parseInt(partIdStr);
     const opIndex = parseInt(opIndexStr);
-    const part = state.parts.find(p => p.id === partId);
+    const part = state.parts.find(p => p.id == partId);
     const op = part ? part.operations[opIndex] : null;
     
     if (op && op.toolSpec && Array.isArray(op.toolSpec)) {
