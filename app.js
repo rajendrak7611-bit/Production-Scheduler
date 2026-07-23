@@ -254,15 +254,7 @@ function renderPartFormOps() {
                     <span class="time-unit">min</span>
                 </td>
                 <td>
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <input type="text" class="input op-spec-input" value="${escapeHtml(op.inspectionSpecs || '')}" placeholder="e.g. Check dimension 10mm" style="width: 100%; font-size: 0.75rem; height: 28px; padding: 2px 6px;">
-                        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem;">
-                            <button class="btn btn-sm btn-ghost btn-link-excel" data-idx="${idx}" style="padding: 2px 4px; height: auto; color: var(--accent-primary); font-size: 0.7rem; line-height: 1;">
-                                ${op.excelLink ? 'Change Link' : '🔗 Link Excel Sheet'}
-                            </button>
-                            ${op.excelLink ? `<a href="${escapeHtml(op.excelLink)}" target="_blank" class="excel-doc-link" style="color: var(--color-success); text-decoration: underline; font-weight: 500; word-break: break-all;" title="${escapeHtml(op.excelLink)}">${escapeHtml(document.getElementById('part-form-name').value.trim() || 'Part')}_Op${idx+1}_Checklist.xlsx</a>` : ''}
-                        </div>
-                    </div>
+                    <input type="text" class="input op-spec-input" value="${escapeHtml(op.inspectionSpecs || '')}" placeholder="e.g. Check dimension 10mm" style="width: 100%;">
                 </td>
                 <td class="row-total-cell" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)">
                     ${Number(processTime.toFixed(1))}m
@@ -298,21 +290,6 @@ function renderPartFormOps() {
             syncFormOperationsFromDOM();
             state.formOperations.splice(parseInt(btn.dataset.idx), 1);
             renderPartFormOps();
-        });
-    });
-    tbody.querySelectorAll('.btn-link-excel').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const idx = parseInt(btn.dataset.idx);
-            syncFormOperationsFromDOM();
-            const partName = document.getElementById('part-form-name').value.trim() || 'Part';
-            const opName = state.formOperations[idx].opName || `Operation ${idx + 1}`;
-            const defaultVal = state.formOperations[idx].excelLink || '';
-            const link = prompt(`Enter URL or File Path to the Excel sheet for ${partName} - ${opName}:`, defaultVal);
-            if (link !== null) {
-                state.formOperations[idx].excelLink = link.trim();
-                renderPartFormOps();
-            }
         });
     });
 }
@@ -1806,16 +1783,7 @@ function handleInspectionPartOpChange() {
     const op = part ? part.operations[opIndex] : null;
 
     if (op) {
-        let contentHtml = `<div>${escapeHtml(op.inspectionSpecs || 'No text spec configured.')}</div>`;
-        if (op.excelLink) {
-            const sheetName = `${part.name}_Op${opIndex + 1}_Checklist.xlsx`;
-            contentHtml += `
-                <div style="margin-top: 6px; font-weight: 500; display: flex; align-items: center; gap: 4px;">
-                    📊 Excel Checklist: <a href="${escapeHtml(op.excelLink)}" target="_blank" style="color: var(--accent-primary); text-decoration: underline; font-weight: 600; word-break: break-all;">${escapeHtml(sheetName)}</a>
-                </div>
-            `;
-        }
-        specText.innerHTML = contentHtml;
+        specText.textContent = op.inspectionSpecs || 'No text spec configured.';
         specBox.style.display = 'block';
     } else {
         specText.textContent = 'No spec configured for this operation.';
