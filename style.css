@@ -205,12 +205,12 @@ body {
 .control-group-inline { display: flex; align-items: center; gap: 6px; }
 .control-group-inline label { font-size: 0.72rem; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
 
-.select-wrapper { position: relative; display: flex; align-items: center; }
+.select-wrapper { position: relative; display: flex; align-items: center; width: 100%; }
 .select-wrapper select {
     appearance: none; background: var(--bg-surface); border: 1px solid var(--border-default);
     border-radius: var(--radius-sm); padding: 7px 32px 7px 12px; color: var(--text-primary);
     font-family: inherit; font-size: 0.82rem; font-weight: 500; cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s; min-width: 200px;
+    transition: border-color 0.2s, box-shadow 0.2s; width: 100%; max-width: 100%; min-width: 0;
 }
 .select-wrapper select:hover { border-color: var(--accent-primary); }
 .select-wrapper select:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-glow); }
