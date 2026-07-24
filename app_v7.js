@@ -32,7 +32,8 @@ const state = {
     activeInspectionReportId: null,
     editingToolOpIdx: null,
     toolMonitorLogs: [],
-    activeToolMonitorId: null
+    activeToolMonitorId: null,
+    toolLibrary: []
 };
 
 // ==================== COLOR PALETTE ====================
@@ -542,7 +543,8 @@ function saveData() {
             productionLines: state.productionLines,
             users: state.users,
             inspectionReports: state.inspectionReports,
-            toolMonitorLogs: state.toolMonitorLogs
+            toolMonitorLogs: state.toolMonitorLogs,
+            toolLibrary: state.toolLibrary
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) { /* localStorage might not be available */ }
@@ -577,7 +579,8 @@ function loadData() {
         state.users = data.users || [];
         state.inspectionReports = data.inspectionReports || [];
         state.toolMonitorLogs = data.toolMonitorLogs || [];
-        return state.machines.length > 0 || state.parts.length > 0 || state.partDatabase.length > 0 || state.productionLogs.length > 0 || state.operators.length > 0 || state.productionLines.length > 0 || state.users.length > 0 || state.inspectionReports.length > 0 || state.toolMonitorLogs.length > 0;
+        state.toolLibrary = data.toolLibrary || [];
+        return state.machines.length > 0 || state.parts.length > 0 || state.partDatabase.length > 0 || state.productionLogs.length > 0 || state.operators.length > 0 || state.productionLines.length > 0 || state.users.length > 0 || state.inspectionReports.length > 0 || state.toolMonitorLogs.length > 0 || state.toolLibrary.length > 0;
     } catch (e) { return false; }
 }
 
@@ -591,6 +594,7 @@ function clearAllData() {
     state.users = [];
     state.inspectionReports = [];
     state.toolMonitorLogs = [];
+    state.toolLibrary = [];
     state.schedule = null;
     state.isScheduled = false;
     state.selectedPart = null;
@@ -604,6 +608,7 @@ function clearAllData() {
     renderUsers();
     renderInspectionReports();
     renderToolMonitorLogs();
+    renderToolLibrary();
     updateCounts();
     showNotification('All data cleared', 'info');
 }
@@ -1474,6 +1479,10 @@ function switchMasterSubView(subTab) {
         activeBtn.classList.add('active');
         activeBtn.style.background = 'var(--bg-card)';
         activeBtn.style.color = 'var(--text-primary)';
+    }
+
+    if (subTab === 'tools') {
+        renderToolLibrary();
     }
 }
 
@@ -3152,6 +3161,9 @@ function init() {
     // Save User
     document.getElementById('btn-save-user').addEventListener('click', saveUser);
 
+    // Save Tool
+    document.getElementById('btn-save-tool').addEventListener('click', saveToolLibraryItem);
+
     // Save Quality Inspection
     document.getElementById('btn-save-inspection').addEventListener('click', saveInspectionReport);
     document.getElementById('btn-clear-inspection').addEventListener('click', clearInspectionForm);
@@ -3469,6 +3481,77 @@ function exportToolMonitorCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// ==================== TOOL LIBRARY LOGIC ====================
+
+function renderToolLibrary() {
+    const tbody = document.getElementById('tool-library-tbody');
+    if (!tbody) return;
+
+    if (!state.toolLibrary || state.toolLibrary.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 20px;">No tools configured. Add a tool.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = state.toolLibrary.map((tool, index) => `
+        <tr>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 500;">${escapeHtml(tool.number)}</td>
+            <td>${escapeHtml(tool.description)}</td>
+            <td style="text-align: center;">
+                <button class="btn-icon delete-tool-lib-btn" data-index="${index}" title="Remove tool" style="color: var(--color-error); padding: 2px;">
+                    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5.5 6.5v3.5M8.5 6.5v3.5M3.5 4l.5 7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    tbody.querySelectorAll('.delete-tool-lib-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.index);
+            state.toolLibrary.splice(idx, 1);
+            saveData();
+            renderToolLibrary();
+            showNotification('🛠️ Tool removed from library', 'info');
+        });
+    });
+}
+
+function saveToolLibraryItem() {
+    const numberInput = document.getElementById('tool-form-number');
+    const descInput = document.getElementById('tool-form-desc');
+    if (!numberInput || !descInput) return;
+
+    const number = numberInput.value.trim();
+    const description = descInput.value.trim();
+
+    if (!number) {
+        showNotification('⚠️ Please enter Tool Number', 'error');
+        return;
+    }
+    if (!description) {
+        showNotification('⚠️ Please enter Tool Description', 'error');
+        return;
+    }
+
+    // Check duplicate
+    const exists = state.toolLibrary.some(t => t.number.toLowerCase() === number.toLowerCase());
+    if (exists) {
+        showNotification('⚠️ A tool with this number already exists', 'error');
+        return;
+    }
+
+    state.toolLibrary.push({ number, description });
+    saveData();
+    renderToolLibrary();
+
+    numberInput.value = '';
+    descInput.value = '';
+    showNotification('✅ Tool added to library successfully', 'success');
 }
 
 document.addEventListener('DOMContentLoaded', init);

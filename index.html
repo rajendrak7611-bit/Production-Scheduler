@@ -105,6 +105,7 @@
                     <button class="sub-tab-btn" data-subtab="operators" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Operators</button>
                     <button class="sub-tab-btn" data-subtab="lines" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Production Lines</button>
                     <button class="sub-tab-btn" data-subtab="users" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Users</button>
+                    <button class="sub-tab-btn" data-subtab="tools" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 500; border-radius: var(--radius-sm); border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Tool Library</button>
                 </nav>
             </div>
         </div>
@@ -230,6 +231,46 @@
                                 </thead>
                                 <tbody id="user-tbody">
                                     <!-- User rows rendered here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub-panel: Tool Library -->
+            <div id="subpanel-tools" class="subpanel" style="display: none;">
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; width: 100%;">
+                    <!-- Form Card -->
+                    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); height: fit-content; display: flex; flex-direction: column; gap: 16px;">
+                        <h3 style="font-size: 1rem; color: var(--text-primary); margin-bottom: 4px; font-weight: 600;">Add Tool to Library</h3>
+                        <div class="control-group">
+                            <label for="tool-form-number">Tool Number</label>
+                            <input type="text" id="tool-form-number" class="input" placeholder="e.g. T01">
+                        </div>
+                        <div class="control-group">
+                            <label for="tool-form-desc">Tool Description</label>
+                            <input type="text" id="tool-form-desc" class="input" placeholder="e.g. Boring tool">
+                        </div>
+                        <button class="btn btn-primary" id="btn-save-tool" style="width: 100%; margin-top: 10px;">
+                            Save Tool
+                        </button>
+                    </div>
+
+                    <!-- Tools List Card -->
+                    <div style="background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 16px;">
+                        <h3 style="font-size: 1rem; color: var(--text-primary); font-weight: 600;">Active Tools List</h3>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            <table class="table" style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Tool Number</th>
+                                        <th style="text-align: left; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle);">Description</th>
+                                        <th style="text-align: center; padding: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); width: 60px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tool-library-tbody">
+                                    <!-- Tool rows rendered here -->
                                 </tbody>
                             </table>
                         </div>
@@ -1098,6 +1139,6 @@
     <div class="notification-container" id="notification-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
-    <script src="app_v7.js?v=7"></script>
+    <script src="app_v7.js?v=8"></script>
 </body>
 </html>
