@@ -247,6 +247,14 @@ function openToolSpecModal(opIdx) {
     }
     op.toolSpec = list;
 
+    // Populate datalist dynamically from Tool Library
+    const datalist = document.getElementById('tool-library-datalist');
+    if (datalist) {
+        datalist.innerHTML = (state.toolLibrary || []).map(t => `
+            <option value="${escapeHtml(t.description)}"></option>
+        `).join('');
+    }
+
     const tbody = document.getElementById('tool-spec-modal-tbody');
     tbody.innerHTML = list.map((item, idx) => `
         <tr>
@@ -264,21 +272,7 @@ function openToolSpecModal(opIdx) {
                 <input type="text" class="input tool-length-input" value="${escapeHtml(item.length || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
             </td>
             <td>
-                <select class="input tool-insert-input" style="font-size: 0.8rem; height: 32px; padding: 4px; text-align: center; width: 100%;">
-                    <option value="">— Select —</option>
-                    ${(() => {
-                        let optionsHtml = state.toolLibrary.map(t => `
-                            <option value="${escapeHtml(t.description)}" ${item.insert === t.description ? 'selected' : ''}>
-                                ${escapeHtml(t.description)}
-                            </option>
-                        `).join('');
-                        
-                        if (item.insert && !state.toolLibrary.some(t => t.description === item.insert)) {
-                            optionsHtml += `<option value="${escapeHtml(item.insert)}" selected>${escapeHtml(item.insert)}</option>`;
-                        }
-                        return optionsHtml;
-                    })()}
-                </select>
+                <input type="text" class="input tool-insert-input" list="tool-library-datalist" value="${escapeHtml(item.insert || '')}" placeholder="Double click for list" style="font-size: 0.8rem; height: 32px; text-align: center; width: 100%;">
             </td>
             <td>
                 <input type="text" class="input tool-rpm-input" value="${escapeHtml(item.rpm || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
