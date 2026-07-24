@@ -272,7 +272,23 @@ function openToolSpecModal(opIdx) {
                 <input type="text" class="input tool-length-input" value="${escapeHtml(item.length || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
             </td>
             <td>
-                <input type="text" class="input tool-insert-input" list="tool-library-datalist" value="${escapeHtml(item.insert || '')}" placeholder="Double click for list" style="font-size: 0.8rem; height: 32px; text-align: center; width: 100%;">
+                <select class="input tool-insert-input" style="font-size: 0.8rem; height: 32px; padding: 4px; text-align: center; width: 100%;">
+                    <option value="">— Select —</option>
+                    ${(() => {
+                        let optionsHtml = state.toolLibrary.map(t => `
+                            <option value="${escapeHtml(t.description)}" ${item.insert === t.description ? 'selected' : ''}>
+                                ${escapeHtml(t.description)}
+                            </option>
+                        `).join('');
+                        
+                        if (item.insert && !state.toolLibrary.some(t => t.description === item.insert)) {
+                            optionsHtml += `<option value="${escapeHtml(item.insert)}" selected>${escapeHtml(item.insert)}</option>`;
+                        }
+                        
+                        optionsHtml += `<option value="__custom__" style="color: var(--accent-primary); font-weight: 600;">+ Custom Spec...</option>`;
+                        return optionsHtml;
+                    })()}
+                </select>
             </td>
             <td>
                 <input type="text" class="input tool-rpm-input" value="${escapeHtml(item.rpm || '')}" style="font-size: 0.8rem; height: 32px; text-align: center;">
@@ -282,6 +298,23 @@ function openToolSpecModal(opIdx) {
             </td>
         </tr>
     `).join('');
+
+    tbody.querySelectorAll('.tool-insert-input').forEach(select => {
+        select.addEventListener('change', (e) => {
+            if (e.target.value === '__custom__') {
+                const customVal = prompt('Enter custom insert specification:');
+                if (customVal && customVal.trim() !== '') {
+                    const opt = document.createElement('option');
+                    opt.value = customVal.trim();
+                    opt.textContent = customVal.trim();
+                    opt.selected = true;
+                    select.insertBefore(opt, select.lastElementChild);
+                } else {
+                    select.value = '';
+                }
+            }
+        });
+    });
 
     document.getElementById('tool-spec-modal').classList.add('active');
 }
