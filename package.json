@@ -5,7 +5,7 @@
   "main": "app_v7.js",
   "scripts": {
     "dev": "vite",
-    "build": "mkdir -p dist && cp index.html dist/ && cp app_v7.js dist/ && cp style.css dist/"
+    "build": "node build.js"
   },
   "keywords": [],
   "author": "",
