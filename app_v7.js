@@ -3306,7 +3306,7 @@ function handleToolPartOpChange(e) {
             if (tool.insert && tool.insert.trim() !== '') {
                 const opt = document.createElement('option');
                 opt.value = tool.insert.trim();
-                opt.textContent = `${tool.insert.trim()} (${tool.tool || 'Unnamed tool'})`;
+                opt.textContent = tool.insert.trim();
                 specSelect.appendChild(opt);
             }
         });
