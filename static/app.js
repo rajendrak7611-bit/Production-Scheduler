@@ -13514,12 +13514,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td style="font-weight: 600;">${escapeHtml(q.part_no)}</td>
                 <td>${escapeHtml(q.part_description || '-')}</td>
                 <td style="text-align: right; font-weight: 700; color: #0284c7;">₹${(q.final_unit_price || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td style="text-align: right; font-weight: 600; color: #10b981; white-space: nowrap;">
-                    <span>₹${(q.total_dev_cost || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #10b981; color: #ffffff; border-radius: 4px; font-size: 11px; margin-left: 6px; vertical-align: middle; box-shadow: 0 1px 2px rgba(0,0,0,0.15);" title="Quote Submitted">
-                        <i class="fas fa-check"></i>
-                    </span>
-                </td>
+                <td style="text-align: right; font-weight: 600; color: #10b981; white-space: nowrap;">₹${(q.total_dev_cost || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td style="text-align: center;">
                     <div style="display: flex; gap: 6px; justify-content: center;">
                         <button class="btn btn-outline btn-sm edit-quote-btn" data-id="${q.id}" title="Edit Quote" style="padding: 3px 8px; font-size: 0.8rem;">✏️ Edit</button>
