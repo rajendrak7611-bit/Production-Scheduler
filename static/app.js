@@ -50,52 +50,79 @@ document.addEventListener("DOMContentLoaded", () => {
     // 1. Dashboard Stats
     window.recentDashboardLogs = [];
 
+    function renderDashboardData(data) {
+        if (!data) return;
+        const activeM = document.getElementById("statActiveMachines");
+        const todayP = document.getElementById("statTodayProduced");
+        const pendingQ = document.getElementById("statPendingQty");
+        const todayS = document.getElementById("statTodayScrap");
+
+        if (activeM) activeM.innerText = `${data.active_machines || 0} / ${data.total_machines || 0}`;
+        if (todayP) todayP.innerText = data.today_produced || 0;
+        if (pendingQ) pendingQ.innerText = (data.pending_qty || 0).toLocaleString();
+        if (todayS) todayS.innerText = data.today_scrap || 0;
+
+        window.recentDashboardLogs = data.recent_logs || [];
+        const tbody = document.getElementById("dashboardLogTable");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        if (!data.recent_logs || data.recent_logs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="color: var(--text-secondary);">No production logs recorded yet</td></tr>`;
+            return;
+        }
+
+        data.recent_logs.forEach((log, index) => {
+            const tr = document.createElement("tr");
+            tr.style.cursor = "pointer";
+            tr.innerHTML = `
+                <td>${log.log_date || '-'}</td>
+                <td><span class="badge badge-success">${log.shift || 'General'}</span></td>
+                <td><strong>${log.machine_name || '-'}</strong></td>
+                <td>${log.operator_name || '-'}</td>
+                <td><strong>${log.part_no || '-'}</strong></td>
+                <td>Opn ${log.opn_no || '10'}</td>
+                <td><span class="badge badge-success">${log.qty_produced || 0}</span></td>
+                <td><span class="badge ${log.scrap_qty > 0 ? 'badge-danger' : 'badge-success'}">${log.scrap_qty || 0}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); viewLogSlNoModal(${index})">
+                        <i class="fa-solid fa-list-ol"></i> View Sl Nos
+                    </button>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteProductionLog(${log.id})">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            tr.onclick = () => viewLogSlNoModal(index);
+            tbody.appendChild(tr);
+        });
+    }
+
     async function loadDashboardStats() {
+        const tbody = document.getElementById("dashboardLogTable");
+        const cachedStats = localStorage.getItem("cached_dashboard_stats");
+        if (cachedStats) {
+            try {
+                const data = JSON.parse(cachedStats);
+                renderDashboardData(data);
+            } catch(e){}
+        }
+
         try {
             const res = await fetch("/api/dashboard/stats");
-            const data = await res.json();
-
-            document.getElementById("statActiveMachines").innerText = `${data.active_machines} / ${data.total_machines}`;
-            document.getElementById("statTodayProduced").innerText = data.today_produced;
-            document.getElementById("statPendingQty").innerText = data.pending_qty.toLocaleString();
-            document.getElementById("statTodayScrap").innerText = data.today_scrap;
-
-            window.recentDashboardLogs = data.recent_logs || [];
-            const tbody = document.getElementById("dashboardLogTable");
-            tbody.innerHTML = "";
-            if (!data.recent_logs || data.recent_logs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="text-center">No production logs recorded yet</td></tr>`;
-                return;
+            if (res.ok) {
+                const data = await res.json();
+                localStorage.setItem("cached_dashboard_stats", JSON.stringify(data));
+                renderDashboardData(data);
+            } else if (tbody && tbody.innerHTML.includes("Loading")) {
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="color: var(--text-secondary);">No production logs recorded yet</td></tr>`;
             }
-
-            data.recent_logs.forEach((log, index) => {
-                const tr = document.createElement("tr");
-                tr.style.cursor = "pointer";
-                tr.innerHTML = `
-                    <td>${log.log_date}</td>
-                    <td><span class="badge badge-success">${log.shift}</span></td>
-                    <td><strong>${log.machine_name}</strong></td>
-                    <td>${log.operator_name}</td>
-                    <td><strong>${log.part_no}</strong></td>
-                    <td>Opn ${log.opn_no || '10'}</td>
-                    <td><span class="badge badge-success">${log.qty_produced}</span></td>
-                    <td><span class="badge ${log.scrap_qty > 0 ? 'badge-danger' : 'badge-success'}">${log.scrap_qty}</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); viewLogSlNoModal(${index})">
-                            <i class="fa-solid fa-list-ol"></i> View Sl Nos
-                        </button>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteProductionLog(${log.id})">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-                tr.onclick = () => viewLogSlNoModal(index);
-                tbody.appendChild(tr);
-            });
         } catch (err) {
             console.error("Error loading dashboard stats:", err);
+            if (tbody && tbody.innerHTML.includes("Loading")) {
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="color: var(--text-secondary);">No production logs recorded yet</td></tr>`;
+            }
         }
     }
 

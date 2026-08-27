@@ -197,8 +197,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     total_schedules = db.query(models.ProductionSchedule).count()
     
     pending_qty = db.query(func.sum(models.ProductionSchedule.balance_to_produce)).scalar() or 0
-    today_produced = db.query(func.sum(models.ProductionLog.qty_produced)).filter(models.ProductionLog.log_date == today_str).scalar() or 0
-    today_scrap = db.query(func.sum(models.ProductionLog.scrap_qty)).filter(models.ProductionLog.log_date == today_str).scalar() or 0
+    today_produced = db.query(func.sum(models.ProductionLog.qty_produced)).filter(models.ProductionLog.log_date.like(f"{today_str}%")).scalar() or 0
+    today_scrap = db.query(func.sum(models.ProductionLog.scrap_qty)).filter(models.ProductionLog.log_date.like(f"{today_str}%")).scalar() or 0
     
     recent_logs = db.query(models.ProductionLog).order_by(models.ProductionLog.id.desc()).limit(10).all()
     
@@ -214,16 +214,16 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "recent_logs": [
             {
                 "id": log.id,
-                "log_date": log.log_date,
-                "shift": log.shift,
-                "machine_name": log.machine_name,
-                "operator_name": log.operator_name,
-                "part_no": log.part_no,
-                "opn_no": log.opn_no,
-                "qty_produced": log.qty_produced,
-                "scrap_qty": log.scrap_qty,
+                "log_date": log.log_date or "",
+                "shift": log.shift or "General",
+                "machine_name": log.machine_name or "",
+                "operator_name": log.operator_name or "",
+                "part_no": log.part_no or "",
+                "opn_no": log.opn_no or "10",
+                "qty_produced": log.qty_produced or 0,
+                "scrap_qty": log.scrap_qty or 0,
                 "completed_sl_nos": log.completed_sl_nos or "",
-                "remarks": log.remarks
+                "remarks": log.remarks or ""
             }
             for log in recent_logs
         ]
