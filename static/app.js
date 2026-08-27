@@ -483,6 +483,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function resetLoggerForm() {
+        lastSelectedPartNo = "";
         const mInput = document.getElementById("logMachine");
         const oInput = document.getElementById("logOperator");
         const pInput = document.getElementById("logPart");
@@ -499,6 +500,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         selectedSlNos.clear();
         alreadyCompletedSlNos.clear();
+        prevCompletedSlNos.clear();
+        isFirstOperation = true;
+        previousOpnNo = null;
 
         const badge = document.getElementById("chartOperatorBadge");
         if (badge) badge.innerText = "Operator: None";
