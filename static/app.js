@@ -303,6 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const partNo = pElem ? pElem.value : "";
         const opnNo = opnElem ? opnElem.value : "";
 
+        selectedSlNos.clear();
         alreadyCompletedSlNos.clear();
         prevCompletedSlNos.clear();
         isFirstOperation = true;

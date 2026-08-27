@@ -674,21 +674,28 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
         if c and c.replace('.', '', 1).isdigit():
             opn_nums_set.add(float(c))
 
-    if clean_curr_opn.replace('.', '', 1).isdigit():
-        opn_nums_set.add(float(clean_curr_opn))
-
-    sorted_opn_nums = sorted(list(opn_nums_set))
-    
     is_first_opn = True
     prev_opn_no = None
 
     if clean_curr_opn.replace('.', '', 1).isdigit():
         curr_num = float(clean_curr_opn)
-        if sorted_opn_nums and curr_num > min(sorted_opn_nums):
+        
+        # Determine minimum operation number for this part
+        min_opn = min(opn_nums_set) if opn_nums_set else 10.0
+
+        # Operation is First Operation ONLY if curr_num <= 10 or curr_num == min_opn <= 10
+        if curr_num <= 10.0 or (opn_nums_set and curr_num == min_opn and min_opn <= 10.0):
+            is_first_opn = True
+            prev_opn_no = None
+        else:
             is_first_opn = False
-            prev_nums = [n for n in sorted_opn_nums if n < curr_num]
-            if prev_nums:
-                p_num = max(prev_nums)
+            # Find previous operation number
+            prev_candidates = [n for n in opn_nums_set if n < curr_num]
+            if prev_candidates:
+                p_num = max(prev_candidates)
+                prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+            else:
+                p_num = max(10.0, curr_num - 10.0)
                 prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
 
     def extract_sl_nos(target_opn):
