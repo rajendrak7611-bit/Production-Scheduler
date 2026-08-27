@@ -215,12 +215,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 oList.innerHTML = operators.map(o => `<option value="${o.name}"></option>`).join("");
             }
 
-            // Populate Scheduled Parts Datalist
+            // Populate Scheduled Parts Datalist ONLY from Work Schedules (Do not fallback to Part Master)
             const pList = document.getElementById("partsDatalist");
             if (pList) {
                 const scheduledPartNos = new Set();
-                allSchedules.forEach(s => { if (s.part_no) scheduledPartNos.add(s.part_no); });
-                const partList = scheduledPartNos.size > 0 ? Array.from(scheduledPartNos) : allParts.map(p => p.part_no);
+                if (allSchedules && allSchedules.length > 0) {
+                    allSchedules.forEach(s => { if (s.part_no && s.part_no.trim()) scheduledPartNos.add(s.part_no.trim()); });
+                }
+                const partList = Array.from(scheduledPartNos);
                 pList.innerHTML = partList.map(pNo => `<option value="${pNo}"></option>`).join("");
             }
 
@@ -425,6 +427,17 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/api/schedules");
             allSchedules = await res.json();
             renderSchedules(allSchedules);
+            
+            // Sync partsDatalist in Production Logger to strictly match active Work Schedules
+            const pList = document.getElementById("partsDatalist");
+            if (pList) {
+                const scheduledPartNos = new Set();
+                if (allSchedules && allSchedules.length > 0) {
+                    allSchedules.forEach(s => { if (s.part_no && s.part_no.trim()) scheduledPartNos.add(s.part_no.trim()); });
+                }
+                const partList = Array.from(scheduledPartNos);
+                pList.innerHTML = partList.map(pNo => `<option value="${pNo}"></option>`).join("");
+            }
         } catch (err) {
             console.error("Error loading schedules:", err);
         }
