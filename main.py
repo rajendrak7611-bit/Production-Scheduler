@@ -684,51 +684,43 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
     logs = db.query(models.ProductionLog).filter(func.lower(models.ProductionLog.part_no) == clean_part).all()
     part = db.query(models.Part).filter(func.lower(models.Part.part_no) == clean_part).first()
 
-    # Build sequence of operation numbers specifically for THIS part from Part Master
-    part_opn_nums = []
+    # Collect all known operation numbers for this part
+    all_opn_nums = []
     if part and part.operations:
         for op in part.operations:
             num, _ = extract_clean_opn(op.opn_no)
-            if num is not None and num not in part_opn_nums:
-                part_opn_nums.append(num)
+            if num is not None and num not in all_opn_nums:
+                all_opn_nums.append(num)
 
-    part_opn_nums = sorted(part_opn_nums)
+    for l in logs:
+        num, _ = extract_clean_opn(l.opn_no)
+        if num is not None and num not in all_opn_nums:
+            all_opn_nums.append(num)
 
-    is_first_opn = False
-    prev_opn_no = None
+    all_opn_nums = sorted(all_opn_nums)
 
-    if part_opn_nums:
-        min_opn = part_opn_nums[0]
-        if curr_num <= min_opn:
-            is_first_opn = True
-            prev_opn_no = None
-        else:
+    # Sequence Determination:
+    if curr_num <= 10.0:
+        is_first_opn = True
+        prev_opn_no = None
+    elif curr_num == 20.0:
+        has_opn_10 = any(n <= 10.0 for n in all_opn_nums)
+        if has_opn_10:
             is_first_opn = False
-            prev_candidates = [n for n in part_opn_nums if n < curr_num]
-            if prev_candidates:
-                p_num = max(prev_candidates)
-                prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
-            else:
-                p_num = max(10.0, curr_num - 10.0)
-                prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
-    else:
-        # Fallback if no operations defined in Part Master for this part
-        if curr_num <= 10.0:
+            prev_opn_no = "10"
+        else:
             is_first_opn = True
             prev_opn_no = None
+    else:
+        # curr_num >= 30.0 (Opn 30, Opn 40, Opn 50...): STRICTLY ALWAYS a subsequent operation!
+        is_first_opn = False
+        prev_candidates = [n for n in all_opn_nums if n < curr_num]
+        if prev_candidates:
+            p_num = max(prev_candidates)
+            prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
         else:
-            log_opns = sorted(list({extract_clean_opn(l.opn_no)[0] for l in logs if extract_clean_opn(l.opn_no)[0] is not None}))
-            if log_opns and curr_num <= log_opns[0]:
-                is_first_opn = True
-                prev_opn_no = None
-            else:
-                is_first_opn = False
-                prev_candidates = [n for n in log_opns if n < curr_num]
-                if prev_candidates:
-                    p_num = max(prev_candidates)
-                    prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
-                else:
-                    prev_opn_no = str(int(max(10.0, curr_num - 10.0)))
+            p_num = max(10.0, curr_num - 10.0)
+            prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
 
     def extract_sl_nos(target_opn_str, target_num):
         sl_set = set()
