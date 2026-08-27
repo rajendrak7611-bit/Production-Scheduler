@@ -321,14 +321,16 @@ document.addEventListener("DOMContentLoaded", () => {
     async function fetchCompletedSlNos() {
         const pElem = document.getElementById("logPart");
         const opnElem = document.getElementById("logOpnNo");
-        const partNo = pElem ? pElem.value : "";
-        const opnNo = opnElem ? opnElem.value : "";
+        const partNo = pElem ? pElem.value.trim() : "";
+        const opnNo = opnElem ? opnElem.value.trim() : "";
 
         selectedSlNos.clear();
         alreadyCompletedSlNos.clear();
         prevCompletedSlNos.clear();
-        isFirstOperation = true;
-        previousOpnNo = null;
+        
+        const cleanOpnNum = parseFloat((opnNo.match(/\d+/) || [10])[0]);
+        isFirstOperation = (cleanOpnNum <= 10);
+        previousOpnNo = (cleanOpnNum > 10) ? strCleanOpn(cleanOpnNum - 10) : null;
 
         if (!partNo || !opnNo) {
             renderOperatorGrid();
@@ -342,13 +344,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 alreadyCompletedSlNos = new Set(data.completed_sl_nos || []);
                 prevCompletedSlNos = new Set(data.prev_completed_sl_nos || []);
                 isFirstOperation = data.is_first_opn !== false;
-                previousOpnNo = data.prev_opn_no;
+                previousOpnNo = data.prev_opn_no || previousOpnNo;
             }
         } catch (err) {
             console.error("Error fetching completed Sl Nos:", err);
         }
 
         renderOperatorGrid();
+    }
+
+    function strCleanOpn(num) {
+        return (typeof num === 'number' && Number.isInteger(num)) ? String(num) : String(num);
     }
 
     function renderOperatorGrid() {
