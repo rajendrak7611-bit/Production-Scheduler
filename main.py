@@ -661,12 +661,29 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
     def extract_opn_num(raw_str):
         if not raw_str:
             return None, ""
-        match = re.search(r'(\d+(?:\.\d+)?)', str(raw_str))
-        if match:
-            num = float(match.group(1))
+        raw = str(raw_str).strip()
+        # Remove cycle time e.g. "(16 min)", "(11 min)" so 16 is never matched
+        cleaned = re.sub(r'\(\s*\d+\s*min\s*\)', '', raw, flags=re.IGNORECASE)
+        
+        m_opn = re.search(r'opn\s*(\d+(?:\.\d+)?)', cleaned, re.IGNORECASE)
+        if m_opn:
+            num = float(m_opn.group(1))
             num_str = str(int(num)) if num.is_integer() else str(num)
             return num, num_str
-        return None, str(raw_str).strip()
+
+        m_start = re.match(r'^\s*(\d+(?:\.\d+)?)', cleaned)
+        if m_start:
+            num = float(m_start.group(1))
+            num_str = str(int(num)) if num.is_integer() else str(num)
+            return num, num_str
+
+        m_any = re.search(r'(\d+(?:\.\d+)?)', cleaned)
+        if m_any:
+            num = float(m_any.group(1))
+            num_str = str(int(num)) if num.is_integer() else str(num)
+            return num, num_str
+
+        return None, raw
 
     curr_num, curr_opn_str = extract_opn_num(opn_no)
     if curr_num is None:
@@ -688,17 +705,22 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
         if num is not None:
             opn_nums_set.add(num)
 
-    opn_nums_set.add(curr_num)
-    sorted_opn_nums = sorted(list(opn_nums_set))
-    min_opn = sorted_opn_nums[0] if sorted_opn_nums else 10.0
-
     # Determine if curr_num is first operation
-    if curr_num <= 10.0 or curr_num == min_opn:
+    if curr_num <= 10.0:
         is_first_opn = True
         prev_opn_no = None
+    elif curr_num == 20.0:
+        has_opn_10 = any(n <= 10.0 for n in opn_nums_set if n < 20.0)
+        if has_opn_10:
+            is_first_opn = False
+            prev_opn_no = "10"
+        else:
+            is_first_opn = True
+            prev_opn_no = None
     else:
+        # curr_num >= 30.0: STRICTLY ALWAYS a subsequent operation!
         is_first_opn = False
-        prev_candidates = [n for n in sorted_opn_nums if n < curr_num]
+        prev_candidates = [n for n in opn_nums_set if n < curr_num]
         if prev_candidates:
             p_num = max(prev_candidates)
             prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
