@@ -656,7 +656,7 @@ def get_production_logs(limit: int = 100, db: Session = Depends(get_db)):
 @app.get("/api/production-logs/sl-nos")
 def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session = Depends(get_db)):
     clean_part = part_no.strip().lower()
-    clean_curr_opn = str(opn_no or "10").lower().replace("opn", "").strip()
+    clean_curr_opn = str(opn_no or "").lower().replace("opn", "").strip()
 
     logs = db.query(models.ProductionLog).filter(func.lower(models.ProductionLog.part_no) == clean_part).all()
     part = db.query(models.Part).filter(func.lower(models.Part.part_no) == clean_part).first()
@@ -670,26 +670,26 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
                 opn_nums_set.add(float(c))
 
     for l in logs:
-        c = str(l.opn_no or "10").lower().replace("opn", "").strip()
+        c = str(l.opn_no or "").lower().replace("opn", "").strip()
         if c and c.replace('.', '', 1).isdigit():
             opn_nums_set.add(float(c))
 
     is_first_opn = True
     prev_opn_no = None
 
-    if clean_curr_opn.replace('.', '', 1).isdigit():
+    if clean_curr_opn and clean_curr_opn.replace('.', '', 1).isdigit():
         curr_num = float(clean_curr_opn)
         
         # Determine minimum operation number for this part
-        min_opn = min(opn_nums_set) if opn_nums_set else 10.0
+        min_opn = min(opn_nums_set) if opn_nums_set else curr_num
 
-        # Operation is First Operation ONLY if curr_num <= 10 or curr_num == min_opn <= 10
-        if curr_num <= 10.0 or (opn_nums_set and curr_num == min_opn and min_opn <= 10.0):
+        # Operation is First Operation if curr_num <= min_opn
+        if curr_num <= min_opn:
             is_first_opn = True
             prev_opn_no = None
         else:
             is_first_opn = False
-            # Find previous operation number
+            # Find the immediate previous operation number (< curr_num)
             prev_candidates = [n for n in opn_nums_set if n < curr_num]
             if prev_candidates:
                 p_num = max(prev_candidates)
@@ -704,7 +704,7 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
         sl_set = set()
         clean_target = str(target_opn).lower().replace("opn", "").strip()
         for l in logs:
-            log_opn = str(l.opn_no or "10").lower().replace("opn", "").strip()
+            log_opn = str(l.opn_no or "").lower().replace("opn", "").strip()
             if log_opn == clean_target and l.completed_sl_nos:
                 for s in l.completed_sl_nos.split(','):
                     s = s.strip()
