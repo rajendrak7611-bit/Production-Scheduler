@@ -1,8 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
     // Current date display
     const today = new Date().toISOString().split("T")[0];
-    document.getElementById("currentDateDisplay").innerText = today;
-    document.getElementById("logDate").value = today;
+    const dateDisplay = document.getElementById("currentDateDisplay");
+    if (dateDisplay) dateDisplay.innerText = today;
+    const logDateInput = document.getElementById("logDate");
+    if (logDateInput) logDateInput.value = today;
 
     // Navigation / Tab Switching
     const navItems = document.querySelectorAll(".nav-item");
@@ -211,7 +213,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 2. Dropdowns for Production Logger
     function getCurrentScheduleQty() {
-        const partNo = document.getElementById("logPart").value;
+        const pElem = document.getElementById("logPart");
+        const partNo = pElem ? pElem.value : "";
         if (!partNo || !allSchedules) return 60;
         const sch = allSchedules.find(s => s.part_no && s.part_no.toUpperCase() === partNo.toUpperCase());
         return (sch && sch.sch_qty > 0) ? sch.sch_qty : 60;
@@ -266,10 +269,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.handleLoggerPartChange = function() {
-        const partNo = document.getElementById("logPart").value;
+        const pElem = document.getElementById("logPart");
         const opnSelect = document.getElementById("logOpnNo");
+        if (!opnSelect) return;
         opnSelect.innerHTML = `<option value="">Select Opn...</option>`;
 
+        const partNo = pElem ? pElem.value : "";
         if (partNo && allParts) {
             const part = allParts.find(p => p.part_no.toUpperCase() === partNo.toUpperCase());
             if (part && part.operations && part.operations.length > 0) {
@@ -290,8 +295,10 @@ document.addEventListener("DOMContentLoaded", () => {
     let alreadyCompletedSlNos = new Set();
 
     async function fetchCompletedSlNos() {
-        const partNo = document.getElementById("logPart").value;
-        const opnNo = document.getElementById("logOpnNo").value;
+        const pElem = document.getElementById("logPart");
+        const opnElem = document.getElementById("logOpnNo");
+        const partNo = pElem ? pElem.value : "";
+        const opnNo = opnElem ? opnElem.value : "";
         alreadyCompletedSlNos.clear();
 
         if (!partNo) {
