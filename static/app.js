@@ -329,8 +329,26 @@ document.addEventListener("DOMContentLoaded", () => {
         prevCompletedSlNos.clear();
         
         const cleanOpnNum = parseFloat((opnNo.match(/\d+/) || [10])[0]);
-        isFirstOperation = (cleanOpnNum <= 10);
-        previousOpnNo = (cleanOpnNum > 10) ? strCleanOpn(cleanOpnNum - 10) : null;
+        
+        // Find lowest operation for this part from Part Master to check if this is initial operation
+        let minOpnNum = 10;
+        if (partNo && allParts) {
+            const part = allParts.find(p => p.part_no.toUpperCase() === partNo.toUpperCase());
+            if (part && part.operations && part.operations.length > 0) {
+                const opNums = part.operations.map(op => parseFloat((String(op.opn_no).match(/\d+/) || [10])[0]));
+                if (opNums.length > 0) {
+                    minOpnNum = Math.min(...opNums);
+                }
+            }
+        }
+
+        if (cleanOpnNum <= minOpnNum) {
+            isFirstOperation = true;
+            previousOpnNo = null;
+        } else {
+            isFirstOperation = false;
+            previousOpnNo = String(minOpnNum);
+        }
 
         if (!partNo || !opnNo) {
             renderOperatorGrid();
@@ -343,8 +361,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 const data = await res.json();
                 alreadyCompletedSlNos = new Set(data.completed_sl_nos || []);
                 prevCompletedSlNos = new Set(data.prev_completed_sl_nos || []);
-                isFirstOperation = data.is_first_opn !== false;
-                previousOpnNo = data.prev_opn_no || previousOpnNo;
+                isFirstOperation = (data.is_first_opn === true);
+                previousOpnNo = data.prev_opn_no;
             }
         } catch (err) {
             console.error("Error fetching completed Sl Nos:", err);
