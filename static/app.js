@@ -293,13 +293,20 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Operator Serial Number Tracking (Dynamic Grid matching Schedule Qty) ---
     let selectedSlNos = new Set();
     let alreadyCompletedSlNos = new Set();
+    let prevCompletedSlNos = new Set();
+    let isFirstOperation = true;
+    let previousOpnNo = null;
 
     async function fetchCompletedSlNos() {
         const pElem = document.getElementById("logPart");
         const opnElem = document.getElementById("logOpnNo");
         const partNo = pElem ? pElem.value : "";
         const opnNo = opnElem ? opnElem.value : "";
+
         alreadyCompletedSlNos.clear();
+        prevCompletedSlNos.clear();
+        isFirstOperation = true;
+        previousOpnNo = null;
 
         if (!partNo) {
             renderOperatorGrid();
@@ -311,6 +318,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (res.ok) {
                 const data = await res.json();
                 alreadyCompletedSlNos = new Set(data.completed_sl_nos || []);
+                prevCompletedSlNos = new Set(data.prev_completed_sl_nos || []);
+                isFirstOperation = data.is_first_opn !== false;
+                previousOpnNo = data.prev_opn_no;
             }
         } catch (err) {
             console.error("Error fetching completed Sl Nos:", err);
@@ -325,28 +335,61 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!grid) return;
         grid.innerHTML = "";
 
+        const legendPrev = document.getElementById("legendPrevOpn");
+        if (legendPrev) {
+            legendPrev.style.display = isFirstOperation ? "none" : "inline-flex";
+        }
+
         for (let i = 1; i <= maxGrid; i++) {
             const cell = document.createElement("div");
             const isSelectedNow = selectedSlNos.has(i);
             const isAlreadyDone = alreadyCompletedSlNos.has(i);
-            const isCompleted = isSelectedNow || isAlreadyDone;
 
-            cell.className = `grid-cell ${isCompleted ? 'done' : ''} ${isAlreadyDone ? 'already-logged' : ''}`;
-            cell.innerText = i;
-            cell.title = `Sl No ${i} ${isAlreadyDone ? '(Already Logged)' : (isSelectedNow ? '(Selected)' : '(Click to pick)')}`;
-            
-            cell.onclick = () => {
-                if (selectedSlNos.has(i)) {
-                    selectedSlNos.delete(i);
-                    if (!alreadyCompletedSlNos.has(i)) {
-                        cell.classList.remove("done");
+            if (isFirstOperation) {
+                // First Operation: Random selection is allowed!
+                const isGreen = isSelectedNow || isAlreadyDone;
+                cell.className = `grid-cell ${isGreen ? 'done' : 'pending'}`;
+                cell.innerText = i;
+                cell.title = `Sl No ${i} ${isGreen ? '(Selected - Light Green)' : '(Click to pick)'}`;
+
+                cell.onclick = () => {
+                    if (selectedSlNos.has(i)) {
+                        selectedSlNos.delete(i);
+                    } else {
+                        selectedSlNos.add(i);
                     }
+                    renderOperatorGrid();
+                };
+            } else {
+                // Subsequent Operations: Must show only completed Sl Nos of previous operation in Light Blue
+                const isPrevDone = prevCompletedSlNos.has(i);
+                const isGreen = isSelectedNow || isAlreadyDone;
+
+                if (isPrevDone) {
+                    // Eligible for this operation
+                    cell.className = `grid-cell ${isGreen ? 'done' : 'prev-done'}`;
+                    cell.innerText = i;
+                    cell.title = `Sl No ${i} ${isGreen ? '(Selected - Light Green)' : '(Completed in Opn ' + (previousOpnNo || 'Prev') + ' - Light Blue - Click to pick)'}`;
+
+                    cell.onclick = () => {
+                        if (selectedSlNos.has(i)) {
+                            selectedSlNos.delete(i);
+                        } else {
+                            selectedSlNos.add(i);
+                        }
+                        renderOperatorGrid();
+                    };
                 } else {
-                    selectedSlNos.add(i);
-                    cell.classList.add("done");
+                    // Locked / Disabled because previous operation is NOT completed
+                    cell.className = `grid-cell disabled`;
+                    cell.innerText = i;
+                    cell.title = `Sl No ${i} (Locked - Operation Opn ${previousOpnNo || ''} not completed yet)`;
+
+                    cell.onclick = () => {
+                        alert(`Sl No ${i} cannot be selected because previous Operation (Opn ${previousOpnNo || ''}) is not completed yet!`);
+                    };
                 }
-                syncSlNosWithForm(maxGrid);
-            };
+            }
             grid.appendChild(cell);
         }
 

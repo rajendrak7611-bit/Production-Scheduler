@@ -655,27 +655,65 @@ def get_production_logs(limit: int = 100, db: Session = Depends(get_db)):
 
 @app.get("/api/production-logs/sl-nos")
 def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session = Depends(get_db)):
-    query = db.query(models.ProductionLog).filter(func.lower(models.ProductionLog.part_no) == part_no.strip().lower())
-    logs = query.all()
+    clean_part = part_no.strip().lower()
+    clean_curr_opn = str(opn_no or "10").lower().replace("opn", "").strip()
+
+    logs = db.query(models.ProductionLog).filter(func.lower(models.ProductionLog.part_no) == clean_part).all()
+    part = db.query(models.Part).filter(func.lower(models.Part.part_no) == clean_part).first()
+
+    # Collect all known operation numbers for this part from Part Master + Production Logs
+    opn_nums_set = set()
+    if part and part.operations:
+        for op in part.operations:
+            c = str(op.opn_no or "").lower().replace("opn", "").strip()
+            if c and c.replace('.', '', 1).isdigit():
+                opn_nums_set.add(float(c))
+
+    for l in logs:
+        c = str(l.opn_no or "10").lower().replace("opn", "").strip()
+        if c and c.replace('.', '', 1).isdigit():
+            opn_nums_set.add(float(c))
+
+    if clean_curr_opn.replace('.', '', 1).isdigit():
+        opn_nums_set.add(float(clean_curr_opn))
+
+    sorted_opn_nums = sorted(list(opn_nums_set))
     
-    matching_logs = []
-    if opn_no:
-        clean_opn = str(opn_no).lower().replace("opn", "").strip()
+    is_first_opn = True
+    prev_opn_no = None
+
+    if clean_curr_opn.replace('.', '', 1).isdigit():
+        curr_num = float(clean_curr_opn)
+        if sorted_opn_nums and curr_num > min(sorted_opn_nums):
+            is_first_opn = False
+            prev_nums = [n for n in sorted_opn_nums if n < curr_num]
+            if prev_nums:
+                p_num = max(prev_nums)
+                prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+
+    def extract_sl_nos(target_opn):
+        if not target_opn:
+            return []
+        sl_set = set()
+        clean_target = str(target_opn).lower().replace("opn", "").strip()
         for l in logs:
             log_opn = str(l.opn_no or "10").lower().replace("opn", "").strip()
-            if log_opn == clean_opn:
-                matching_logs.append(l)
-    else:
-        matching_logs = logs
+            if log_opn == clean_target and l.completed_sl_nos:
+                for s in l.completed_sl_nos.split(','):
+                    s = s.strip()
+                    if s.isdigit():
+                        sl_set.add(int(s))
+        return sorted(list(sl_set))
 
-    completed_set = set()
-    for l in matching_logs:
-        if l.completed_sl_nos:
-            for s in l.completed_sl_nos.split(','):
-                s = s.strip()
-                if s.isdigit():
-                    completed_set.add(int(s))
-    return {"completed_sl_nos": sorted(list(completed_set))}
+    curr_completed = extract_sl_nos(clean_curr_opn)
+    prev_completed = extract_sl_nos(prev_opn_no) if (not is_first_opn and prev_opn_no) else []
+
+    return {
+        "is_first_opn": is_first_opn,
+        "prev_opn_no": prev_opn_no,
+        "prev_completed_sl_nos": prev_completed,
+        "completed_sl_nos": curr_completed
+    }
 
 @app.post("/api/production-logs", response_model=ProductionLogResponse)
 def create_production_log(log: ProductionLogCreate, db: Session = Depends(get_db)):

@@ -579,20 +579,41 @@ body {
 }
 
 .grid-cell.done {
-    background-color: #22c55e !important;
-    color: #ffffff !important;
+    background-color: #86efac !important;
+    color: #14532d !important;
     font-weight: 800 !important;
+    border: 1px solid #4ade80 !important;
 }
 
 .grid-cell.done:hover {
-    background-color: #16a34a !important;
-    color: #ffffff !important;
+    background-color: #4ade80 !important;
+    color: #064e3b !important;
 }
 
 .grid-cell.already-logged {
-    background-color: #15803d !important;
-    color: #ffffff !important;
+    background-color: #86efac !important;
+    color: #14532d !important;
     font-weight: 800 !important;
+}
+
+.grid-cell.prev-done {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+    font-weight: 800 !important;
+    border: 1px solid #93c5fd !important;
+    cursor: pointer !important;
+}
+
+.grid-cell.prev-done:hover {
+    background-color: #bfdbfe !important;
+    color: #1e3a8a !important;
+}
+
+.grid-cell.disabled {
+    background-color: #f8fafc !important;
+    color: #cbd5e1 !important;
+    cursor: not-allowed !important;
+    opacity: 0.55;
 }
 
 .grid-quick-actions {
