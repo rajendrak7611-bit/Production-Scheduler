@@ -447,9 +447,19 @@ document.addEventListener("DOMContentLoaded", () => {
     let allSchedules = [];
     async function loadSchedules() {
         try {
+            const cached = localStorage.getItem("cached_schedules");
+            if (cached) {
+                try {
+                    allSchedules = JSON.parse(cached);
+                    renderSchedules(allSchedules);
+                } catch(e){}
+            }
             const res = await fetch("/api/schedules");
-            allSchedules = await res.json();
-            renderSchedules(allSchedules);
+            if (res.ok) {
+                allSchedules = await res.json();
+                localStorage.setItem("cached_schedules", JSON.stringify(allSchedules));
+                renderSchedules(allSchedules);
+            }
             
             // Sync partsDatalist in Production Logger to strictly match active Work Schedules
             const pList = document.getElementById("partsDatalist");
@@ -551,6 +561,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/api/schedules/clear-all", { method: "DELETE" });
             if (res.ok) {
                 alert("All work schedules cleared successfully!");
+                localStorage.removeItem("cached_schedules");
                 loadSchedules();
                 loadDashboardStats();
             } else {
@@ -599,9 +610,19 @@ document.addEventListener("DOMContentLoaded", () => {
     let allParts = [];
     async function loadParts() {
         try {
+            const cached = localStorage.getItem("cached_parts");
+            if (cached) {
+                try {
+                    allParts = JSON.parse(cached);
+                    renderParts(allParts);
+                } catch(e){}
+            }
             const res = await fetch("/api/parts");
-            allParts = await res.json();
-            renderParts(allParts);
+            if (res.ok) {
+                allParts = await res.json();
+                localStorage.setItem("cached_parts", JSON.stringify(allParts));
+                renderParts(allParts);
+            }
         } catch (err) {
             console.error("Error loading parts:", err);
         }
@@ -795,9 +816,19 @@ document.addEventListener("DOMContentLoaded", () => {
     let allMachines = [];
     async function loadMachines() {
         try {
+            const cached = localStorage.getItem("cached_machines");
+            if (cached) {
+                try {
+                    allMachines = JSON.parse(cached);
+                    renderMachines(allMachines);
+                } catch(e){}
+            }
             const res = await fetch("/api/machines");
-            allMachines = await res.json();
-            renderMachines(allMachines);
+            if (res.ok) {
+                allMachines = await res.json();
+                localStorage.setItem("cached_machines", JSON.stringify(allMachines));
+                renderMachines(allMachines);
+            }
         } catch (err) {
             console.error("Error loading machines:", err);
         }
@@ -876,6 +907,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/api/machines/clear-all", { method: "DELETE" });
             if (res.ok) {
                 alert("All machines cleared successfully!");
+                localStorage.removeItem("cached_machines");
                 loadMachines();
                 loadDropdowns();
             }
@@ -922,9 +954,19 @@ document.addEventListener("DOMContentLoaded", () => {
     let allOperators = [];
     async function loadOperators() {
         try {
+            const cached = localStorage.getItem("cached_operators");
+            if (cached) {
+                try {
+                    allOperators = JSON.parse(cached);
+                    renderOperators(allOperators);
+                } catch(e){}
+            }
             const res = await fetch("/api/operators");
-            allOperators = await res.json();
-            renderOperators(allOperators);
+            if (res.ok) {
+                allOperators = await res.json();
+                localStorage.setItem("cached_operators", JSON.stringify(allOperators));
+                renderOperators(allOperators);
+            }
         } catch (err) {
             console.error("Error loading operators:", err);
         }
