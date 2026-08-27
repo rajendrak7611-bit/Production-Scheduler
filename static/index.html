@@ -135,72 +135,43 @@
 
             <!-- Screen: Production Logger -->
             <section id="screen-prodlog" class="tab-screen">
-                <div class="content-grid-2">
-                    <!-- Form Card -->
-                    <div class="card shadow">
+                <form id="prodLogForm">
+                    <!-- Form Inputs Card (Vertical Mobile-Friendly Layout) -->
+                    <div class="card shadow" style="margin-bottom: 20px;">
                         <div class="card-header">
                             <h3><i class="fa-solid fa-plus-circle"></i> Log Daily Production</h3>
                         </div>
-                        <form id="prodLogForm" class="form-body">
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label>Date</label>
-                                    <input type="date" id="logDate" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>Shift</label>
-                                    <select id="logShift" required>
-                                        <option value="Shift A">Shift A (07:00 - 15:00)</option>
-                                        <option value="Shift B">Shift B (15:00 - 23:00)</option>
-                                        <option value="Shift C">Shift C (23:00 - 07:00)</option>
-                                        <option value="Shift D">Shift D (07:00 - 19:00)</option>
-                                        <option value="Shift E">Shift E (19:00 - 07:00)</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label>Machine</label>
-                                    <input type="text" id="logMachine" list="machinesDatalist" placeholder="Search or select Machine..." required autocomplete="off">
-                                    <datalist id="machinesDatalist"></datalist>
-                                </div>
-                                <div class="form-group">
-                                    <label>Operator</label>
-                                    <input type="text" id="logOperator" list="operatorsDatalist" placeholder="Search or select Operator..." required autocomplete="off">
-                                    <datalist id="operatorsDatalist"></datalist>
-                                </div>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label>Part Number (From Work Schedule)</label>
-                                    <input type="text" id="logPart" list="partsDatalist" placeholder="Search or select Scheduled Part..." required autocomplete="off" oninput="handleLoggerPartChange()">
-                                    <datalist id="partsDatalist"></datalist>
-                                </div>
-                                <div class="form-group">
-                                    <label>Operation No</label>
-                                    <select id="logOpnNo" required onchange="fetchCompletedSlNos()">
-                                        <option value="">Select Operation...</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label>Qty Produced</label>
-                                    <input type="number" id="logQtyProduced" min="0" required value="0">
-                                </div>
-                                <div class="form-group">
-                                    <label>Scrap Qty</label>
-                                    <input type="number" id="logScrapQty" min="0" required value="0">
-                                </div>
+                        <div class="form-body">
+                            <div class="form-group">
+                                <label>Machine</label>
+                                <input type="text" id="logMachine" list="machinesDatalist" placeholder="Search or select Machine..." required autocomplete="off">
+                                <datalist id="machinesDatalist"></datalist>
                             </div>
                             <div class="form-group">
-                                <label>Remarks / Notes</label>
-                                <textarea id="logRemarks" rows="2" placeholder="Optional notes..."></textarea>
+                                <label>Operator</label>
+                                <input type="text" id="logOperator" list="operatorsDatalist" placeholder="Search or select Operator..." required autocomplete="off">
+                                <datalist id="operatorsDatalist"></datalist>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-block">
-                                <i class="fa-solid fa-paper-plane"></i> Save Production Record
-                            </button>
-                        </form>
+                            <div class="form-group">
+                                <label>Part Number (From Work Schedule)</label>
+                                <input type="text" id="logPart" list="partsDatalist" placeholder="Search or select Scheduled Part..." required autocomplete="off" oninput="handleLoggerPartChange()">
+                                <datalist id="partsDatalist"></datalist>
+                            </div>
+                            <div class="form-group">
+                                <label>Operation No</label>
+                                <select id="logOpnNo" required onchange="fetchCompletedSlNos()">
+                                    <option value="">Select Operation...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Qty Produced</label>
+                                <input type="number" id="logQtyProduced" min="0" required value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Scrap Qty</label>
+                                <input type="number" id="logScrapQty" min="0" required value="0">
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Operator Part Sl No Tracking Chart Card -->
@@ -216,7 +187,6 @@
                         <div class="chart-summary-bar">
                             <div class="summary-info">
                                 <div><small>Completed Part Sl Nos</small> <h4 id="gridCountDisplay">0 / 0 Sl Nos</h4></div>
-                                <div><small>Selected Shift</small> <span id="gridShiftDisplay">Shift A</span></div>
                             </div>
                             <div class="progress-bar-container">
                                 <div class="progress-bar-fill" id="gridProgressFill" style="width: 0%;"></div>
@@ -244,8 +214,15 @@
                             <button type="button" class="btn btn-sm btn-outline" onclick="selectAllSlNos(1.0)">Select All</button>
                             <button type="button" class="btn btn-sm btn-danger" onclick="clearSlNoSelection()">Clear All</button>
                         </div>
+
+                        <!-- Save Production Record Button (Placed BELOW Grid) -->
+                        <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                            <button type="submit" class="btn btn-primary btn-block" style="padding: 14px; font-size: 1.15rem; font-weight: 700;">
+                                <i class="fa-solid fa-paper-plane"></i> Save Production Record
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </form>
             </section>
 
             <!-- Screen: Schedules -->

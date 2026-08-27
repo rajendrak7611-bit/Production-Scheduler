@@ -148,8 +148,8 @@ class ProductionScheduleResponse(ProductionScheduleBase):
         from_attributes = True
 
 class ProductionLogBase(BaseModel):
-    log_date: str
-    shift: Optional[str] = "Shift A"
+    log_date: Optional[str] = None
+    shift: Optional[str] = None
     machine_name: str
     operator_name: str
     part_no: str
@@ -679,7 +679,24 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
 
 @app.post("/api/production-logs", response_model=ProductionLogResponse)
 def create_production_log(log: ProductionLogCreate, db: Session = Depends(get_db)):
-    db_log = models.ProductionLog(**log.model_dump())
+    data = log.model_dump()
+    
+    # Auto capture exact date and time when entered
+    now = datetime.datetime.now()
+    if not data.get("log_date"):
+        data["log_date"] = now.strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Auto calculate shift based on current time if not provided
+    if not data.get("shift"):
+        h = now.hour
+        if 7 <= h < 15:
+            data["shift"] = "Shift A (07:00 - 15:00)"
+        elif 15 <= h < 23:
+            data["shift"] = "Shift B (15:00 - 23:00)"
+        else:
+            data["shift"] = "Shift C (23:00 - 07:00)"
+
+    db_log = models.ProductionLog(**data)
     db.add(db_log)
     
     # Auto update balance in production schedule matching part_no

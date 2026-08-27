@@ -369,11 +369,6 @@ document.addEventListener("DOMContentLoaded", () => {
         logOpInput.addEventListener("change", (e) => updateOpBadge(e.target.value));
     }
 
-    document.getElementById("logShift").addEventListener("change", (e) => {
-        const shiftDisplay = document.getElementById("gridShiftDisplay");
-        if (shiftDisplay) shiftDisplay.innerText = e.target.value;
-    });
-
     function resetLoggerForm() {
         const mInput = document.getElementById("logMachine");
         const oInput = document.getElementById("logOperator");
@@ -381,7 +376,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const opnSelect = document.getElementById("logOpnNo");
         const qtyInput = document.getElementById("logQtyProduced");
         const scrapInput = document.getElementById("logScrapQty");
-        const remInput = document.getElementById("logRemarks");
 
         if (mInput) mInput.value = "";
         if (oInput) oInput.value = "";
@@ -389,7 +383,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (opnSelect) opnSelect.innerHTML = `<option value="">Select Operation...</option>`;
         if (qtyInput) qtyInput.value = "0";
         if (scrapInput) scrapInput.value = "0";
-        if (remInput) remInput.value = "";
 
         selectedSlNos.clear();
         alreadyCompletedSlNos.clear();
@@ -411,16 +404,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const completedSlNosStr = Array.from(selectedSlNos).sort((a, b) => a - b).join(",");
         
         const payload = {
-            log_date: document.getElementById("logDate").value,
-            shift: document.getElementById("logShift").value,
             machine_name: document.getElementById("logMachine").value,
             operator_name: document.getElementById("logOperator").value,
             part_no: document.getElementById("logPart").value,
             opn_no: document.getElementById("logOpnNo").value,
             qty_produced: selectedSlNos.size,
             scrap_qty: parseInt(document.getElementById("logScrapQty").value) || 0,
-            completed_sl_nos: completedSlNosStr,
-            remarks: document.getElementById("logRemarks").value
+            completed_sl_nos: completedSlNosStr
         };
 
         try {
