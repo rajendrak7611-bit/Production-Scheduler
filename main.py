@@ -52,17 +52,16 @@ def parse_excel_bytes(file_bytes: bytes):
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
 
-# Auto seed master data if fresh/empty database
-try:
-    db_temp = SessionLocal()
-    if db_temp.query(models.Machine).count() == 0:
+app = FastAPI(title="Production Management API")
+
+@app.post("/api/seed-default-data")
+def seed_default_data(db: Session = Depends(get_db)):
+    try:
         import seed_data
         seed_data.seed_database()
-    db_temp.close()
-except Exception as e:
-    print("Auto-seed on startup check:", e)
-
-app = FastAPI(title="Production Management API")
+        return {"message": "Default master data seeded successfully!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Pydantic Schemas ---
 

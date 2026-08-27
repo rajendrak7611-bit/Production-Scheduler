@@ -101,9 +101,12 @@
 
                 <div class="dashboard-sections">
                     <div class="card shadow">
-                        <div class="card-header">
+                        <div class="card-header space-between">
                             <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Production Logs</h3>
-                            <button class="btn btn-sm btn-outline" onclick="switchTab('prodlog')">View All</button>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-sm btn-outline" onclick="seedDefaultData()"><i class="fa-solid fa-database"></i> Restore Sample Data</button>
+                                <button class="btn btn-sm btn-outline" onclick="switchTab('prodlog')">View All</button>
+                            </div>
                         </div>
                         <div class="table-responsive">
                             <table class="data-table">

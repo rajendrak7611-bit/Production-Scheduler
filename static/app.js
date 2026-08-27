@@ -112,6 +112,26 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    window.seedDefaultData = async function() {
+        if (!confirm("Are you sure you want to restore default master data from Excel files?")) return;
+        try {
+            const res = await fetch("/api/seed-default-data", { method: "POST" });
+            if (res.ok) {
+                const data = await res.json();
+                alert(data.message || "Sample master data restored successfully!");
+                loadDashboardStats();
+                if (typeof loadMachines === "function") loadMachines();
+                if (typeof loadOperators === "function") loadOperators();
+                if (typeof loadParts === "function") loadParts();
+                if (typeof loadSchedules === "function") loadSchedules();
+                if (typeof loadTooling === "function") loadTooling();
+                loadDropdowns();
+            }
+        } catch (err) {
+            console.error("Error seeding default data:", err);
+        }
+    };
+
     window.viewLogSlNoModal = function(index) {
         const log = window.recentDashboardLogs[index];
         if (!log) return;
