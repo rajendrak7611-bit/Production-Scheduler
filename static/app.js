@@ -289,11 +289,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     const cleanNum = match ? match[0] : String(op.opn_no).trim();
                     opnSelect.innerHTML += `<option value="${cleanNum}">Opn ${cleanNum}</option>`;
                 });
-                opnSelect.selectedIndex = 1;
             } else {
-                opnSelect.innerHTML += `<option value="10" selected>Opn 10</option>`;
+                opnSelect.innerHTML += `<option value="10">Opn 10</option>`;
             }
         }
+        opnSelect.selectedIndex = 0; // Default to 'Select Opn...'
         fetchCompletedSlNos();
     };
 
@@ -316,7 +316,7 @@ document.addEventListener("DOMContentLoaded", () => {
         isFirstOperation = true;
         previousOpnNo = null;
 
-        if (!partNo) {
+        if (!partNo || !opnNo) {
             renderOperatorGrid();
             return;
         }
@@ -343,19 +343,31 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!grid) return;
         grid.innerHTML = "";
 
+        const opnElem = document.getElementById("logOpnNo");
+        const currentOpnNo = opnElem ? opnElem.value : "";
+
         const legendPrev = document.getElementById("legendPrevOpn");
         if (legendPrev) {
-            legendPrev.style.display = isFirstOperation ? "none" : "inline-flex";
+            legendPrev.style.display = (!currentOpnNo || isFirstOperation) ? "none" : "inline-flex";
         }
 
         for (let i = 1; i <= maxGrid; i++) {
             const cell = document.createElement("div");
-            const isSelectedNow = selectedSlNos.has(i);
-            const isAlreadyDone = alreadyCompletedSlNos.has(i);
 
-            if (isFirstOperation) {
-                // First Operation: Random selection is allowed!
+            if (!currentOpnNo) {
+                // No operation selected yet: Lock all grid cells
+                cell.className = `grid-cell disabled`;
+                cell.innerText = i;
+                cell.title = `Sl No ${i} (Locked - Select an Operation No first)`;
+                cell.onclick = () => {
+                    alert("Please select an Operation No before selecting serial numbers!");
+                };
+            } else if (isFirstOperation) {
+                // First Operation (e.g. Opn 20 for H44): Random selection allowed
+                const isSelectedNow = selectedSlNos.has(i);
+                const isAlreadyDone = alreadyCompletedSlNos.has(i);
                 const isGreen = isSelectedNow || isAlreadyDone;
+
                 cell.className = `grid-cell ${isGreen ? 'done' : 'pending'}`;
                 cell.innerText = i;
                 cell.title = `Sl No ${i} ${isGreen ? '(Selected - Light Green)' : '(Click to pick)'}`;
@@ -369,12 +381,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     renderOperatorGrid();
                 };
             } else {
-                // Subsequent Operations: Must show only completed Sl Nos of previous operation in Light Blue
+                // Subsequent Operation (e.g. Opn 30 for H44): Must be completed in previous operation (Light Blue)
+                const isSelectedNow = selectedSlNos.has(i);
+                const isAlreadyDone = alreadyCompletedSlNos.has(i);
                 const isPrevDone = prevCompletedSlNos.has(i);
                 const isGreen = isSelectedNow || isAlreadyDone;
 
                 if (isPrevDone) {
-                    // Eligible for this operation
+                    // Completed in Opn 20 -> Light Blue, turns Light Green on selection
                     cell.className = `grid-cell ${isGreen ? 'done' : 'prev-done'}`;
                     cell.innerText = i;
                     cell.title = `Sl No ${i} ${isGreen ? '(Selected - Light Green)' : '(Completed in Opn ' + (previousOpnNo || 'Prev') + ' - Light Blue - Click to pick)'}`;
@@ -388,7 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         renderOperatorGrid();
                     };
                 } else {
-                    // Locked / Disabled because previous operation is NOT completed
+                    // Locked / Disabled because previous operation (Opn 20) is NOT completed
                     cell.className = `grid-cell disabled`;
                     cell.innerText = i;
                     cell.title = `Sl No ${i} (Locked - Operation Opn ${previousOpnNo || ''} not completed yet)`;
