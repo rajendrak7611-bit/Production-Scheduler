@@ -183,37 +183,25 @@ document.addEventListener("DOMContentLoaded", () => {
             allParts = await pRes.json();
             allSchedules = await sRes.json();
 
-            const mSelect = document.getElementById("logMachine");
-            mSelect.innerHTML = `<option value="">Select Machine...</option>`;
-            machines.forEach(m => {
-                mSelect.innerHTML += `<option value="${m.name}">${m.name}</option>`;
-            });
+            // Populate Machines Datalist
+            const mList = document.getElementById("machinesDatalist");
+            if (mList) {
+                mList.innerHTML = machines.map(m => `<option value="${m.name}"></option>`).join("");
+            }
 
-            const oSelect = document.getElementById("logOperator");
-            oSelect.innerHTML = `<option value="">Select Operator...</option>`;
-            operators.forEach(o => {
-                oSelect.innerHTML += `<option value="${o.name}">${o.name}</option>`;
-            });
+            // Populate Operators Datalist
+            const oList = document.getElementById("operatorsDatalist");
+            if (oList) {
+                oList.innerHTML = operators.map(o => `<option value="${o.name}"></option>`).join("");
+            }
 
-            // Populate Logger Part dropdown from Work Schedule
-            const pSelect = document.getElementById("logPart");
-            pSelect.innerHTML = `<option value="">Select Scheduled Part...</option>`;
-            
-            const scheduledPartNos = new Set();
-            allSchedules.forEach(s => {
-                if (s.part_no) scheduledPartNos.add(s.part_no);
-            });
-
-            if (scheduledPartNos.size > 0) {
-                scheduledPartNos.forEach(pNo => {
-                    const sch = allSchedules.find(s => s.part_no === pNo);
-                    const qtyStr = sch ? ` (Sch Qty: ${sch.sch_qty})` : '';
-                    pSelect.innerHTML += `<option value="${pNo}">${pNo}${qtyStr}</option>`;
-                });
-            } else {
-                allParts.forEach(p => {
-                    pSelect.innerHTML += `<option value="${p.part_no}">${p.part_no}</option>`;
-                });
+            // Populate Scheduled Parts Datalist
+            const pList = document.getElementById("partsDatalist");
+            if (pList) {
+                const scheduledPartNos = new Set();
+                allSchedules.forEach(s => { if (s.part_no) scheduledPartNos.add(s.part_no); });
+                const partList = scheduledPartNos.size > 0 ? Array.from(scheduledPartNos) : allParts.map(p => p.part_no);
+                pList.innerHTML = partList.map(pNo => `<option value="${pNo}"></option>`).join("");
             }
 
             const schPartSelect = document.getElementById("schPartNoSelect");
@@ -348,11 +336,16 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // Event listeners to sync dropdowns with Serial Number Grid
-    document.getElementById("logOperator").addEventListener("change", (e) => {
-        const opName = e.target.value || "None";
-        const badge = document.getElementById("chartOperatorBadge");
-        if (badge) badge.innerText = `Operator: ${opName}`;
-    });
+    const logOpInput = document.getElementById("logOperator");
+    if (logOpInput) {
+        const updateOpBadge = (val) => {
+            const opName = val || "None";
+            const badge = document.getElementById("chartOperatorBadge");
+            if (badge) badge.innerText = `Operator: ${opName}`;
+        };
+        logOpInput.addEventListener("input", (e) => updateOpBadge(e.target.value));
+        logOpInput.addEventListener("change", (e) => updateOpBadge(e.target.value));
+    }
 
     document.getElementById("logShift").addEventListener("change", (e) => {
         const shiftDisplay = document.getElementById("gridShiftDisplay");

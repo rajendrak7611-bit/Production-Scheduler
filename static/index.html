@@ -158,23 +158,20 @@
                             <div class="form-row-2">
                                 <div class="form-group">
                                     <label>Machine</label>
-                                    <select id="logMachine" required>
-                                        <option value="">Select Machine...</option>
-                                    </select>
+                                    <input type="text" id="logMachine" list="machinesDatalist" placeholder="Search or select Machine..." required autocomplete="off">
+                                    <datalist id="machinesDatalist"></datalist>
                                 </div>
                                 <div class="form-group">
                                     <label>Operator</label>
-                                    <select id="logOperator" required>
-                                        <option value="">Select Operator...</option>
-                                    </select>
+                                    <input type="text" id="logOperator" list="operatorsDatalist" placeholder="Search or select Operator..." required autocomplete="off">
+                                    <datalist id="operatorsDatalist"></datalist>
                                 </div>
                             </div>
                             <div class="form-row-2">
                                 <div class="form-group">
                                     <label>Part Number (From Work Schedule)</label>
-                                    <select id="logPart" required onchange="handleLoggerPartChange()">
-                                        <option value="">Select Scheduled Part...</option>
-                                    </select>
+                                    <input type="text" id="logPart" list="partsDatalist" placeholder="Search or select Scheduled Part..." required autocomplete="off" oninput="handleLoggerPartChange()">
+                                    <datalist id="partsDatalist"></datalist>
                                 </div>
                                 <div class="form-group">
                                     <label>Operation No</label>
