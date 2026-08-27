@@ -401,6 +401,17 @@ body {
 .badge-warning { background: #fef3c7; color: #92400e; }
 .badge-danger { background: #fee2e2; color: #991b1b; }
 
+/* Status Banners */
+.alert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+.alert-info { background-color: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+.alert-success { background-color: #d1fae5; color: #047857; border: 1px solid #6ee7b7; }
+.alert-warning { background-color: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+
 /* Modals */
 .modal {
     display: none;

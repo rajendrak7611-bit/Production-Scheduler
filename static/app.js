@@ -389,6 +389,29 @@ document.addEventListener("DOMContentLoaded", () => {
             legendPrev.style.display = (!currentOpnNo || isFirstOperation) ? "none" : "inline-flex";
         }
 
+        const alertBanner = document.getElementById("opnGridStatusBanner");
+        if (alertBanner) {
+            if (!currentOpnNo) {
+                alertBanner.className = "alert alert-warning";
+                alertBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <strong>Please select an Operation No</strong> above to view available serial numbers.`;
+                alertBanner.style.display = "block";
+            } else if (isFirstOperation) {
+                alertBanner.className = "alert alert-info";
+                alertBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> <strong>Initial Operation (Opn ${currentOpnNo}):</strong> All serial numbers are open for initial entry. Click boxes to toggle selection (Light Green).`;
+                alertBanner.style.display = "block";
+            } else {
+                const prevCount = prevCompletedSlNos.size;
+                if (prevCount > 0) {
+                    alertBanner.className = "alert alert-success";
+                    alertBanner.innerHTML = `<i class="fa-solid fa-check-circle"></i> <strong>Subsequent Operation (Opn ${currentOpnNo}):</strong> Showing ${prevCount} serial numbers completed in Opn ${previousOpnNo || 'Prev'} (highlighted in <strong>Light Blue</strong>). Click Light Blue boxes to complete Opn ${currentOpnNo}.`;
+                } else {
+                    alertBanner.className = "alert alert-warning";
+                    alertBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <strong>Opn ${currentOpnNo} Locked:</strong> No serial numbers have been logged for Opn ${previousOpnNo || 'Prev'} yet. Please log Opn ${previousOpnNo || 'Prev'} first.`;
+                }
+                alertBanner.style.display = "block";
+            }
+        }
+
         for (let i = 1; i <= maxGrid; i++) {
             const cell = document.createElement("div");
 
