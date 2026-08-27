@@ -658,80 +658,82 @@ def get_production_logs(limit: int = 100, db: Session = Depends(get_db)):
 def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session = Depends(get_db)):
     clean_part = part_no.strip().lower()
 
-    def extract_opn_num(raw_str):
+    def extract_clean_opn(raw_str):
         if not raw_str:
             return None, ""
         raw = str(raw_str).strip()
-        # Remove cycle time e.g. "(16 min)", "(11 min)" so 16 is never matched
         cleaned = re.sub(r'\(\s*\d+\s*min\s*\)', '', raw, flags=re.IGNORECASE)
-        
         m_opn = re.search(r'opn\s*(\d+(?:\.\d+)?)', cleaned, re.IGNORECASE)
         if m_opn:
             num = float(m_opn.group(1))
-            num_str = str(int(num)) if num.is_integer() else str(num)
-            return num, num_str
-
+            return num, str(int(num)) if num.is_integer() else str(num)
         m_start = re.match(r'^\s*(\d+(?:\.\d+)?)', cleaned)
         if m_start:
             num = float(m_start.group(1))
-            num_str = str(int(num)) if num.is_integer() else str(num)
-            return num, num_str
-
+            return num, str(int(num)) if num.is_integer() else str(num)
         m_any = re.search(r'(\d+(?:\.\d+)?)', cleaned)
         if m_any:
             num = float(m_any.group(1))
-            num_str = str(int(num)) if num.is_integer() else str(num)
-            return num, num_str
-
+            return num, str(int(num)) if num.is_integer() else str(num)
         return None, raw
 
-    curr_num, curr_opn_str = extract_opn_num(opn_no)
+    curr_num, curr_opn_str = extract_clean_opn(opn_no)
     if curr_num is None:
         curr_num, curr_opn_str = 10.0, "10"
 
     logs = db.query(models.ProductionLog).filter(func.lower(models.ProductionLog.part_no) == clean_part).all()
     part = db.query(models.Part).filter(func.lower(models.Part.part_no) == clean_part).first()
 
-    # Collect all known operation numbers for this part from Part Master + Production Logs
-    opn_nums_set = set()
+    # Build sequence of operation numbers specifically for THIS part from Part Master
+    part_opn_nums = []
     if part and part.operations:
         for op in part.operations:
-            num, _ = extract_opn_num(op.opn_no)
-            if num is not None:
-                opn_nums_set.add(num)
+            num, _ = extract_clean_opn(op.opn_no)
+            if num is not None and num not in part_opn_nums:
+                part_opn_nums.append(num)
 
-    for l in logs:
-        num, _ = extract_opn_num(l.opn_no)
-        if num is not None:
-            opn_nums_set.add(num)
+    part_opn_nums = sorted(part_opn_nums)
 
-    # Determine if curr_num is first operation
-    if curr_num <= 10.0:
-        is_first_opn = True
-        prev_opn_no = None
-    elif curr_num == 20.0:
-        has_opn_10 = any(n <= 10.0 for n in opn_nums_set if n < 20.0)
-        if has_opn_10:
-            is_first_opn = False
-            prev_opn_no = "10"
-        else:
+    is_first_opn = False
+    prev_opn_no = None
+
+    if part_opn_nums:
+        min_opn = part_opn_nums[0]
+        if curr_num <= min_opn:
             is_first_opn = True
             prev_opn_no = None
-    else:
-        # curr_num >= 30.0: STRICTLY ALWAYS a subsequent operation!
-        is_first_opn = False
-        prev_candidates = [n for n in opn_nums_set if n < curr_num]
-        if prev_candidates:
-            p_num = max(prev_candidates)
-            prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
         else:
-            p_num = max(10.0, curr_num - 10.0)
-            prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+            is_first_opn = False
+            prev_candidates = [n for n in part_opn_nums if n < curr_num]
+            if prev_candidates:
+                p_num = max(prev_candidates)
+                prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+            else:
+                p_num = max(10.0, curr_num - 10.0)
+                prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+    else:
+        # Fallback if no operations defined in Part Master for this part
+        if curr_num <= 10.0:
+            is_first_opn = True
+            prev_opn_no = None
+        else:
+            log_opns = sorted(list({extract_clean_opn(l.opn_no)[0] for l in logs if extract_clean_opn(l.opn_no)[0] is not None}))
+            if log_opns and curr_num <= log_opns[0]:
+                is_first_opn = True
+                prev_opn_no = None
+            else:
+                is_first_opn = False
+                prev_candidates = [n for n in log_opns if n < curr_num]
+                if prev_candidates:
+                    p_num = max(prev_candidates)
+                    prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+                else:
+                    prev_opn_no = str(int(max(10.0, curr_num - 10.0)))
 
     def extract_sl_nos(target_opn_str, target_num):
         sl_set = set()
         for l in logs:
-            l_num, l_str = extract_opn_num(l.opn_no)
+            l_num, l_str = extract_clean_opn(l.opn_no)
             if (l_num is not None and target_num is not None and l_num == target_num) or (l_str == target_opn_str):
                 if l.completed_sl_nos:
                     for s in l.completed_sl_nos.split(','):
@@ -741,8 +743,7 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
         return sorted(list(sl_set))
 
     curr_completed = extract_sl_nos(curr_opn_str, curr_num)
-    
-    prev_num, _ = extract_opn_num(prev_opn_no) if prev_opn_no else (None, "")
+    prev_num, _ = extract_clean_opn(prev_opn_no) if prev_opn_no else (None, "")
     prev_completed = extract_sl_nos(prev_opn_no, prev_num) if (not is_first_opn and prev_opn_no) else []
 
     return {
