@@ -813,6 +813,15 @@ def delete_tooling(tool_id: int, db: Session = Depends(get_db)):
     return {"message": "Tooling item deleted"}
 
 # --- Serve Static Files ---
+@app.middleware("http")
+async def add_no_cache_headers(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static") or request.url.path == "/":
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
