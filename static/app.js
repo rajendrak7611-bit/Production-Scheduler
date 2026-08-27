@@ -278,13 +278,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if (partNo && allParts) {
             const part = allParts.find(p => p.part_no.toUpperCase() === partNo.toUpperCase());
             if (part && part.operations && part.operations.length > 0) {
-                part.operations.forEach(op => {
-                    let ctStr = op.cycle_time ? ` (${op.cycle_time} min)` : '';
-                    opnSelect.innerHTML += `<option value="${op.opn_no}">Opn ${op.opn_no}: ${op.description || ''}${ctStr}</option>`;
+                const sortedOps = part.operations.slice().sort((a, b) => {
+                    const numA = parseFloat((String(a.opn_no).match(/\d+/) || [0])[0]);
+                    const numB = parseFloat((String(b.opn_no).match(/\d+/) || [0])[0]);
+                    return numA - numB;
+                });
+
+                sortedOps.forEach(op => {
+                    const match = String(op.opn_no).match(/\d+/);
+                    const cleanNum = match ? match[0] : String(op.opn_no).trim();
+                    opnSelect.innerHTML += `<option value="${cleanNum}">Opn ${cleanNum}</option>`;
                 });
                 opnSelect.selectedIndex = 1;
             } else {
-                opnSelect.innerHTML += `<option value="10" selected>Opn 10: General</option>`;
+                opnSelect.innerHTML += `<option value="10" selected>Opn 10</option>`;
             }
         }
         fetchCompletedSlNos();
