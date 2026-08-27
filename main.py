@@ -704,9 +704,11 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
                     all_opn_nums.append(num)
 
         for sch in schedules:
-            num, _ = extract_clean_opn(sch.opn_no)
-            if num is not None and num not in all_opn_nums:
-                all_opn_nums.append(num)
+            opn_val = getattr(sch, 'opn_no', None)
+            if opn_val:
+                num, _ = extract_clean_opn(opn_val)
+                if num is not None and num not in all_opn_nums:
+                    all_opn_nums.append(num)
 
         for l in logs:
             num, _ = extract_clean_opn(l.opn_no)
