@@ -683,8 +683,9 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
 
     logs = db.query(models.ProductionLog).filter(func.lower(models.ProductionLog.part_no) == clean_part).all()
     part = db.query(models.Part).filter(func.lower(models.Part.part_no) == clean_part).first()
+    schedules = db.query(models.ProductionSchedule).filter(func.lower(models.ProductionSchedule.part_no) == clean_part).all()
 
-    # Collect all known operation numbers for this part
+    # Collect ALL operation numbers for this part from Part Master + Work Schedules + Logs
     all_opn_nums = []
     if part and part.operations:
         for op in part.operations:
@@ -692,35 +693,33 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
             if num is not None and num not in all_opn_nums:
                 all_opn_nums.append(num)
 
+    for sch in schedules:
+        num, _ = extract_clean_opn(sch.opn_no)
+        if num is not None and num not in all_opn_nums:
+            all_opn_nums.append(num)
+
     for l in logs:
         num, _ = extract_clean_opn(l.opn_no)
         if num is not None and num not in all_opn_nums:
             all_opn_nums.append(num)
 
+    if curr_num not in all_opn_nums:
+        all_opn_nums.append(curr_num)
+
     all_opn_nums = sorted(all_opn_nums)
 
-    # Sequence Determination:
-    if curr_num <= 10.0:
+    # Determine position of curr_num in sorted operation sequence for this part
+    idx = all_opn_nums.index(curr_num) if curr_num in all_opn_nums else 0
+
+    if idx == 0:
+        # First operation in sequence (e.g. Opn 20 for H44, M50, DK7)
         is_first_opn = True
         prev_opn_no = None
-    elif curr_num == 20.0:
-        has_opn_10 = any(n <= 10.0 for n in all_opn_nums)
-        if has_opn_10:
-            is_first_opn = False
-            prev_opn_no = "10"
-        else:
-            is_first_opn = True
-            prev_opn_no = None
     else:
-        # curr_num >= 30.0 (Opn 30, Opn 40, Opn 50...): STRICTLY ALWAYS a subsequent operation!
+        # Subsequent operation in sequence! Previous operation is index - 1!
         is_first_opn = False
-        prev_candidates = [n for n in all_opn_nums if n < curr_num]
-        if prev_candidates:
-            p_num = max(prev_candidates)
-            prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
-        else:
-            p_num = max(10.0, curr_num - 10.0)
-            prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+        p_num = all_opn_nums[idx - 1]
+        prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
 
     def extract_sl_nos(target_opn_str, target_num):
         sl_set = set()
