@@ -9,6 +9,7 @@ import datetime
 import io
 import zipfile
 import xml.etree.ElementTree as ET
+import re
 
 from database import engine, get_db, Base
 import models
@@ -656,7 +657,20 @@ def get_production_logs(limit: int = 100, db: Session = Depends(get_db)):
 @app.get("/api/production-logs/sl-nos")
 def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session = Depends(get_db)):
     clean_part = part_no.strip().lower()
-    clean_curr_opn = str(opn_no or "").lower().replace("opn", "").strip()
+
+    def extract_opn_num(raw_str):
+        if not raw_str:
+            return None, ""
+        match = re.search(r'(\d+(?:\.\d+)?)', str(raw_str))
+        if match:
+            num = float(match.group(1))
+            num_str = str(int(num)) if num.is_integer() else str(num)
+            return num, num_str
+        return None, str(raw_str).strip()
+
+    curr_num, curr_opn_str = extract_opn_num(opn_no)
+    if curr_num is None:
+        curr_num, curr_opn_str = 10.0, "10"
 
     logs = db.query(models.ProductionLog).filter(func.lower(models.ProductionLog.part_no) == clean_part).all()
     part = db.query(models.Part).filter(func.lower(models.Part.part_no) == clean_part).first()
@@ -665,55 +679,49 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
     opn_nums_set = set()
     if part and part.operations:
         for op in part.operations:
-            c = str(op.opn_no or "").lower().replace("opn", "").strip()
-            if c and c.replace('.', '', 1).isdigit():
-                opn_nums_set.add(float(c))
+            num, _ = extract_opn_num(op.opn_no)
+            if num is not None:
+                opn_nums_set.add(num)
 
     for l in logs:
-        c = str(l.opn_no or "").lower().replace("opn", "").strip()
-        if c and c.replace('.', '', 1).isdigit():
-            opn_nums_set.add(float(c))
+        num, _ = extract_opn_num(l.opn_no)
+        if num is not None:
+            opn_nums_set.add(num)
 
-    is_first_opn = True
-    prev_opn_no = None
+    opn_nums_set.add(curr_num)
+    sorted_opn_nums = sorted(list(opn_nums_set))
+    min_opn = sorted_opn_nums[0] if sorted_opn_nums else 10.0
 
-    if clean_curr_opn and clean_curr_opn.replace('.', '', 1).isdigit():
-        curr_num = float(clean_curr_opn)
-        
-        # Determine minimum operation number for this part
-        min_opn = min(opn_nums_set) if opn_nums_set else curr_num
-
-        # Operation is First Operation if curr_num <= min_opn
-        if curr_num <= min_opn:
-            is_first_opn = True
-            prev_opn_no = None
+    # Determine if curr_num is first operation
+    if curr_num <= 10.0 or curr_num == min_opn:
+        is_first_opn = True
+        prev_opn_no = None
+    else:
+        is_first_opn = False
+        prev_candidates = [n for n in sorted_opn_nums if n < curr_num]
+        if prev_candidates:
+            p_num = max(prev_candidates)
+            prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
         else:
-            is_first_opn = False
-            # Find the immediate previous operation number (< curr_num)
-            prev_candidates = [n for n in opn_nums_set if n < curr_num]
-            if prev_candidates:
-                p_num = max(prev_candidates)
-                prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
-            else:
-                p_num = max(10.0, curr_num - 10.0)
-                prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+            p_num = max(10.0, curr_num - 10.0)
+            prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
 
-    def extract_sl_nos(target_opn):
-        if not target_opn:
-            return []
+    def extract_sl_nos(target_opn_str, target_num):
         sl_set = set()
-        clean_target = str(target_opn).lower().replace("opn", "").strip()
         for l in logs:
-            log_opn = str(l.opn_no or "").lower().replace("opn", "").strip()
-            if log_opn == clean_target and l.completed_sl_nos:
-                for s in l.completed_sl_nos.split(','):
-                    s = s.strip()
-                    if s.isdigit():
-                        sl_set.add(int(s))
+            l_num, l_str = extract_opn_num(l.opn_no)
+            if (l_num is not None and target_num is not None and l_num == target_num) or (l_str == target_opn_str):
+                if l.completed_sl_nos:
+                    for s in l.completed_sl_nos.split(','):
+                        s = s.strip()
+                        if s.isdigit():
+                            sl_set.add(int(s))
         return sorted(list(sl_set))
 
-    curr_completed = extract_sl_nos(clean_curr_opn)
-    prev_completed = extract_sl_nos(prev_opn_no) if (not is_first_opn and prev_opn_no) else []
+    curr_completed = extract_sl_nos(curr_opn_str, curr_num)
+    
+    prev_num, _ = extract_opn_num(prev_opn_no) if prev_opn_no else (None, "")
+    prev_completed = extract_sl_nos(prev_opn_no, prev_num) if (not is_first_opn and prev_opn_no) else []
 
     return {
         "is_first_opn": is_first_opn,
