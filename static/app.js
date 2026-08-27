@@ -268,13 +268,21 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    let lastSelectedPartNo = "";
+
     window.handleLoggerPartChange = function() {
         const pElem = document.getElementById("logPart");
         const opnSelect = document.getElementById("logOpnNo");
         if (!opnSelect) return;
+
+        const partNo = pElem ? pElem.value.trim() : "";
+        if (partNo && partNo.toUpperCase() === lastSelectedPartNo.toUpperCase()) {
+            return; // Part hasn't changed, keep selected operation!
+        }
+        lastSelectedPartNo = partNo;
+
         opnSelect.innerHTML = `<option value="">Select Opn...</option>`;
 
-        const partNo = pElem ? pElem.value : "";
         if (partNo && allParts) {
             const part = allParts.find(p => p.part_no.toUpperCase() === partNo.toUpperCase());
             if (part && part.operations && part.operations.length > 0) {
@@ -289,11 +297,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     const cleanNum = match ? match[0] : String(op.opn_no).trim();
                     opnSelect.innerHTML += `<option value="${cleanNum}">Opn ${cleanNum}</option>`;
                 });
+                opnSelect.selectedIndex = 1; // Auto-select initial operation (e.g. Opn 20)
             } else {
                 opnSelect.innerHTML += `<option value="10">Opn 10</option>`;
+                opnSelect.selectedIndex = 1;
             }
+        } else if (partNo) {
+            opnSelect.innerHTML += `<option value="10">Opn 10</option>`;
+            opnSelect.innerHTML += `<option value="20">Opn 20</option>`;
+            opnSelect.selectedIndex = 1;
         }
-        opnSelect.selectedIndex = 0; // Default to 'Select Opn...'
+
         fetchCompletedSlNos();
     };
 
