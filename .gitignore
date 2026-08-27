@@ -4,3 +4,6 @@ __pycache__/
 venv/
 env/
 inventory.db
+production.db
+cloudflared.exe
+~$*.xlsx

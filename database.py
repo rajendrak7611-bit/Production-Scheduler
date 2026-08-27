@@ -1,13 +1,21 @@
+import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Using SQLite for a simpler local setup that doesn't require Docker
-SQLALCHEMY_DATABASE_URL = "sqlite:///./inventory.db"
+# Support Render environment variable or persistent disk /data/production.db
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    if os.path.exists("/data"):
+        db_url = "sqlite:////data/production.db"
+    else:
+        db_url = "sqlite:///./production.db"
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
+
+engine = create_engine(db_url, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

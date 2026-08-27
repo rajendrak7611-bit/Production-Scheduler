@@ -1,4 +1,6 @@
-sqlalchemy==2.0.25
 fastapi
 uvicorn
+sqlalchemy==2.0.25
 pydantic
+python-multipart
+gunicorn

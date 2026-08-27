@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: grs-production-management
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+    disk:
+      name: grs-db-data
+      mountPath: /data
+      sizeGB: 1
