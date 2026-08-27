@@ -835,6 +835,40 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    window.triggerMachineExcelImport = function() {
+        document.getElementById("machineExcelInput").click();
+    };
+
+    window.handleMachineExcelUpload = async function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const res = await fetch("/api/machines/import-excel", {
+                method: "POST",
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(data.message || "Excel file imported successfully!");
+                loadMachines();
+                loadDropdowns();
+            } else {
+                const errData = await res.json();
+                alert("Import failed: " + (errData.detail || "Unknown error"));
+            }
+        } catch (err) {
+            console.error("Error importing Excel:", err);
+            alert("Error uploading file: " + err.message);
+        } finally {
+            event.target.value = "";
+        }
+    };
+
     // 6. Operators
     let allOperators = [];
     async function loadOperators() {

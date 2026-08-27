@@ -337,6 +337,10 @@
                             <input type="text" id="machineSearch" placeholder="Search machine name or dept..." onkeyup="filterMachines()">
                         </div>
                         <div style="display: flex; gap: 8px;">
+                            <input type="file" id="machineExcelInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleMachineExcelUpload(event)">
+                            <button class="btn btn-outline" onclick="triggerMachineExcelImport()">
+                                <i class="fa-solid fa-file-excel" style="color: #16a34a;"></i> Import Excel
+                            </button>
                             <button class="btn btn-danger" onclick="clearAllMachines()">
                                 <i class="fa-solid fa-trash"></i> Clear All Machines
                             </button>

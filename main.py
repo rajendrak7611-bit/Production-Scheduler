@@ -243,6 +243,51 @@ def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
     db.refresh(db_m)
     return db_m
 
+@app.post("/api/machines/import-excel")
+async def import_machines_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    contents = await file.read()
+    rows = parse_excel_bytes(contents)
+    if not rows:
+        raise HTTPException(status_code=400, detail="Could not parse Excel file or file is empty")
+    
+    headers = [h.lower().strip() for h in rows[0]]
+    
+    name_idx = -1
+    dept_idx = -1
+    status_idx = -1
+    
+    for i, h in enumerate(headers):
+        if "name" in h or "machine" in h or "mc" in h or "m/c" in h:
+            if name_idx == -1: name_idx = i
+        elif "dept" in h or "department" in h:
+            dept_idx = i
+        elif "status" in h:
+            status_idx = i
+
+    if name_idx == -1:
+        name_idx = 1 if len(headers) > 1 else 0
+        dept_idx = 0 if len(headers) > 1 else -1
+
+    existing_names = {m.name.strip().upper() for m in db.query(models.Machine).all()}
+    imported_count = 0
+
+    for row in rows[1:]:
+        if name_idx < len(row) and row[name_idx]:
+            name = row[name_idx].strip()
+            if not name or name.upper() in ["MACHINE", "MACHINE NAME", "M/C NAME"]:
+                continue
+            dept = row[dept_idx].strip() if dept_idx != -1 and dept_idx < len(row) and row[dept_idx] else "General"
+            status = row[status_idx].strip() if status_idx != -1 and status_idx < len(row) and row[status_idx] else "Active"
+            
+            if name.upper() not in existing_names:
+                m = models.Machine(name=name, dept=dept, status=status)
+                db.add(m)
+                existing_names.add(name.upper())
+                imported_count += 1
+                
+    db.commit()
+    return {"imported_count": imported_count, "message": f"Successfully imported {imported_count} new machines!"}
+
 @app.put("/api/machines/{machine_id}", response_model=MachineResponse)
 def update_machine(machine_id: int, machine: MachineCreate, db: Session = Depends(get_db)):
     db_m = db.query(models.Machine).filter(models.Machine.id == machine_id).first()
