@@ -658,6 +658,15 @@ def get_production_logs(limit: int = 100, db: Session = Depends(get_db)):
 def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session = Depends(get_db)):
     clean_part = part_no.strip().lower()
 
+    def safe_str_opn(val):
+        if val is None:
+            return ""
+        try:
+            f = float(val)
+            return str(int(f)) if f.is_integer() else str(f)
+        except Exception:
+            return str(val).strip()
+
     def extract_clean_opn(raw_str):
         if not raw_str:
             return None, ""
@@ -666,15 +675,15 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
         m_opn = re.search(r'opn\s*(\d+(?:\.\d+)?)', cleaned, re.IGNORECASE)
         if m_opn:
             num = float(m_opn.group(1))
-            return num, str(int(num)) if num.is_integer() else str(num)
+            return num, safe_str_opn(num)
         m_start = re.match(r'^\s*(\d+(?:\.\d+)?)', cleaned)
         if m_start:
             num = float(m_start.group(1))
-            return num, str(int(num)) if num.is_integer() else str(num)
+            return num, safe_str_opn(num)
         m_any = re.search(r'(\d+(?:\.\d+)?)', cleaned)
         if m_any:
             num = float(m_any.group(1))
-            return num, str(int(num)) if num.is_integer() else str(num)
+            return num, safe_str_opn(num)
         return None, raw
 
     curr_num, curr_opn_str = extract_clean_opn(opn_no)
@@ -712,14 +721,14 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
     idx = all_opn_nums.index(curr_num) if curr_num in all_opn_nums else 0
 
     if idx == 0:
-        # First operation in sequence (e.g. Opn 20 for H44, M50, DK7)
+        # First operation in sequence (e.g. Opn 20 for 214, H44, M50, DK7)
         is_first_opn = True
         prev_opn_no = None
     else:
         # Subsequent operation in sequence! Previous operation is index - 1!
         is_first_opn = False
         p_num = all_opn_nums[idx - 1]
-        prev_opn_no = str(int(p_num)) if p_num.is_integer() else str(p_num)
+        prev_opn_no = safe_str_opn(p_num)
 
     def extract_sl_nos(target_opn_str, target_num):
         sl_set = set()
