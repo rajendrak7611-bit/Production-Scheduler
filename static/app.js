@@ -374,9 +374,35 @@ document.addEventListener("DOMContentLoaded", () => {
         if (shiftDisplay) shiftDisplay.innerText = e.target.value;
     });
 
+    function resetLoggerForm() {
+        const mInput = document.getElementById("logMachine");
+        const oInput = document.getElementById("logOperator");
+        const pInput = document.getElementById("logPart");
+        const opnSelect = document.getElementById("logOpnNo");
+        const qtyInput = document.getElementById("logQtyProduced");
+        const scrapInput = document.getElementById("logScrapQty");
+        const remInput = document.getElementById("logRemarks");
+
+        if (mInput) mInput.value = "";
+        if (oInput) oInput.value = "";
+        if (pInput) pInput.value = "";
+        if (opnSelect) opnSelect.innerHTML = `<option value="">Select Operation...</option>`;
+        if (qtyInput) qtyInput.value = "0";
+        if (scrapInput) scrapInput.value = "0";
+        if (remInput) remInput.value = "";
+
+        selectedSlNos.clear();
+        alreadyCompletedSlNos.clear();
+
+        const badge = document.getElementById("chartOperatorBadge");
+        if (badge) badge.innerText = "Operator: None";
+
+        renderOperatorGrid();
+    }
+
     async function loadProdLogPageData() {
+        resetLoggerForm();
         await loadDropdowns();
-        handleLoggerPartChange();
     }
 
     // Submit Log Form
@@ -406,11 +432,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (res.ok) {
                 alert(`Saved record! Sl Nos completed: ${completedSlNosStr || 'None'}`);
-                selectedSlNos.clear();
-                document.getElementById("logQtyProduced").value = "0";
-                document.getElementById("logScrapQty").value = "0";
-                document.getElementById("logRemarks").value = "";
-                await fetchCompletedSlNos();
+                resetLoggerForm();
+                await loadDropdowns();
                 loadDashboardStats();
             } else {
                 alert("Failed to save production record.");
