@@ -2290,6 +2290,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    // Excel Export Helpers
+    window.exportProductionLogsExcel = function() {
+        window.location.href = "/api/export/production-logs/excel";
+    };
+
+    window.exportInspectionLogsExcel = function() {
+        window.location.href = "/api/export/inspection-reports/excel";
+    };
+
     // Modal Helpers
     window.openModal = function(id) {
         document.getElementById(id).classList.add("active");

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -1099,6 +1099,193 @@ def delete_inspection_report(report_id: int, db: Session = Depends(get_db)):
     db.delete(r)
     db.commit()
     return {"message": "Inspection report deleted"}
+
+# --- Excel Export Endpoints ---
+@app.get("/api/export/production-logs/excel")
+def export_production_logs_excel(db: Session = Depends(get_db)):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    logs = db.query(models.ProductionLog).order_by(models.ProductionLog.id.desc()).all()
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Production Logs"
+
+    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    align_center = Alignment(horizontal="center", vertical="center")
+    align_left = Alignment(horizontal="left", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
+
+    headers = [
+        "Log ID", "Date & Time", "Shift", "Machine Name", "Operator Name", 
+        "Part Number", "Operation No", "Qty Produced", "Scrap Qty", "Completed Serial Nos"
+    ]
+    ws.append(headers)
+
+    for col_num in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = align_center
+
+    ws.row_dimensions[1].height = 24
+
+    for log in logs:
+        ts_str = log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else (log.log_date or "")
+        row = [
+            log.id,
+            ts_str,
+            log.shift or "",
+            log.machine_name or "",
+            log.operator_name or "",
+            log.part_no or "",
+            f"Opn {log.opn_no}" if log.opn_no else "",
+            log.qty_produced or 0,
+            log.scrap_qty or 0,
+            log.completed_sl_nos or ""
+        ]
+        ws.append(row)
+        r_idx = ws.max_row
+        ws.row_dimensions[r_idx].height = 20
+        for c_idx in range(1, len(row) + 1):
+            cell = ws.cell(row=r_idx, column=c_idx)
+            cell.border = thin_border
+            if c_idx in [1, 2, 3, 7, 8, 9]:
+                cell.alignment = align_center
+            else:
+                cell.alignment = align_left
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"Production_Logs_{datetime.date.today().strftime('%Y%m%d')}.xlsx"
+    return Response(
+        content=output.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@app.get("/api/export/inspection-reports/excel")
+def export_inspection_reports_excel(db: Session = Depends(get_db)):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    reports = db.query(models.InspectionReport).order_by(models.InspectionReport.id.desc()).all()
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Quality Inspection Logs"
+
+    header_fill = PatternFill(start_color="065F46", end_color="065F46", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    align_center = Alignment(horizontal="center", vertical="center")
+    align_left = Alignment(horizontal="left", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
+
+    headers = [
+        "Report ID", "Traceability ID", "Date", "Part Number", "Operation No", 
+        "Batch Qty", "Machine Name", "Operator Name", "Serial Nos", "Recorded Measurement Readings Summary"
+    ]
+    ws.append(headers)
+
+    for col_num in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = align_center
+
+    ws.row_dimensions[1].height = 24
+
+    for r in reports:
+        params = db.query(models.InspectionParameter).filter(
+            func.lower(models.InspectionParameter.part_no) == r.part_no.strip().lower(),
+            func.lower(models.InspectionParameter.opn_no) == r.opn_no.strip().lower()
+        ).order_by(models.InspectionParameter.sl_no.asc()).all()
+
+        readings_map = {}
+        try:
+            import json
+            readings_map = json.loads(r.readings_json or "{}")
+        except Exception:
+            readings_map = {}
+
+        summary_parts = []
+        for p in params:
+            p_readings = readings_map.get(str(p.id)) or readings_map.get(p.id) or {}
+            val = p_readings.get("col_0") or p_readings.get("col_1") or ""
+            nom = p.nominal_dimension or 0
+            lo = p.lo_tol or 0
+            hi = p.hi_tol or 0
+            status = "PASS"
+            if val != "" and val is not None:
+                try:
+                    v = float(val)
+                    if v < (nom - lo) or v > (nom + hi):
+                        status = "OUT OF SPEC"
+                except ValueError:
+                    pass
+            summary_parts.append(f"{p.description}: {val if val!='' else '-'} (Nom: {nom}, Lo: {lo}, Hi: {hi}) [{status}]")
+
+        summary_str = " | ".join(summary_parts) if summary_parts else "No measurement readings recorded"
+
+        row = [
+            r.id,
+            r.report_code or f"IR-{r.id}",
+            r.inspection_date or "",
+            r.part_no or "",
+            f"Opn {r.opn_no}" if r.opn_no else "",
+            f"{r.batch_qty} pcs" if r.batch_qty else "-",
+            r.machine_name or "-",
+            r.operator_name or "-",
+            r.comp_sl_nos or "1",
+            summary_str
+        ]
+        ws.append(row)
+        r_idx = ws.max_row
+        ws.row_dimensions[r_idx].height = 20
+        for c_idx in range(1, len(row) + 1):
+            cell = ws.cell(row=r_idx, column=c_idx)
+            cell.border = thin_border
+            if c_idx in [1, 2, 3, 5, 6]:
+                cell.alignment = align_center
+            else:
+                cell.alignment = align_left
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(min(max_len + 4, 60), 12)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"Quality_Inspection_Logs_{datetime.date.today().strftime('%Y%m%d')}.xlsx"
+    return Response(
+        content=output.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # --- Serve Static Files ---
 @app.middleware("http")

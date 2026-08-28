@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRS ENGINEERING PVT LTD - Production Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=1500">
+    <link rel="stylesheet" href="/static/style.css?v=1700">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -110,6 +110,9 @@
                         <div class="card-header space-between">
                             <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Production Logs</h3>
                             <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-sm btn-outline" onclick="exportProductionLogsExcel()" title="Export Production Logs to Excel">
+                                    <i class="fa-solid fa-file-excel" style="color: #16a34a;"></i> Export Excel
+                                </button>
                                 <button class="btn btn-sm btn-outline" onclick="seedDefaultData()"><i class="fa-solid fa-database"></i> Restore Sample Data</button>
                                 <button class="btn btn-sm btn-outline" onclick="switchTab('prodlog')">View All</button>
                             </div>
@@ -141,9 +144,14 @@
                     <div class="card shadow" style="margin-top: 1.5rem;">
                         <div class="card-header space-between">
                             <h3><i class="fa-solid fa-clipboard-check" style="color: var(--primary);"></i> Recent Quality Inspection Logs</h3>
-                            <button class="btn btn-sm btn-outline" onclick="loadDashboardStats()">
-                                <i class="fa-solid fa-rotate-right"></i> Refresh
-                            </button>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-sm btn-outline" onclick="exportInspectionLogsExcel()" title="Export Quality Inspection Logs to Excel">
+                                    <i class="fa-solid fa-file-excel" style="color: #16a34a;"></i> Export Excel
+                                </button>
+                                <button class="btn btn-sm btn-outline" onclick="loadDashboardStats()">
+                                    <i class="fa-solid fa-rotate-right"></i> Refresh
+                                </button>
+                            </div>
                         </div>
                         <div class="table-responsive">
                             <table class="data-table">
@@ -730,6 +738,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=1600"></script>
+    <script src="/static/app.js?v=1700"></script>
 </body>
 </html>
