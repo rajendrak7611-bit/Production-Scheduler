@@ -366,6 +366,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     schPartSelect.innerHTML += `<option value="${p.part_no}">${p.part_no}</option>`;
                 });
             }
+
+            restoreDeviceStationSettings();
         } catch (err) {
             console.error("Error loading dropdowns:", err);
         }
@@ -631,10 +633,49 @@ document.addEventListener("DOMContentLoaded", () => {
         renderOperatorGrid();
     };
 
-    // Event listeners to sync dropdowns with Serial Number Grid
+    // Device Persistence Helper Functions (Hold Machine, Operator, Part Number per device)
+    function saveDeviceStationSettings() {
+        const mInput = document.getElementById("logMachine");
+        const oInput = document.getElementById("logOperator");
+        const pInput = document.getElementById("logPart");
+
+        if (mInput && mInput.value.trim()) localStorage.setItem("saved_logMachine", mInput.value.trim());
+        if (oInput && oInput.value.trim()) localStorage.setItem("saved_logOperator", oInput.value.trim());
+        if (pInput && pInput.value.trim()) localStorage.setItem("saved_logPart", pInput.value.trim());
+    }
+
+    function restoreDeviceStationSettings() {
+        const mInput = document.getElementById("logMachine");
+        const oInput = document.getElementById("logOperator");
+        const pInput = document.getElementById("logPart");
+
+        const savedMachine = localStorage.getItem("saved_logMachine") || "";
+        const savedOperator = localStorage.getItem("saved_logOperator") || "";
+        const savedPart = localStorage.getItem("saved_logPart") || "";
+
+        if (mInput && savedMachine) mInput.value = savedMachine;
+        if (oInput && savedOperator) {
+            oInput.value = savedOperator;
+            const badge = document.getElementById("chartOperatorBadge");
+            if (badge) badge.innerText = `Operator: ${savedOperator}`;
+        }
+        if (pInput && savedPart) {
+            pInput.value = savedPart;
+            handleLoggerPartChange();
+        }
+    }
+
+    // Event listeners to sync inputs & persist device station settings
+    const logMInput = document.getElementById("logMachine");
+    if (logMInput) {
+        logMInput.addEventListener("input", () => saveDeviceStationSettings());
+        logMInput.addEventListener("change", () => saveDeviceStationSettings());
+    }
+
     const logOpInput = document.getElementById("logOperator");
     if (logOpInput) {
         const updateOpBadge = (val) => {
+            saveDeviceStationSettings();
             const opName = val || "None";
             const badge = document.getElementById("chartOperatorBadge");
             if (badge) badge.innerText = `Operator: ${opName}`;
@@ -643,42 +684,34 @@ document.addEventListener("DOMContentLoaded", () => {
         logOpInput.addEventListener("change", (e) => updateOpBadge(e.target.value));
     }
 
+    const logPInput = document.getElementById("logPart");
+    if (logPInput) {
+        logPInput.addEventListener("input", () => saveDeviceStationSettings());
+        logPInput.addEventListener("change", () => saveDeviceStationSettings());
+    }
+
     function resetLoggerForm() {
-        lastSelectedPartNo = "";
-        const mInput = document.getElementById("logMachine");
-        const oInput = document.getElementById("logOperator");
-        const pInput = document.getElementById("logPart");
-        const opnSelect = document.getElementById("logOpnNo");
         const qtyInput = document.getElementById("logQtyProduced");
         const scrapInput = document.getElementById("logScrapQty");
-
-        if (mInput) mInput.value = "";
-        if (oInput) oInput.value = "";
-        if (pInput) pInput.value = "";
-        if (opnSelect) opnSelect.innerHTML = `<option value="">Select Operation...</option>`;
         if (qtyInput) qtyInput.value = "0";
         if (scrapInput) scrapInput.value = "0";
 
         selectedSlNos.clear();
-        alreadyCompletedSlNos.clear();
-        prevCompletedSlNos.clear();
-        isFirstOperation = true;
-        previousOpnNo = null;
 
-        const badge = document.getElementById("chartOperatorBadge");
-        if (badge) badge.innerText = "Operator: None";
-
-        renderOperatorGrid();
+        // Restore & hold Machine, Operator, and Part Number for this device
+        restoreDeviceStationSettings();
     }
 
     async function loadProdLogPageData() {
-        resetLoggerForm();
         await loadDropdowns();
+        restoreDeviceStationSettings();
     }
 
     // Submit Log Form
     document.getElementById("prodLogForm").addEventListener("submit", async (e) => {
         e.preventDefault();
+        saveDeviceStationSettings();
+
         const completedSlNosStr = Array.from(selectedSlNos).sort((a, b) => a - b).join(",");
         
         const payload = {
