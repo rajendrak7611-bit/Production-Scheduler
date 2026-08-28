@@ -13,28 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
 
-    window.selectRoleTab = function(role) {
-        document.getElementById("loginRole").value = role;
-        const pAdmin = document.getElementById("pillAdmin");
-        const pGuest = document.getElementById("pillGuest");
-        const uInput = document.getElementById("loginUsername");
-        const pInput = document.getElementById("loginPassword");
-        const err = document.getElementById("loginErrorMessage");
-        if (err) err.style.display = "none";
-
-        if (role === "admin") {
-            if (pAdmin) pAdmin.classList.add("active");
-            if (pGuest) pGuest.classList.remove("active");
-            if (uInput) uInput.value = "admin";
-            if (pInput) pInput.value = "admin123";
-        } else {
-            if (pGuest) pGuest.classList.add("active");
-            if (pAdmin) pAdmin.classList.remove("active");
-            if (uInput) uInput.value = "guest";
-            if (pInput) pInput.value = "guest123";
-        }
-    };
-
     window.handleLoginSubmit = async function(e) {
         e.preventDefault();
         const err = document.getElementById("loginErrorMessage");
@@ -73,6 +51,12 @@ document.addEventListener("DOMContentLoaded", () => {
     window.logoutUser = function() {
         localStorage.removeItem("currentUser");
         window.currentUser = null;
+        const uInput = document.getElementById("loginUsername");
+        const pInput = document.getElementById("loginPassword");
+        const err = document.getElementById("loginErrorMessage");
+        if (uInput) uInput.value = "";
+        if (pInput) pInput.value = "";
+        if (err) err.style.display = "none";
         checkUserAuth();
     };
 

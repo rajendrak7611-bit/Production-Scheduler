@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRS ENGINEERING PVT LTD - Production Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=600">
+    <link rel="stylesheet" href="/static/style.css?v=700">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -608,29 +608,18 @@
             <div class="login-brand">
                 <i class="fa-solid fa-industry login-icon"></i>
                 <h2>GRS ENGINEERING</h2>
-                <p class="login-subtitle">Production Management System</p>
-            </div>
-
-            <div class="role-tabs">
-                <button type="button" class="role-tab active" id="pillAdmin" onclick="selectRoleTab('admin')">
-                    <i class="fa-solid fa-user-shield"></i> Admin User
-                </button>
-                <button type="button" class="role-tab" id="pillGuest" onclick="selectRoleTab('guest')">
-                    <i class="fa-solid fa-user"></i> Guest User
-                </button>
+                <p class="login-subtitle">Production Management Login</p>
             </div>
 
             <form id="loginForm" onsubmit="handleLoginSubmit(event)">
-                <input type="hidden" id="loginRole" value="admin">
-                
                 <div class="form-group" style="text-align: left; margin-bottom: 15px;">
                     <label style="font-size: 0.85rem; font-weight: 600;"><i class="fa-solid fa-user"></i> Username</label>
-                    <input type="text" id="loginUsername" value="admin" required autocomplete="username" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; margin-top: 4px;">
+                    <input type="text" id="loginUsername" placeholder="Enter username (e.g. admin or guest)" required autocomplete="username" class="form-control" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #cbd5e1; margin-top: 4px;">
                 </div>
 
                 <div class="form-group" style="text-align: left; margin-bottom: 20px;">
                     <label style="font-size: 0.85rem; font-weight: 600;"><i class="fa-solid fa-lock"></i> Password</label>
-                    <input type="password" id="loginPassword" value="admin123" required autocomplete="current-password" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; margin-top: 4px;">
+                    <input type="password" id="loginPassword" placeholder="Enter password" required autocomplete="current-password" class="form-control" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #cbd5e1; margin-top: 4px;">
                 </div>
 
                 <div id="loginErrorMessage" class="alert alert-danger" style="display: none; margin-bottom: 15px; font-size: 0.85rem;"></div>
@@ -640,12 +629,14 @@
                 </button>
             </form>
 
-            <div class="login-footer-hint" style="margin-top: 15px; font-size: 0.78rem; color: #64748b;">
-                <i class="fa-solid fa-circle-info"></i> Admin: Access All Screens | Guest: Production Logger Only
+            <div class="login-footer-hint" style="margin-top: 18px; font-size: 0.78rem; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                <strong>System Accounts:</strong><br>
+                <span>Admin User: <code>admin</code> / <code>admin123</code></span><br>
+                <span>Guest User: <code>guest</code> / <code>guest123</code></span>
             </div>
         </div>
     </div>
 
-    <script src="/static/app.js?v=600"></script>
+    <script src="/static/app.js?v=700"></script>
 </body>
 </html>
