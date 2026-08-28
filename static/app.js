@@ -371,10 +371,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2. Dropdowns for Production Logger
     function getCurrentScheduleQty() {
         const pElem = document.getElementById("logPart");
-        const partNo = pElem ? pElem.value : "";
-        if (!partNo || !allSchedules) return 60;
-        const sch = allSchedules.find(s => s.part_no && s.part_no.toUpperCase() === partNo.toUpperCase());
-        return (sch && sch.sch_qty > 0) ? sch.sch_qty : 60;
+        const partNo = pElem ? pElem.value.trim() : "";
+        if (!partNo || !allSchedules) return 30;
+        const sch = allSchedules.find(s => s.part_no && s.part_no.trim().toUpperCase() === partNo.toUpperCase());
+        if (sch) {
+            if (sch.total_sch_qty && sch.total_sch_qty > 0) return sch.total_sch_qty;
+            if (sch.sch_qty && sch.sch_qty > 0) return sch.sch_qty;
+        }
+        return 30;
     }
 
     async function loadDropdowns() {
@@ -793,11 +797,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (codeBadge) codeBadge.innerText = window.currentLoggerReportCode;
 
+            const schBatchQty = typeof getCurrentScheduleQty === "function" ? getCurrentScheduleQty() : 30;
+
             let html = `
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 6px; margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 4px; font-size: 0.75rem;">
                     <div><strong>Date:</strong> ${new Date().toISOString().split('T')[0]}</div>
                     <div><strong>Part No:</strong> <span style="color:var(--primary); font-weight:700;">${partNo}</span></div>
                     <div><strong>Opn:</strong> ${opnNo}</div>
+                    <div><strong>Batch Qty:</strong> ${schBatchQty} pcs</div>
                     <div><strong>Machine:</strong> ${machine || '-'}</div>
                     <div><strong>Operator:</strong> ${operator || '-'}</div>
                 </div>
@@ -916,11 +923,12 @@ document.addEventListener("DOMContentLoaded", () => {
             readingsObj[pId] = rowReadings;
         });
 
+        const schBatchQty = typeof getCurrentScheduleQty === "function" ? getCurrentScheduleQty() : 30;
         const reportPayload = {
             report_code: window.currentLoggerReportCode,
             part_no: partNo,
             opn_no: opnNo,
-            batch_qty: selectedSlNos.size > 0 ? selectedSlNos.size : 5,
+            batch_qty: schBatchQty,
             machine_name: document.getElementById("logMachine")?.value || "",
             operator_name: document.getElementById("logOperator")?.value || "",
             comp_sl_nos: compSlNosStr,
@@ -1115,12 +1123,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         readingsObj[pId] = rowReadings;
                     });
 
+                    const schBatchQty = typeof getCurrentScheduleQty === "function" ? getCurrentScheduleQty() : 30;
                     const reportPayload = {
                         report_code: window.currentLoggerReportCode,
                         prod_log_id: prodLogData.id,
                         part_no: document.getElementById("logPart").value,
                         opn_no: document.getElementById("logOpnNo").value,
-                        batch_qty: selectedSlNos.size > 0 ? selectedSlNos.size : 5,
+                        batch_qty: schBatchQty,
                         machine_name: document.getElementById("logMachine").value,
                         operator_name: document.getElementById("logOperator").value,
                         comp_sl_nos: compSlNosStr,

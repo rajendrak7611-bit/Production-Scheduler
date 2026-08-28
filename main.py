@@ -257,7 +257,7 @@ class InspectionReportSave(BaseModel):
     prod_log_id: Optional[int] = None
     part_no: str
     opn_no: str
-    batch_qty: Optional[int] = 5
+    batch_qty: Optional[int] = 30
     machine_name: Optional[str] = None
     operator_name: Optional[str] = None
     inspection_date: Optional[str] = None
@@ -1040,16 +1040,21 @@ def get_inspection_report(part_no: str, opn_no: str, db: Session = Depends(get_d
 
     next_code = generate_traceability_code(part_no, opn_no, db)
 
+    sch = db.query(models.ProductionSchedule).filter(
+        func.lower(models.ProductionSchedule.part_no) == clean_p
+    ).first()
+    sch_batch_qty = sch.total_sch_qty if (sch and sch.total_sch_qty and sch.total_sch_qty > 0) else 30
+
     if not report:
         return {
             "report_code": next_code,
             "part_no": part_no,
             "opn_no": opn_no,
-            "batch_qty": 5,
+            "batch_qty": sch_batch_qty,
             "machine_name": "",
             "operator_name": "",
             "inspection_date": get_now_ist().strftime("%Y-%m-%d"),
-            "comp_sl_nos": "1,2,3,4,5",
+            "comp_sl_nos": "1",
             "readings_json": "{}"
         }
     return report

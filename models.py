@@ -121,7 +121,7 @@ class InspectionReport(Base):
     prod_log_id = Column(Integer, nullable=True)
     part_no = Column(String, index=True, nullable=False)
     opn_no = Column(String, index=True, nullable=False)
-    batch_qty = Column(Integer, default=5)
+    batch_qty = Column(Integer, default=30)
     machine_name = Column(String, nullable=True)
     operator_name = Column(String, nullable=True)
     inspection_date = Column(String, nullable=True)
