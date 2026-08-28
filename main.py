@@ -1195,6 +1195,14 @@ def export_inspection_reports_excel(db: Session = Depends(get_db)):
     header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
     align_center = Alignment(horizontal="center", vertical="center")
     align_left = Alignment(horizontal="left", vertical="center")
+    align_right = Alignment(horizontal="right", vertical="center")
+    
+    pass_fill = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
+    pass_font = Font(name="Calibri", size=11, bold=True, color="065F46")
+    
+    fail_fill = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
+    fail_font = Font(name="Calibri", size=11, bold=True, color="991B1B")
+
     thin_border = Border(
         left=Side(style='thin', color='CBD5E1'),
         right=Side(style='thin', color='CBD5E1'),
@@ -1204,7 +1212,8 @@ def export_inspection_reports_excel(db: Session = Depends(get_db)):
 
     headers = [
         "Report ID", "Traceability ID", "Date", "Part Number", "Operation No", 
-        "Batch Qty", "Machine Name", "Operator Name", "Serial Nos", "Recorded Measurement Readings Summary"
+        "Batch Qty", "Machine Name", "Operator Name", "Component Sl No",
+        "Parameter Description", "Nominal", "Lo Tol", "Hi Tol", "Measured Reading", "Status"
     ]
     ws.append(headers)
 
@@ -1214,7 +1223,7 @@ def export_inspection_reports_excel(db: Session = Depends(get_db)):
         cell.font = header_font
         cell.alignment = align_center
 
-    ws.row_dimensions[1].height = 24
+    ws.row_dimensions[1].height = 25
 
     for r in reports:
         params = db.query(models.InspectionParameter).filter(
@@ -1229,52 +1238,107 @@ def export_inspection_reports_excel(db: Session = Depends(get_db)):
         except Exception:
             readings_map = {}
 
-        summary_parts = []
-        for p in params:
-            p_readings = readings_map.get(str(p.id)) or readings_map.get(p.id) or {}
-            val = p_readings.get("col_0") or p_readings.get("col_1") or ""
-            nom = p.nominal_dimension or 0
-            lo = p.lo_tol or 0
-            hi = p.hi_tol or 0
-            status = "PASS"
-            if val != "" and val is not None:
-                try:
-                    v = float(val)
-                    if v < (nom - lo) or v > (nom + hi):
-                        status = "OUT OF SPEC"
-                except ValueError:
-                    pass
-            summary_parts.append(f"{p.description}: {val if val!='' else '-'} (Nom: {nom}, Lo: {lo}, Hi: {hi}) [{status}]")
+        if not params:
+            row = [
+                r.id,
+                r.report_code or f"IR-{r.id}",
+                r.inspection_date or "",
+                r.part_no or "",
+                f"Opn {r.opn_no}" if r.opn_no else "",
+                f"{r.batch_qty} pcs" if r.batch_qty else "-",
+                r.machine_name or "-",
+                r.operator_name or "-",
+                r.comp_sl_nos or "1",
+                "No parameters defined", "-", "-", "-", "-", "-"
+            ]
+            ws.append(row)
+            r_idx = ws.max_row
+            ws.row_dimensions[r_idx].height = 20
+            for c_idx in range(1, len(row) + 1):
+                cell = ws.cell(row=r_idx, column=c_idx)
+                cell.border = thin_border
+                cell.alignment = align_center if c_idx in [1, 2, 3, 5, 6, 9] else align_left
+        else:
+            is_first_row = True
+            for p in params:
+                p_readings = readings_map.get(str(p.id)) or readings_map.get(p.id) or {}
+                val = p_readings.get("col_0") if "col_0" in p_readings else (p_readings.get("col_1") if "col_1" in p_readings else "")
+                if val is None: val = ""
+                val_str = str(val).strip()
 
-        summary_str = " | ".join(summary_parts) if summary_parts else "No measurement readings recorded"
+                nom = float(p.nominal_dimension or 0.0)
+                lo = float(p.lo_tol or 0.0)
+                hi = float(p.hi_tol or 0.0)
+                status = "-"
+                val_num = val_str
 
-        row = [
-            r.id,
-            r.report_code or f"IR-{r.id}",
-            r.inspection_date or "",
-            r.part_no or "",
-            f"Opn {r.opn_no}" if r.opn_no else "",
-            f"{r.batch_qty} pcs" if r.batch_qty else "-",
-            r.machine_name or "-",
-            r.operator_name or "-",
-            r.comp_sl_nos or "1",
-            summary_str
-        ]
-        ws.append(row)
-        r_idx = ws.max_row
-        ws.row_dimensions[r_idx].height = 20
-        for c_idx in range(1, len(row) + 1):
-            cell = ws.cell(row=r_idx, column=c_idx)
-            cell.border = thin_border
-            if c_idx in [1, 2, 3, 5, 6]:
-                cell.alignment = align_center
-            else:
-                cell.alignment = align_left
+                if val_str != "":
+                    try:
+                        v = float(val_str)
+                        val_num = v
+                        if (nom - lo) <= v <= (nom + hi):
+                            status = "PASS"
+                        else:
+                            status = "OUT OF SPEC"
+                    except ValueError:
+                        status = "INVALID"
+
+                if is_first_row:
+                    row = [
+                        r.id,
+                        r.report_code or f"IR-{r.id}",
+                        r.inspection_date or "",
+                        r.part_no or "",
+                        f"Opn {r.opn_no}" if r.opn_no else "",
+                        f"{r.batch_qty} pcs" if r.batch_qty else "-",
+                        r.machine_name or "-",
+                        r.operator_name or "-",
+                        r.comp_sl_nos or "1",
+                        p.description or "",
+                        nom,
+                        lo,
+                        hi,
+                        val_num,
+                        status
+                    ]
+                    is_first_row = False
+                else:
+                    row = [
+                        "", "", "", "", "", "", "", "", "",
+                        p.description or "",
+                        nom,
+                        lo,
+                        hi,
+                        val_num,
+                        status
+                    ]
+
+                ws.append(row)
+                r_idx = ws.max_row
+                ws.row_dimensions[r_idx].height = 20
+
+                for c_idx in range(1, len(row) + 1):
+                    cell = ws.cell(row=r_idx, column=c_idx)
+                    cell.border = thin_border
+                    if c_idx in [1, 2, 3, 5, 6, 9]:
+                        cell.alignment = align_center
+                    elif c_idx in [11, 12, 13, 14]:
+                        cell.alignment = align_right
+                    elif c_idx == 15:
+                        cell.alignment = align_center
+                        if status == "PASS":
+                            cell.fill = pass_fill
+                            cell.font = pass_font
+                        elif status == "OUT OF SPEC":
+                            cell.fill = fail_fill
+                            cell.font = fail_font
+                    else:
+                        cell.alignment = align_left
 
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(min(max_len + 4, 60), 12)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
     output = io.BytesIO()
     wb.save(output)
