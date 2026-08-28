@@ -617,6 +617,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (listText) {
             listText.innerText = sortedList.length > 0 ? sortedList.join(", ") : "None selected";
         }
+
+        if (typeof syncLoggerInspectionSection === "function") {
+            syncLoggerInspectionSection();
+        }
     }
 
     window.selectAllSlNos = function(factor = 1.0) {
@@ -668,14 +672,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // Event listeners to sync inputs & persist device station settings
     const logMInput = document.getElementById("logMachine");
     if (logMInput) {
-        logMInput.addEventListener("input", () => saveDeviceStationSettings());
-        logMInput.addEventListener("change", () => saveDeviceStationSettings());
+        logMInput.addEventListener("input", () => { saveDeviceStationSettings(); syncLoggerInspectionSection(); });
+        logMInput.addEventListener("change", () => { saveDeviceStationSettings(); syncLoggerInspectionSection(); });
     }
 
     const logOpInput = document.getElementById("logOperator");
     if (logOpInput) {
         const updateOpBadge = (val) => {
             saveDeviceStationSettings();
+            syncLoggerInspectionSection();
             const opName = val || "None";
             const badge = document.getElementById("chartOperatorBadge");
             if (badge) badge.innerText = `Operator: ${opName}`;
@@ -686,9 +691,160 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const logPInput = document.getElementById("logPart");
     if (logPInput) {
-        logPInput.addEventListener("input", () => saveDeviceStationSettings());
-        logPInput.addEventListener("change", () => saveDeviceStationSettings());
+        logPInput.addEventListener("input", () => { saveDeviceStationSettings(); syncLoggerInspectionSection(); });
+        logPInput.addEventListener("change", () => { saveDeviceStationSettings(); syncLoggerInspectionSection(); });
     }
+
+    const logOpnSelectElem = document.getElementById("logOpnNo");
+    if (logOpnSelectElem) {
+        logOpnSelectElem.addEventListener("change", () => syncLoggerInspectionSection());
+        logOpnSelectElem.addEventListener("input", () => syncLoggerInspectionSection());
+    }
+
+    // --- Production Logger Integrated Quality Inspection Section ---
+    window.currentLoggerReportCode = "";
+
+    window.syncLoggerInspectionSection = async function() {
+        const body = document.getElementById("loggerInspectionBody");
+        const codeBadge = document.getElementById("loggerReportCodeBadge");
+        if (!body) return;
+
+        const partNo = document.getElementById("logPart")?.value.trim() || "";
+        const opnNo = document.getElementById("logOpnNo")?.value.trim() || "";
+        const machine = document.getElementById("logMachine")?.value.trim() || "";
+        const operator = document.getElementById("logOperator")?.value.trim() || "";
+
+        if (!partNo || !opnNo) {
+            body.innerHTML = `
+                <div class="text-center" style="padding: 15px; color: #64748b; font-size: 0.82rem;">
+                    <i class="fa-solid fa-circle-info"></i> Select Part Number & Operation No above to load the Quality Inspection Report.
+                </div>
+            `;
+            if (codeBadge) codeBadge.innerText = "-";
+            return;
+        }
+
+        const sortedSlNos = Array.from(selectedSlNos).sort((a, b) => a - b);
+        let compSlNos = sortedSlNos.slice(0, 5).map(String);
+        while (compSlNos.length < 5) {
+            compSlNos.push(String(compSlNos.length + 1));
+        }
+
+        try {
+            const [pRes, cRes] = await Promise.all([
+                fetch(`/api/inspection-parameters?part_no=${encodeURIComponent(partNo)}&opn_no=${encodeURIComponent(opnNo)}`),
+                fetch(`/api/inspection-reports/next-code?part_no=${encodeURIComponent(partNo)}&opn_no=${encodeURIComponent(opnNo)}`)
+            ]);
+
+            const params = await pRes.json();
+            const codeData = await cRes.json();
+            window.currentLoggerReportCode = codeData.report_code || `${partNo.toUpperCase()}-${opnNo}-${new Date().toISOString().slice(5,10).replace('-','')}-001`;
+
+            if (codeBadge) codeBadge.innerText = window.currentLoggerReportCode;
+
+            let html = `
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 0.78rem;">
+                    <div><strong>Date:</strong> ${new Date().toISOString().split('T')[0]}</div>
+                    <div><strong>Part No:</strong> <span style="color:var(--primary); font-weight:700;">${partNo}</span></div>
+                    <div><strong>Opn No:</strong> Opn ${opnNo}</div>
+                    <div><strong>Batch Qty:</strong> ${selectedSlNos.size > 0 ? selectedSlNos.size : 5} pcs</div>
+                    <div><strong>Machine:</strong> ${machine || 'None'}</div>
+                    <div><strong>Operator:</strong> ${operator || 'None'}</div>
+                </div>
+
+                <div class="table-responsive" style="overflow-x: auto; max-height: 380px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <table class="data-table" id="loggerMatrixTable" style="font-size: 0.78rem; border-collapse: separate; border-spacing: 0; min-width: 580px;">
+                        <thead>
+                            <tr style="background: #f1f5f9;">
+                                <th style="position: sticky; left: 0px; z-index: 4; background: #f1f5f9; width: 105px; min-width: 105px; max-width: 105px; border-bottom: 2px solid #cbd5e1;">Desc</th>
+                                <th style="position: sticky; left: 105px; z-index: 4; background: #f1f5f9; width: 60px; min-width: 60px; max-width: 60px; border-bottom: 2px solid #cbd5e1; text-align: right;">Nom</th>
+                                <th style="position: sticky; left: 165px; z-index: 4; background: #f1f5f9; width: 50px; min-width: 50px; max-width: 50px; border-bottom: 2px solid #cbd5e1; text-align: right;">Lo</th>
+                                <th style="position: sticky; left: 215px; z-index: 4; background: #f1f5f9; width: 50px; min-width: 50px; max-width: 50px; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06); text-align: right;">Hi</th>
+                                ${compSlNos.map((s, idx) => `
+                                    <th style="width: 62px; min-width: 62px; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
+                                        C${idx + 1}<br>
+                                        <input type="text" class="logger-comp-sl" data-col="${idx}" value="${s}" placeholder="Sl No" style="width: 56px; text-align: center; font-size: 0.75rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
+                                    </th>
+                                `).join("")}
+                            </tr>
+                        </thead>
+                        <tbody id="loggerMatrixBody">
+            `;
+
+            if (!params || params.length === 0) {
+                html += `<tr><td colspan="9" class="text-center" style="padding: 12px;">No parameters configured in Part Master for ${partNo} (Opn ${opnNo}).</td></tr>`;
+            } else {
+                params.forEach((p, pIdx) => {
+                    const nom = parseFloat(p.nominal_dimension || 0);
+                    const lo = parseFloat(p.lo_tol || 0);
+                    const hi = parseFloat(p.hi_tol || 0);
+
+                    html += `
+                        <tr data-param-id="${p.id}">
+                            <td style="position: sticky; left: 0px; z-index: 2; background: #ffffff; width: 105px; min-width: 105px; max-width: 105px; padding: 2px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">
+                                ${p.description}
+                            </td>
+                            <td style="position: sticky; left: 105px; z-index: 2; background: #ffffff; width: 60px; min-width: 60px; max-width: 60px; padding: 2px; border-bottom: 1px solid #e2e8f0; text-align: right;">
+                                ${nom}
+                            </td>
+                            <td style="position: sticky; left: 165px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0; text-align: right;">
+                                ${lo}
+                            </td>
+                            <td style="position: sticky; left: 215px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06); text-align: right;">
+                                ${hi}
+                            </td>
+                    `;
+
+                    for (let col = 0; col < 5; col++) {
+                        html += `
+                            <td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 62px; min-width: 62px;">
+                                <input type="number" step="0.001" class="logger-reading form-control" data-nom="${nom}" data-lo="${lo}" data-hi="${hi}" data-col="${col}" value="" oninput="validateLoggerReadingCell(this)" style="width: 58px; padding: 2px 2px; font-size: 0.78rem; text-align: center; background-color: #ffffff; color: #000000; font-weight: 600;">
+                            </td>
+                        `;
+                    }
+                    html += `</tr>`;
+                });
+            }
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 6px; font-size: 0.75rem; color: #64748b;">
+                    <span style="display: inline-block; width: 10px; height: 10px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 2px; vertical-align: middle; margin-right: 3px;"></span> In Spec (Green)
+                    <span style="display: inline-block; width: 10px; height: 10px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 2px; vertical-align: middle; margin-left: 8px; margin-right: 3px;"></span> Out Spec (Red)
+                </div>
+            `;
+
+            body.innerHTML = html;
+        } catch (err) {
+            console.error("Error syncing logger inspection section:", err);
+        }
+    };
+
+    window.validateLoggerReadingCell = function(inputElem) {
+        const nom = parseFloat(inputElem.getAttribute("data-nom") || 0);
+        const lo = parseFloat(inputElem.getAttribute("data-lo") || 0);
+        const hi = parseFloat(inputElem.getAttribute("data-hi") || 0);
+        const minVal = nom - lo;
+        const maxVal = nom + hi;
+
+        const valStr = inputElem.value.trim();
+        if (valStr !== '' && !isNaN(valStr)) {
+            const v = parseFloat(valStr);
+            if (v >= minVal && v <= maxVal) {
+                inputElem.style.backgroundColor = '#d1fae5';
+                inputElem.style.color = '#065f46';
+            } else {
+                inputElem.style.backgroundColor = '#fee2e2';
+                inputElem.style.color = '#991b1b';
+            }
+        } else {
+            inputElem.style.backgroundColor = '#ffffff';
+            inputElem.style.color = '#000000';
+        }
+    };
 
     function resetLoggerForm() {
         const qtyInput = document.getElementById("logQtyProduced");
@@ -700,11 +856,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Restore & hold Machine, Operator, and Part Number for this device
         restoreDeviceStationSettings();
+        syncLoggerInspectionSection();
     }
 
     async function loadProdLogPageData() {
         await loadDropdowns();
         restoreDeviceStationSettings();
+        syncLoggerInspectionSection();
     }
 
     // Submit Log Form
@@ -732,7 +890,48 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             if (res.ok) {
-                alert(`Saved record! Sl Nos completed: ${completedSlNosStr || 'None'}`);
+                const prodLogData = await res.json();
+
+                // Save Quality Inspection Report instance with unique Traceability ID e.g. W04-20-0828-001
+                const rows = document.querySelectorAll("#loggerMatrixBody tr");
+                if (rows && rows.length > 0) {
+                    const compInputs = document.querySelectorAll(".logger-comp-sl");
+                    const compSlList = [];
+                    compInputs.forEach(i => compSlList.push(i.value.trim()));
+                    const compSlNosStr = compSlList.join(",");
+
+                    const readingsObj = {};
+                    rows.forEach((tr, pIdx) => {
+                        const pId = tr.getAttribute("data-param-id") || `param_${pIdx + 1}`;
+                        const rowReadings = {};
+                        const readingInputs = tr.querySelectorAll(".logger-reading");
+                        readingInputs.forEach(inp => {
+                            const col = inp.getAttribute("data-col");
+                            rowReadings[`col_${col}`] = inp.value;
+                        });
+                        readingsObj[pId] = rowReadings;
+                    });
+
+                    const reportPayload = {
+                        report_code: window.currentLoggerReportCode,
+                        prod_log_id: prodLogData.id,
+                        part_no: document.getElementById("logPart").value,
+                        opn_no: document.getElementById("logOpnNo").value,
+                        batch_qty: selectedSlNos.size > 0 ? selectedSlNos.size : 5,
+                        machine_name: document.getElementById("logMachine").value,
+                        operator_name: document.getElementById("logOperator").value,
+                        comp_sl_nos: compSlNosStr,
+                        readings_json: JSON.stringify(readingsObj)
+                    };
+
+                    await fetch("/api/inspection-reports", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(reportPayload)
+                    });
+                }
+
+                alert(`Saved Production Record & Quality Inspection Report!\nSl Nos completed: ${completedSlNosStr || 'None'}\nTraceability ID: ${window.currentLoggerReportCode}`);
                 resetLoggerForm();
                 await loadDropdowns();
                 loadDashboardStats();

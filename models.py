@@ -117,11 +117,13 @@ class InspectionReport(Base):
     __tablename__ = "inspection_reports"
 
     id = Column(Integer, primary_key=True, index=True)
+    report_code = Column(String, index=True, nullable=True)  # Unique Traceability ID e.g. W04-20-0828-001
+    prod_log_id = Column(Integer, nullable=True)
     part_no = Column(String, index=True, nullable=False)
     opn_no = Column(String, index=True, nullable=False)
-    batch_qty = Column(Integer, default=10)
+    batch_qty = Column(Integer, default=5)
     machine_name = Column(String, nullable=True)
     operator_name = Column(String, nullable=True)
     inspection_date = Column(String, nullable=True)
-    comp_sl_nos = Column(Text, nullable=True)  # Comma-separated component serial numbers, e.g. "1,2,3,4,5,6,7,8,9,10"
+    comp_sl_nos = Column(Text, nullable=True)  # Comma-separated component serial numbers, e.g. "10,11,12,13,14"
     readings_json = Column(Text, nullable=True) # JSON string mapping param_id -> { col_0: val, col_1: val ... }

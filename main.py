@@ -53,6 +53,21 @@ def parse_excel_bytes(file_bytes: bytes):
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
 
+# Auto migrate inspection_reports columns if missing
+try:
+    with engine.begin() as conn:
+        from sqlalchemy import text
+        try:
+            conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN report_code VARCHAR;"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN prod_log_id INTEGER;"))
+        except Exception:
+            pass
+except Exception as _ex:
+    pass
+
 app = FastAPI(title="Production Management API")
 
 class UserLogin(BaseModel):
@@ -238,13 +253,15 @@ class InspectionParamResponse(InspectionParamBase):
         from_attributes = True
 
 class InspectionReportSave(BaseModel):
+    report_code: Optional[str] = None
+    prod_log_id: Optional[int] = None
     part_no: str
     opn_no: str
-    batch_qty: Optional[int] = 10
+    batch_qty: Optional[int] = 5
     machine_name: Optional[str] = None
     operator_name: Optional[str] = None
     inspection_date: Optional[str] = None
-    comp_sl_nos: Optional[str] = "1,2,3,4,5,6,7,8,9,10"
+    comp_sl_nos: Optional[str] = "1,2,3,4,5"
     readings_json: Optional[str] = "{}"
 
 
@@ -977,6 +994,24 @@ def delete_inspection_parameter(param_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Parameter deleted"}
 
+def generate_traceability_code(part_no: str, opn_no: str, db: Session) -> str:
+    clean_p = part_no.strip().upper()
+    clean_op = opn_no.strip()
+    mmdd = get_now_ist().strftime("%m%d")
+    prefix = f"{clean_p}-{clean_op}-{mmdd}-"
+    
+    existing_count = db.query(models.InspectionReport).filter(
+        models.InspectionReport.report_code.like(f"{prefix}%")
+    ).count()
+    
+    seq_num = existing_count + 1
+    return f"{prefix}{seq_num:03d}"
+
+@app.get("/api/inspection-reports/next-code")
+def get_next_report_code(part_no: str, opn_no: str, db: Session = Depends(get_db)):
+    code = generate_traceability_code(part_no, opn_no, db)
+    return {"report_code": code}
+
 @app.get("/api/inspection-reports")
 def get_inspection_report(part_no: str, opn_no: str, db: Session = Depends(get_db)):
     clean_p = part_no.strip().lower()
@@ -987,8 +1022,11 @@ def get_inspection_report(part_no: str, opn_no: str, db: Session = Depends(get_d
         func.lower(models.InspectionReport.opn_no) == clean_op
     ).order_by(models.InspectionReport.id.desc()).first()
 
+    next_code = generate_traceability_code(part_no, opn_no, db)
+
     if not report:
         return {
+            "report_code": next_code,
             "part_no": part_no,
             "opn_no": opn_no,
             "batch_qty": 5,
@@ -1002,36 +1040,28 @@ def get_inspection_report(part_no: str, opn_no: str, db: Session = Depends(get_d
 
 @app.post("/api/inspection-reports")
 def save_inspection_report(req: InspectionReportSave, db: Session = Depends(get_db)):
-    clean_p = req.part_no.strip().lower()
-    clean_op = req.opn_no.strip().lower()
+    report_code = req.report_code
+    if not report_code:
+        report_code = generate_traceability_code(req.part_no, req.opn_no, db)
 
-    report = db.query(models.InspectionReport).filter(
-        func.lower(models.InspectionReport.part_no) == clean_p,
-        func.lower(models.InspectionReport.opn_no) == clean_op
-    ).first()
-
-    if not report:
-        report = models.InspectionReport(
-            part_no=req.part_no.strip(),
-            opn_no=req.opn_no.strip(),
-            batch_qty=req.batch_qty,
-            machine_name=req.machine_name,
-            operator_name=req.operator_name,
-            inspection_date=req.inspection_date or get_now_ist().strftime("%Y-%m-%d"),
-            comp_sl_nos=req.comp_sl_nos,
-            readings_json=req.readings_json
-        )
-        db.add(report)
-    else:
-        report.batch_qty = req.batch_qty
-        report.machine_name = req.machine_name
-        report.operator_name = req.operator_name
-        report.inspection_date = req.inspection_date or report.inspection_date
-        report.comp_sl_nos = req.comp_sl_nos
-        report.readings_json = req.readings_json
-
+    # Save as a distinct, traceable quality inspection instance
+    report = models.InspectionReport(
+        report_code=report_code,
+        prod_log_id=req.prod_log_id,
+        part_no=req.part_no.strip(),
+        opn_no=req.opn_no.strip(),
+        batch_qty=req.batch_qty,
+        machine_name=req.machine_name,
+        operator_name=req.operator_name,
+        inspection_date=req.inspection_date or get_now_ist().strftime("%Y-%m-%d"),
+        comp_sl_nos=req.comp_sl_nos,
+        readings_json=req.readings_json
+    )
+    db.add(report)
     db.commit()
-    return {"message": "Inspection Report saved successfully!"}
+    db.refresh(report)
+
+    return {"message": "Inspection Report saved successfully!", "report_code": report.report_code, "id": report.id}
 
 # --- Serve Static Files ---
 @app.middleware("http")
