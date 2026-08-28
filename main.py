@@ -221,11 +221,14 @@ class ToolingResponse(ToolingBase):
         from_attributes = True
 
 
-# --- API Routes ---
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+
+def get_now_ist():
+    return datetime.datetime.now(IST)
 
 @app.get("/api/dashboard/stats")
 def get_dashboard_stats(db: Session = Depends(get_db)):
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    today_str = get_now_ist().strftime("%Y-%m-%d")
     
     total_machines = db.query(models.Machine).count()
     active_machines = db.query(models.Machine).filter(models.Machine.status == "Active").count()
@@ -805,14 +808,14 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
 def create_production_log(log: ProductionLogCreate, db: Session = Depends(get_db)):
     data = log.model_dump()
     
-    # Auto capture exact date and time when entered
-    now = datetime.datetime.now()
+    # Auto capture exact date and time in Indian Standard Time (IST, UTC+5:30)
+    now_ist = get_now_ist()
     if not data.get("log_date"):
-        data["log_date"] = now.strftime("%Y-%m-%d %H:%M:%S")
+        data["log_date"] = now_ist.strftime("%Y-%m-%d %H:%M:%S")
     
-    # Auto calculate shift based on current time if not provided
+    # Auto calculate shift based on IST time if not provided
     if not data.get("shift"):
-        h = now.hour
+        h = now_ist.hour
         if 7 <= h < 15:
             data["shift"] = "Shift A (07:00 - 15:00)"
         elif 15 <= h < 23:

@@ -63,6 +63,10 @@ class ProductionSchedule(Base):
     balance_to_produce = Column(Integer, default=0)
     remarks = Column(String, nullable=True)
 
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+def get_now_ist():
+    return datetime.datetime.now(IST)
+
 class ProductionLog(Base):
     __tablename__ = "production_logs"
 
@@ -77,7 +81,7 @@ class ProductionLog(Base):
     scrap_qty = Column(Integer, default=0)
     completed_sl_nos = Column(Text, nullable=True)  # Stores comma-separated Sl Nos like "1,2,3,4,5"
     remarks = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=get_now_ist)
 
 class Tooling(Base):
     __tablename__ = "tooling"
