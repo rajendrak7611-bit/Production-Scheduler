@@ -461,24 +461,48 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function syncSlNosWithForm(maxGrid = 60) {
-        const totalSelected = new Set([...selectedSlNos, ...alreadyCompletedSlNos]);
+        const opnElem = document.getElementById("logOpnNo");
+        const currentOpnNo = opnElem ? opnElem.value : "";
+
+        const totalCompletedInThisOpn = new Set([...selectedSlNos, ...alreadyCompletedSlNos]);
         const sortedList = Array.from(selectedSlNos).sort((a, b) => a - b);
         
         // Auto update Qty Produced input field to count of newly selected Sl Nos
         document.getElementById("logQtyProduced").value = selectedSlNos.size;
 
         // Displays
+        const chartTitle = document.getElementById("chartTitleText");
         const countDisplay = document.getElementById("gridCountDisplay");
         const totalBadge = document.getElementById("chartTotalBadge");
         const progressFill = document.getElementById("gridProgressFill");
         const listText = document.getElementById("completedSlNoListText");
 
-        if (countDisplay) countDisplay.innerText = `${totalSelected.size} / ${maxGrid} Sl Nos`;
-        if (totalBadge) totalBadge.innerText = `Completed: ${totalSelected.size} Sl Nos`;
+        if (chartTitle) {
+            chartTitle.innerHTML = currentOpnNo ? `<i class="fa-solid fa-list-ol"></i> Part Serial Number (Sl No) Chart — <span style="color: var(--primary);">Opn ${currentOpnNo}</span>` : `<i class="fa-solid fa-list-ol"></i> Part Serial Number (Sl No) Chart`;
+        }
+
+        if (countDisplay) {
+            countDisplay.innerText = `${totalCompletedInThisOpn.size} / ${maxGrid} Sl Nos`;
+        }
+
+        if (totalBadge) {
+            if (!currentOpnNo) {
+                totalBadge.className = "badge badge-warning";
+                totalBadge.innerText = "Select Operation No";
+            } else if (isFirstOperation) {
+                totalBadge.className = "badge badge-success";
+                totalBadge.innerText = `Available to Log: ${availableSlNos.size} Sl Nos`;
+            } else {
+                totalBadge.className = "badge badge-primary";
+                totalBadge.innerText = `Received from Opn ${previousOpnNo || 'Prev'}: ${availableSlNos.size} Sl Nos`;
+            }
+        }
+
         if (progressFill) {
-            const pct = Math.min(100, Math.round((totalSelected.size / maxGrid) * 100));
+            const pct = Math.min(100, Math.round((totalCompletedInThisOpn.size / maxGrid) * 100));
             progressFill.style.width = `${pct}%`;
         }
+
         if (listText) {
             listText.innerText = sortedList.length > 0 ? sortedList.join(", ") : "None selected";
         }
