@@ -414,27 +414,32 @@ body {
 .alert-warning { background-color: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
 
 /* Modals */
-.modal {
+.modal, .modal-backdrop {
     display: none;
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+    z-index: 2000;
     justify-content: center;
     align-items: center;
 }
 
-.modal.active {
-    display: flex;
+.modal.active, .modal-backdrop.active {
+    display: flex !important;
 }
 
 .modal-content {
     background: var(--card-bg);
     border-radius: var(--radius-md);
     width: 100%;
-    max-width: 450px;
+    max-width: 500px;
     padding: 1.5rem;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+    position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
+    z-index: 2001;
 }
 
 .modal-header {
