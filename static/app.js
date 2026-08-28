@@ -755,6 +755,82 @@ document.addEventListener("DOMContentLoaded", () => {
         logOpnSelectElem.addEventListener("input", () => syncLoggerInspectionSection());
     }
 
+    // --- Custom On-Screen Touch Keypad Helpers ---
+    window.activeKeypadInput = null;
+
+    window.setActiveKeypadInput = function(elem) {
+        if (window.activeKeypadInput) {
+            window.activeKeypadInput.classList.remove("input-active-cell");
+        }
+        window.activeKeypadInput = elem;
+        if (elem) {
+            elem.classList.add("input-active-cell");
+        }
+    };
+
+    window.keypadKeyPress = function(char) {
+        if (!window.activeKeypadInput) return;
+        const elem = window.activeKeypadInput;
+        elem.value = (elem.value || "") + char;
+        elem.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    window.keypadBackspace = function() {
+        if (!window.activeKeypadInput) return;
+        const elem = window.activeKeypadInput;
+        elem.value = (elem.value || "").slice(0, -1);
+        elem.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    window.keypadClear = function() {
+        if (!window.activeKeypadInput) return;
+        const elem = window.activeKeypadInput;
+        elem.value = "";
+        elem.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    window.keypadNextRow = function() {
+        if (!window.activeKeypadInput) return;
+        const current = window.activeKeypadInput;
+        const tr = current.closest("tr");
+        if (tr && tr.nextElementSibling) {
+            const nextInput = tr.nextElementSibling.querySelector(".logger-reading, .insp-reading");
+            if (nextInput) {
+                nextInput.focus();
+                window.setActiveKeypadInput(nextInput);
+            }
+        }
+    };
+
+    window.renderKeypadHtml = function() {
+        return `
+            <div class="custom-keypad-container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <small style="font-weight: 700; color: #475569; font-size: 0.75rem;"><i class="fa-solid fa-calculator"></i> Touch Numeric Keypad</small>
+                    <small style="color: #64748b; font-size: 0.7rem;">Tap box & use keys below</small>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('7')">7</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('8')">8</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('9')">9</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('4')">4</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('5')">5</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('6')">6</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('1')">1</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('2')">2</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('3')">3</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('.')">.</button>
+                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('0')">0</button>
+                    <button type="button" class="btn-keypad action" onclick="keypadBackspace()"><i class="fa-solid fa-backspace"></i></button>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <button type="button" class="btn-keypad action-danger" style="flex: 1;" onclick="keypadClear()">Clear</button>
+                    <button type="button" class="btn-keypad action-success" style="flex: 1;" onclick="keypadNextRow()">Next ⬇</button>
+                </div>
+            </div>
+        `;
+    };
+
     // --- Production Logger Integrated Quality Inspection Section ---
     window.currentLoggerReportCode = "";
 
@@ -779,10 +855,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const sortedSlNos = Array.from(selectedSlNos).sort((a, b) => a - b);
-        let compSlNos = sortedSlNos.slice(0, 5).map(String);
-        while (compSlNos.length < 5) {
-            compSlNos.push(String(compSlNos.length + 1));
-        }
+        const compSlNoVal = sortedSlNos.length > 0 ? String(sortedSlNos[0]) : "1";
 
         try {
             const [pRes, cRes] = await Promise.all([
@@ -797,36 +870,33 @@ document.addEventListener("DOMContentLoaded", () => {
             if (codeBadge) codeBadge.innerText = window.currentLoggerReportCode;
 
             let html = `
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 0.78rem;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 6px; margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 4px; font-size: 0.75rem;">
                     <div><strong>Date:</strong> ${new Date().toISOString().split('T')[0]}</div>
                     <div><strong>Part No:</strong> <span style="color:var(--primary); font-weight:700;">${partNo}</span></div>
-                    <div><strong>Opn No:</strong> Opn ${opnNo}</div>
-                    <div><strong>Batch Qty:</strong> ${selectedSlNos.size > 0 ? selectedSlNos.size : 5} pcs</div>
-                    <div><strong>Machine:</strong> ${machine || 'None'}</div>
-                    <div><strong>Operator:</strong> ${operator || 'None'}</div>
+                    <div><strong>Opn:</strong> ${opnNo}</div>
+                    <div><strong>Machine:</strong> ${machine || '-'}</div>
+                    <div><strong>Operator:</strong> ${operator || '-'}</div>
                 </div>
 
                 <div class="table-responsive" style="overflow-x: auto; max-height: 380px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                    <table class="data-table" id="loggerMatrixTable" style="font-size: 0.78rem; border-collapse: separate; border-spacing: 0; min-width: 580px;">
+                    <table class="data-table" id="loggerMatrixTable" style="font-size: 0.75rem; border-collapse: separate; border-spacing: 0; min-width: 240px; width: 100%;">
                         <thead>
                             <tr style="background: #f1f5f9;">
-                                <th style="position: sticky; left: 0px; z-index: 4; background: #f1f5f9; width: 105px; min-width: 105px; max-width: 105px; border-bottom: 2px solid #cbd5e1;">Desc</th>
-                                <th style="position: sticky; left: 105px; z-index: 4; background: #f1f5f9; width: 60px; min-width: 60px; max-width: 60px; border-bottom: 2px solid #cbd5e1; text-align: right;">Nom</th>
-                                <th style="position: sticky; left: 165px; z-index: 4; background: #f1f5f9; width: 50px; min-width: 50px; max-width: 50px; border-bottom: 2px solid #cbd5e1; text-align: right;">Lo</th>
-                                <th style="position: sticky; left: 215px; z-index: 4; background: #f1f5f9; width: 50px; min-width: 50px; max-width: 50px; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06); text-align: right;">Hi</th>
-                                ${compSlNos.map((s, idx) => `
-                                    <th style="width: 62px; min-width: 62px; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
-                                        C${idx + 1}<br>
-                                        <input type="text" class="logger-comp-sl" data-col="${idx}" value="${s}" placeholder="Sl No" style="width: 56px; text-align: center; font-size: 0.75rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
-                                    </th>
-                                `).join("")}
+                                <th style="width: 75px; min-width: 75px; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Desc</th>
+                                <th style="width: 40px; min-width: 40px; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Nom</th>
+                                <th style="width: 32px; min-width: 32px; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Lo</th>
+                                <th style="width: 32px; min-width: 32px; text-align: right; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; padding: 4px 2px;">Hi</th>
+                                <th style="width: 65px; min-width: 65px; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
+                                    Reading<br>
+                                    <input type="text" class="logger-comp-sl" data-col="0" value="${compSlNoVal}" placeholder="Sl No" inputmode="decimal" onfocus="setActiveKeypadInput(this)" style="width: 58px; text-align: center; font-size: 0.72rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="loggerMatrixBody">
             `;
 
             if (!params || params.length === 0) {
-                html += `<tr><td colspan="9" class="text-center" style="padding: 12px;">No parameters configured in Part Master for ${partNo} (Opn ${opnNo}).</td></tr>`;
+                html += `<tr><td colspan="5" class="text-center" style="padding: 12px;">No parameters configured in Part Master for ${partNo} (Opn ${opnNo}).</td></tr>`;
             } else {
                 params.forEach((p, pIdx) => {
                     const nom = parseFloat(p.nominal_dimension || 0);
@@ -835,28 +905,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     html += `
                         <tr data-param-id="${p.id}">
-                            <td style="position: sticky; left: 0px; z-index: 2; background: #ffffff; width: 105px; min-width: 105px; max-width: 105px; padding: 2px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">
+                            <td style="width: 75px; min-width: 75px; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; font-weight: 600; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.description}">
                                 ${p.description}
                             </td>
-                            <td style="position: sticky; left: 105px; z-index: 2; background: #ffffff; width: 60px; min-width: 60px; max-width: 60px; padding: 2px; border-bottom: 1px solid #e2e8f0; text-align: right;">
+                            <td style="width: 40px; min-width: 40px; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 0.72rem;">
                                 ${nom}
                             </td>
-                            <td style="position: sticky; left: 165px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0; text-align: right;">
+                            <td style="width: 32px; min-width: 32px; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 0.72rem;">
                                 ${lo}
                             </td>
-                            <td style="position: sticky; left: 215px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06); text-align: right;">
+                            <td style="width: 32px; min-width: 32px; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1; text-align: right; font-size: 0.72rem;">
                                 ${hi}
                             </td>
-                    `;
-
-                    for (let col = 0; col < 5; col++) {
-                        html += `
-                            <td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 62px; min-width: 62px;">
-                                <input type="number" step="0.001" class="logger-reading form-control" data-nom="${nom}" data-lo="${lo}" data-hi="${hi}" data-col="${col}" value="" oninput="validateLoggerReadingCell(this)" style="width: 58px; padding: 2px 2px; font-size: 0.78rem; text-align: center; background-color: #ffffff; color: #000000; font-weight: 600;">
+                            <td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 65px; min-width: 65px;">
+                                <input type="number" step="0.001" inputmode="decimal" class="logger-reading form-control" data-nom="${nom}" data-lo="${lo}" data-hi="${hi}" data-col="0" value="" oninput="validateLoggerReadingCell(this)" onfocus="setActiveKeypadInput(this)" style="width: 58px; padding: 3px 2px; font-size: 0.75rem; text-align: center; background-color: #ffffff; color: #000000; font-weight: 700;">
                             </td>
-                        `;
-                    }
-                    html += `</tr>`;
+                        </tr>
+                    `;
                 });
             }
 
@@ -865,10 +930,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     </table>
                 </div>
 
-                <div style="margin-top: 6px; font-size: 0.75rem; color: #64748b;">
-                    <span style="display: inline-block; width: 10px; height: 10px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 2px; vertical-align: middle; margin-right: 3px;"></span> In Spec (Green)
-                    <span style="display: inline-block; width: 10px; height: 10px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 2px; vertical-align: middle; margin-left: 8px; margin-right: 3px;"></span> Out Spec (Red)
+                <div style="margin-top: 6px; font-size: 0.72rem; color: #64748b; display: flex; gap: 12px;">
+                    <span><span style="display: inline-block; width: 10px; height: 10px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 2px; vertical-align: middle;"></span> In Spec</span>
+                    <span><span style="display: inline-block; width: 10px; height: 10px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 2px; vertical-align: middle;"></span> Out Spec</span>
                 </div>
+
+                ${renderKeypadHtml()}
             `;
 
             body.innerHTML = html;
@@ -1990,62 +2057,60 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         let html = `
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 0.82rem;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 8px; margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 4px; font-size: 0.75rem;">
                 <div>
-                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Date</label>
-                    <input type="date" id="inspDate" value="${report.inspection_date || new Date().toISOString().split('T')[0]}" class="form-control" style="padding: 2px 4px; font-size: 0.78rem;">
+                    <label style="font-weight:700; color:#475569; font-size:0.7rem;">Date</label>
+                    <input type="date" id="inspDate" value="${report.inspection_date || new Date().toISOString().split('T')[0]}" class="form-control" style="padding: 1px 3px; font-size: 0.75rem;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Part No</label>
-                    <input type="text" id="inspPartNo" value="${window.currentInspectionPartNo}" class="form-control" style="padding: 2px 4px; font-size: 0.78rem; font-weight: 700;">
+                    <label style="font-weight:700; color:#475569; font-size:0.7rem;">Part No</label>
+                    <input type="text" id="inspPartNo" value="${window.currentInspectionPartNo}" class="form-control" style="padding: 1px 3px; font-size: 0.75rem; font-weight: 700;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Opn No</label>
-                    <input type="text" id="inspOpnNo" value="${window.currentInspectionOpnNo}" class="form-control" style="padding: 2px 4px; font-size: 0.78rem; font-weight: 700;">
+                    <label style="font-weight:700; color:#475569; font-size:0.7rem;">Opn No</label>
+                    <input type="text" id="inspOpnNo" value="${window.currentInspectionOpnNo}" class="form-control" style="padding: 1px 3px; font-size: 0.75rem; font-weight: 700;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Batch Qty</label>
-                    <input type="number" id="inspBatchQty" value="${report.batch_qty || 5}" class="form-control" style="padding: 2px 4px; font-size: 0.78rem;">
+                    <label style="font-weight:700; color:#475569; font-size:0.7rem;">Batch Qty</label>
+                    <input type="number" id="inspBatchQty" value="${report.batch_qty || 1}" class="form-control" style="padding: 1px 3px; font-size: 0.75rem;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Machine</label>
-                    <input type="text" id="inspMachine" value="${report.machine_name || ''}" placeholder="e.g. AMS" class="form-control" style="padding: 2px 4px; font-size: 0.78rem;">
+                    <label style="font-weight:700; color:#475569; font-size:0.7rem;">Machine</label>
+                    <input type="text" id="inspMachine" value="${report.machine_name || ''}" placeholder="e.g. AMS" class="form-control" style="padding: 1px 3px; font-size: 0.75rem;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Operator</label>
-                    <input type="text" id="inspOperator" value="${report.operator_name || ''}" placeholder="e.g. ABHISHEK" class="form-control" style="padding: 2px 4px; font-size: 0.78rem;">
+                    <label style="font-weight:700; color:#475569; font-size:0.7rem;">Operator</label>
+                    <input type="text" id="inspOperator" value="${report.operator_name || ''}" placeholder="e.g. ABHISHEK" class="form-control" style="padding: 1px 3px; font-size: 0.75rem;">
                 </div>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0;"><i class="fa-solid fa-sliders"></i> Parameters & 5 Component Readings</h4>
-                <button type="button" class="btn btn-sm btn-outline" style="padding: 2px 8px; font-size: 0.78rem;" onclick="addInspectionParamRow()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <h4 style="font-size: 0.82rem; font-weight: 700; margin: 0;"><i class="fa-solid fa-sliders"></i> Parameters & Measurement Reading</h4>
+                <button type="button" class="btn btn-sm btn-outline" style="padding: 2px 6px; font-size: 0.75rem;" onclick="addInspectionParamRow()">
                     <i class="fa-solid fa-plus"></i> Add Row
                 </button>
             </div>
 
-            <div class="table-responsive" style="overflow-x: auto; max-height: 420px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                <table class="data-table" id="inspectionMatrixTable" style="font-size: 0.78rem; border-collapse: separate; border-spacing: 0; min-width: 580px;">
+            <div class="table-responsive" style="overflow-x: auto; max-height: 360px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                <table class="data-table" id="inspectionMatrixTable" style="font-size: 0.75rem; border-collapse: separate; border-spacing: 0; min-width: 240px; width: 100%;">
                     <thead>
                         <tr style="background: #f1f5f9;">
-                            <th style="position: sticky; left: 0px; z-index: 4; background: #f1f5f9; width: 105px; min-width: 105px; max-width: 105px; border-bottom: 2px solid #cbd5e1;">Desc</th>
-                            <th style="position: sticky; left: 105px; z-index: 4; background: #f1f5f9; width: 60px; min-width: 60px; max-width: 60px; border-bottom: 2px solid #cbd5e1; text-align: right;">Nom</th>
-                            <th style="position: sticky; left: 165px; z-index: 4; background: #f1f5f9; width: 50px; min-width: 50px; max-width: 50px; border-bottom: 2px solid #cbd5e1; text-align: right;">Lo</th>
-                            <th style="position: sticky; left: 215px; z-index: 4; background: #f1f5f9; width: 50px; min-width: 50px; max-width: 50px; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06); text-align: right;">Hi</th>
-                            ${compSlNos.slice(0, 5).map((s, idx) => `
-                                <th style="width: 62px; min-width: 62px; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
-                                    C${idx + 1}<br>
-                                    <input type="text" class="insp-comp-sl" data-col="${idx}" value="${s}" placeholder="Sl No" style="width: 56px; text-align: center; font-size: 0.75rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
-                                </th>
-                            `).join("")}
-                            <th style="width: 32px; border-bottom: 2px solid #cbd5e1;"></th>
+                            <th style="width: 75px; min-width: 75px; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Desc</th>
+                            <th style="width: 40px; min-width: 40px; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Nom</th>
+                            <th style="width: 32px; min-width: 32px; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Lo</th>
+                            <th style="width: 32px; min-width: 32px; text-align: right; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; padding: 4px 2px;">Hi</th>
+                            <th style="width: 65px; min-width: 65px; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
+                                Reading<br>
+                                <input type="text" class="insp-comp-sl" data-col="0" value="${compSlNos[0] || '1'}" placeholder="Sl No" inputmode="decimal" onfocus="setActiveKeypadInput(this)" style="width: 58px; text-align: center; font-size: 0.72rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
+                            </th>
+                            <th style="width: 26px; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;"></th>
                         </tr>
                     </thead>
                     <tbody id="inspectionMatrixBody">
         `;
 
         if (params.length === 0) {
-            html += `<tr><td colspan="10" class="text-center" style="padding: 15px;">No inspection parameters defined. Click '+ Add Row' to add.</td></tr>`;
+            html += `<tr><td colspan="6" class="text-center" style="padding: 15px;">No inspection parameters defined. Click '+ Add Row' to add.</td></tr>`;
         } else {
             params.forEach((p, pIdx) => {
                 const paramReadings = readings[p.id] || readings[`temp_${pIdx + 1}`] || {};
@@ -2055,47 +2120,39 @@ document.addEventListener("DOMContentLoaded", () => {
                 const minVal = nom - lo;
                 const maxVal = nom + hi;
 
-                html += `
-                    <tr data-param-id="${p.id || ''}">
-                        <td style="position: sticky; left: 0px; z-index: 2; background: #ffffff; width: 105px; min-width: 105px; max-width: 105px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
-                            <input type="text" class="param-desc form-control" value="${p.description || ''}" style="width: 101px; padding: 2px 4px; font-size: 0.78rem;">
-                        </td>
-                        <td style="position: sticky; left: 105px; z-index: 2; background: #ffffff; width: 60px; min-width: 60px; max-width: 60px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
-                            <input type="number" step="0.001" class="param-nom form-control" value="${nom}" onchange="recalculateToleranceColors()" style="width: 56px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
-                        </td>
-                        <td style="position: sticky; left: 165px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
-                            <input type="number" step="0.001" class="param-lo form-control" value="${lo}" onchange="recalculateToleranceColors()" style="width: 46px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
-                        </td>
-                        <td style="position: sticky; left: 215px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06);">
-                            <input type="number" step="0.001" class="param-hi form-control" value="${hi}" onchange="recalculateToleranceColors()" style="width: 46px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
-                        </td>
-                `;
-
-                for (let col = 0; col < 5; col++) {
-                    const valStr = paramReadings[`col_${col}`] !== undefined ? paramReadings[`col_${col}`] : '';
-                    let cellBg = '#ffffff';
-                    let cellColor = '#000000';
-                    if (valStr !== '' && !isNaN(valStr)) {
-                        const v = parseFloat(valStr);
-                        if (v >= minVal && v <= maxVal) {
-                            cellBg = '#d1fae5';
-                            cellColor = '#065f46';
-                        } else {
-                            cellBg = '#fee2e2';
-                            cellColor = '#991b1b';
-                        }
+                const valStr = paramReadings[`col_0`] !== undefined ? paramReadings[`col_0`] : (paramReadings[`col_1`] || '');
+                let cellBg = '#ffffff';
+                let cellColor = '#000000';
+                if (valStr !== '' && !isNaN(valStr)) {
+                    const v = parseFloat(valStr);
+                    if (v >= minVal && v <= maxVal) {
+                        cellBg = '#d1fae5';
+                        cellColor = '#065f46';
+                    } else {
+                        cellBg = '#fee2e2';
+                        cellColor = '#991b1b';
                     }
-
-                    html += `
-                        <td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 62px; min-width: 62px;">
-                            <input type="number" step="0.001" class="insp-reading form-control" data-col="${col}" value="${valStr}" oninput="validateReadingCell(this)" style="width: 58px; padding: 2px 2px; font-size: 0.78rem; text-align: center; background-color: ${cellBg}; color: ${cellColor}; font-weight: 600;">
-                        </td>
-                    `;
                 }
 
                 html += `
+                    <tr data-param-id="${p.id || ''}">
+                        <td style="width: 75px; min-width: 75px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="text" class="param-desc form-control" value="${p.description || ''}" onfocus="setActiveKeypadInput(this)" style="width: 71px; padding: 2px 2px; font-size: 0.72rem;">
+                        </td>
+                        <td style="width: 40px; min-width: 40px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="number" step="0.001" inputmode="decimal" class="param-nom form-control" value="${nom}" onchange="recalculateToleranceColors()" onfocus="setActiveKeypadInput(this)" style="width: 36px; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
+                        </td>
+                        <td style="width: 32px; min-width: 32px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="number" step="0.001" inputmode="decimal" class="param-lo form-control" value="${lo}" onchange="recalculateToleranceColors()" onfocus="setActiveKeypadInput(this)" style="width: 28px; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
+                        </td>
+                        <td style="width: 32px; min-width: 32px; padding: 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1;">
+                            <input type="number" step="0.001" inputmode="decimal" class="param-hi form-control" value="${hi}" onchange="recalculateToleranceColors()" onfocus="setActiveKeypadInput(this)" style="width: 28px; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
+                        </td>
+                        <td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 65px; min-width: 65px;">
+                            <input type="number" step="0.001" inputmode="decimal" class="insp-reading form-control" data-col="0" value="${valStr}" oninput="validateReadingCell(this)" onfocus="setActiveKeypadInput(this)" style="width: 58px; padding: 2px 2px; font-size: 0.75rem; text-align: center; background-color: ${cellBg}; color: ${cellColor}; font-weight: 700;">
+                        </td>
                         <td style="text-align: center; padding: 2px; border-bottom: 1px solid #e2e8f0;">
-                            <button type="button" class="btn btn-sm btn-danger" style="padding: 1px 4px; font-size: 0.7rem;" onclick="removeInspectionParamRow(this)">
+                            <button type="button" class="btn btn-sm btn-danger" style="padding: 1px 3px; font-size: 0.68rem;" onclick="removeInspectionParamRow(this)">
                                 <i class="fa-solid fa-xmark"></i>
                             </button>
                         </td>
@@ -2109,8 +2166,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 </table>
             </div>
 
-            <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 8px;">
-                <div style="font-size: 0.75rem; color: #64748b;">
+            <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 6px;">
+                <div style="font-size: 0.72rem; color: #64748b;">
                     <span style="display: inline-block; width: 10px; height: 10px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 2px; vertical-align: middle; margin-right: 3px;"></span> In Spec
                     <span style="display: inline-block; width: 10px; height: 10px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 2px; vertical-align: middle; margin-left: 8px; margin-right: 3px;"></span> Out Spec
                 </div>
@@ -2121,6 +2178,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     </button>
                 </div>
             </div>
+
+            ${renderKeypadHtml()}
         `;
 
         body.innerHTML = html;

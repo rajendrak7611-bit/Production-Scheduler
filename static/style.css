@@ -795,4 +795,64 @@ body {
     }
 }
 
+/* On-Screen Numeric Keypad for Mobile Shop Floor Entry */
+.custom-keypad-container {
+    margin-top: 12px;
+    background: #f8fafc;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.btn-keypad {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 9px 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn-keypad:active {
+    background: #cbd5e1 !important;
+    transform: scale(0.95);
+}
+
+.btn-keypad.action {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fca5a5;
+}
+
+.btn-keypad.action-danger {
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.85rem;
+    padding: 8px 0;
+}
+
+.btn-keypad.action-success {
+    background: #10b981;
+    color: #ffffff;
+    font-size: 0.85rem;
+    padding: 8px 0;
+}
+
+/* Highlight focused/active input cell */
+.input-active-cell {
+    border: 2px solid var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25) !important;
+    background-color: #eff6ff !important;
+}
+
 
