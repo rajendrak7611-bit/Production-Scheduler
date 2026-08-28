@@ -11,7 +11,126 @@ document.addEventListener("DOMContentLoaded", () => {
     const tabScreens = document.querySelectorAll(".tab-screen");
     const tabTitle = document.getElementById("currentTabTitle");
 
+    window.currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+
+    window.selectRoleTab = function(role) {
+        document.getElementById("loginRole").value = role;
+        const pAdmin = document.getElementById("pillAdmin");
+        const pGuest = document.getElementById("pillGuest");
+        const uInput = document.getElementById("loginUsername");
+        const pInput = document.getElementById("loginPassword");
+        const err = document.getElementById("loginErrorMessage");
+        if (err) err.style.display = "none";
+
+        if (role === "admin") {
+            if (pAdmin) pAdmin.classList.add("active");
+            if (pGuest) pGuest.classList.remove("active");
+            if (uInput) uInput.value = "admin";
+            if (pInput) pInput.value = "admin123";
+        } else {
+            if (pGuest) pGuest.classList.add("active");
+            if (pAdmin) pAdmin.classList.remove("active");
+            if (uInput) uInput.value = "guest";
+            if (pInput) pInput.value = "guest123";
+        }
+    };
+
+    window.handleLoginSubmit = async function(e) {
+        e.preventDefault();
+        const err = document.getElementById("loginErrorMessage");
+        if (err) err.style.display = "none";
+
+        const u = document.getElementById("loginUsername").value.trim();
+        const p = document.getElementById("loginPassword").value.trim();
+
+        try {
+            const res = await fetch("/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            if (res.ok) {
+                const user = await res.json();
+                localStorage.setItem("currentUser", JSON.stringify(user));
+                window.currentUser = user;
+                applyUserRoleAccess();
+            } else {
+                const data = await res.json();
+                if (err) {
+                    err.innerText = data.detail || "Invalid username or password!";
+                    err.style.display = "block";
+                }
+            }
+        } catch (error) {
+            console.error("Login error:", error);
+            if (err) {
+                err.innerText = "Error connecting to server. Please try again.";
+                err.style.display = "block";
+            }
+        }
+    };
+
+    window.logoutUser = function() {
+        localStorage.removeItem("currentUser");
+        window.currentUser = null;
+        checkUserAuth();
+    };
+
+    window.applyUserRoleAccess = function() {
+        const overlay = document.getElementById("loginOverlay");
+        const userBadge = document.getElementById("userStatusBadge");
+        const userRoleText = document.getElementById("userRoleText");
+        const userIcon = document.getElementById("userStatusIcon");
+
+        if (!window.currentUser) {
+            if (overlay) overlay.style.display = "flex";
+            return;
+        }
+
+        if (overlay) overlay.style.display = "none";
+
+        const isGuest = (window.currentUser.role === "guest");
+
+        if (userRoleText) userRoleText.innerText = isGuest ? "Guest User" : "Admin User";
+        if (userIcon) userIcon.className = isGuest ? "fa-solid fa-user" : "fa-solid fa-user-shield";
+        if (userBadge) {
+            userBadge.style.background = isGuest ? "#fef3c7" : "#dbeafe";
+            userBadge.style.color = isGuest ? "#92400e" : "#1e40af";
+        }
+
+        navItems.forEach(item => {
+            const tab = item.dataset.tab;
+            if (isGuest && tab !== "prodlog") {
+                item.style.display = "none";
+            } else {
+                item.style.display = "flex";
+            }
+        });
+
+        if (isGuest) {
+            switchTab("prodlog");
+        } else {
+            const activeNav = document.querySelector(".nav-item.active");
+            const currentTab = activeNav ? activeNav.dataset.tab : "dashboard";
+            switchTab(currentTab);
+        }
+    };
+
+    window.checkUserAuth = function() {
+        window.currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+        if (!window.currentUser) {
+            const overlay = document.getElementById("loginOverlay");
+            if (overlay) overlay.style.display = "flex";
+        } else {
+            applyUserRoleAccess();
+        }
+    };
+
     window.switchTab = function(tabName) {
+        if (window.currentUser && window.currentUser.role === "guest" && tabName !== "prodlog") {
+            tabName = "prodlog";
+        }
+
         navItems.forEach(item => {
             if (item.dataset.tab === tabName) {
                 item.classList.add("active");
@@ -43,8 +162,8 @@ document.addEventListener("DOMContentLoaded", () => {
         item.addEventListener("click", () => switchTab(item.dataset.tab));
     });
 
-    // Initial Loads
-    loadDashboardStats();
+    // Check auth and load initial data
+    checkUserAuth();
     loadDropdowns();
 
     // --- API Loaders ---

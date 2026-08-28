@@ -88,3 +88,11 @@ class Tooling(Base):
     current_usage = Column(Integer, default=0)
     max_life = Column(Integer, default=1000)
     status = Column(String, default="Good") # Good, Warning, Replace
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    password = Column(String, nullable=False)
+    role = Column(String, nullable=False)  # 'admin' or 'guest'

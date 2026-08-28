@@ -55,6 +55,42 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Production Management API")
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+@app.on_event("startup")
+def seed_default_users():
+    db = next(get_db())
+    try:
+        admin_user = db.query(models.User).filter(models.User.username == "admin").first()
+        if not admin_user:
+            db.add(models.User(username="admin", password="admin123", role="admin"))
+        
+        guest_user = db.query(models.User).filter(models.User.username == "guest").first()
+        if not guest_user:
+            db.add(models.User(username="guest", password="guest123", role="guest"))
+        
+        db.commit()
+    except Exception as e:
+        print("Error seeding default users:", e)
+        db.rollback()
+    finally:
+        db.close()
+
+@app.post("/api/auth/login")
+def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
+    u = login_data.username.strip()
+    p = login_data.password.strip()
+    user = db.query(models.User).filter(models.User.username == u).first()
+    if not user or user.password != p:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    return {
+        "success": True,
+        "username": user.username,
+        "role": user.role
+    }
+
 @app.post("/api/seed-default-data")
 def seed_default_data(db: Session = Depends(get_db)):
     try:

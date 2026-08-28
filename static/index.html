@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRS ENGINEERING PVT LTD - Production Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=500">
+    <link rel="stylesheet" href="/static/style.css?v=600">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -59,6 +59,12 @@
                     <h1 id="currentTabTitle">Dashboard & Overview</h1>
                 </div>
                 <div class="header-actions">
+                    <span class="user-status-pill" id="userStatusBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; background: #e2e8f0; color: #1e293b;">
+                        <i class="fa-solid fa-user-shield" id="userStatusIcon"></i> <span id="userRoleText">Admin</span>
+                    </span>
+                    <button class="btn btn-secondary btn-sm" onclick="logoutUser()" title="Logout" style="padding: 4px 10px; font-size: 0.8rem;">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </button>
                     <div class="date-badge">
                         <i class="fa-regular fa-calendar"></i>
                         <span id="currentDateDisplay"></span>
@@ -596,6 +602,50 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=500"></script>
+    <!-- Login Screen Overlay Modal -->
+    <div id="loginOverlay" class="login-overlay-backdrop">
+        <div class="login-box shadow-lg">
+            <div class="login-brand">
+                <i class="fa-solid fa-industry login-icon"></i>
+                <h2>GRS ENGINEERING</h2>
+                <p class="login-subtitle">Production Management System</p>
+            </div>
+
+            <div class="role-tabs">
+                <button type="button" class="role-tab active" id="pillAdmin" onclick="selectRoleTab('admin')">
+                    <i class="fa-solid fa-user-shield"></i> Admin User
+                </button>
+                <button type="button" class="role-tab" id="pillGuest" onclick="selectRoleTab('guest')">
+                    <i class="fa-solid fa-user"></i> Guest User
+                </button>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLoginSubmit(event)">
+                <input type="hidden" id="loginRole" value="admin">
+                
+                <div class="form-group" style="text-align: left; margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; font-weight: 600;"><i class="fa-solid fa-user"></i> Username</label>
+                    <input type="text" id="loginUsername" value="admin" required autocomplete="username" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; margin-top: 4px;">
+                </div>
+
+                <div class="form-group" style="text-align: left; margin-bottom: 20px;">
+                    <label style="font-size: 0.85rem; font-weight: 600;"><i class="fa-solid fa-lock"></i> Password</label>
+                    <input type="password" id="loginPassword" value="admin123" required autocomplete="current-password" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; margin-top: 4px;">
+                </div>
+
+                <div id="loginErrorMessage" class="alert alert-danger" style="display: none; margin-bottom: 15px; font-size: 0.85rem;"></div>
+
+                <button type="submit" class="btn btn-primary btn-block" style="width: 100%; padding: 12px; font-weight: 600; font-size: 1rem; border-radius: 6px;">
+                    <i class="fa-solid fa-right-to-bracket"></i> Sign In
+                </button>
+            </form>
+
+            <div class="login-footer-hint" style="margin-top: 15px; font-size: 0.78rem; color: #64748b;">
+                <i class="fa-solid fa-circle-info"></i> Admin: Access All Screens | Guest: Production Logger Only
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=600"></script>
 </body>
 </html>
