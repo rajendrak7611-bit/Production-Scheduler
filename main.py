@@ -285,6 +285,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     today_scrap = db.query(func.sum(models.ProductionLog.scrap_qty)).filter(models.ProductionLog.log_date.like(f"{today_str}%")).scalar() or 0
     
     recent_logs = db.query(models.ProductionLog).order_by(models.ProductionLog.id.desc()).limit(10).all()
+    recent_inspection_reports = db.query(models.InspectionReport).order_by(models.InspectionReport.id.desc()).limit(10).all()
     
     return {
         "total_machines": total_machines,
@@ -310,6 +311,21 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
                 "remarks": log.remarks or ""
             }
             for log in recent_logs
+        ],
+        "recent_inspection_logs": [
+            {
+                "id": r.id,
+                "report_code": r.report_code or f"IR-{r.id}",
+                "inspection_date": r.inspection_date or "",
+                "part_no": r.part_no or "",
+                "opn_no": r.opn_no or "10",
+                "batch_qty": r.batch_qty or 5,
+                "machine_name": r.machine_name or "",
+                "operator_name": r.operator_name or "",
+                "comp_sl_nos": r.comp_sl_nos or "",
+                "readings_json": r.readings_json or "{}"
+            }
+            for r in recent_inspection_reports
         ]
     }
 
@@ -1062,6 +1078,22 @@ def save_inspection_report(req: InspectionReportSave, db: Session = Depends(get_
     db.refresh(report)
 
     return {"message": "Inspection Report saved successfully!", "report_code": report.report_code, "id": report.id}
+
+@app.get("/api/inspection-reports/by-id/{report_id}")
+def get_inspection_report_by_id(report_id: int, db: Session = Depends(get_db)):
+    r = db.query(models.InspectionReport).filter(models.InspectionReport.id == report_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Inspection report not found")
+    return r
+
+@app.delete("/api/inspection-reports/{report_id}")
+def delete_inspection_report(report_id: int, db: Session = Depends(get_db)):
+    r = db.query(models.InspectionReport).filter(models.InspectionReport.id == report_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Inspection report not found")
+    db.delete(r)
+    db.commit()
+    return {"message": "Inspection report deleted"}
 
 # --- Serve Static Files ---
 @app.middleware("http")

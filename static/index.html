@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRS ENGINEERING PVT LTD - Production Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=1100">
+    <link rel="stylesheet" href="/static/style.css?v=1200">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -136,6 +136,36 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- Card: Recent Quality Inspection Logs -->
+                    <div class="card shadow" style="margin-top: 1.5rem;">
+                        <div class="card-header space-between">
+                            <h3><i class="fa-solid fa-clipboard-check" style="color: var(--primary);"></i> Recent Quality Inspection Logs</h3>
+                            <button class="btn btn-sm btn-outline" onclick="loadDashboardStats()">
+                                <i class="fa-solid fa-rotate-right"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Traceability ID</th>
+                                        <th>Date</th>
+                                        <th>Part No</th>
+                                        <th>Opn</th>
+                                        <th>Batch Qty</th>
+                                        <th>Machine</th>
+                                        <th>Operator</th>
+                                        <th>Result</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentInspectionLogsBody">
+                                    <tr><td colspan="9" class="text-center">Loading recent inspection logs...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -243,8 +273,11 @@
                                         Auto-filled | Traceability ID: <strong id="loggerReportCodeBadge" style="color: var(--primary); font-size: 0.85rem;">-</strong>
                                     </small>
                                 </div>
-                                <div style="display: flex; gap: 8px; align-items: center;">
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                                     <span class="badge badge-success" id="loggerInspStatusBadge" style="font-size: 0.78rem;">Auto-filled from Logger</span>
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="saveLoggerInspectionReportData()" style="font-weight: 700; padding: 5px 12px; font-size: 0.82rem;">
+                                        <i class="fa-solid fa-floppy-disk"></i> Save Inspection Report
+                                    </button>
                                 </div>
                             </div>
                             <div class="card-body" id="loggerInspectionBody" style="padding: 12px;">
@@ -642,6 +675,26 @@
         </div>
     </div>
 
+    <!-- Saved Inspection Report Detail View Modal -->
+    <div id="viewSavedReportModal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 720px; width: 96%; padding: 14px; border-radius: 12px;">
+            <div class="modal-header space-between">
+                <div>
+                    <h3 id="viewReportTitle" style="font-size: 1.1rem; font-weight: 700; margin: 0; color: var(--primary-dark);">
+                        <i class="fa-solid fa-clipboard-check" style="color: var(--primary);"></i> Saved Quality Inspection Report
+                    </h3>
+                    <small style="color: #64748b; font-size: 0.8rem;">
+                        Traceability ID: <strong id="viewReportCodeBadge" style="color: var(--primary); font-size: 0.88rem;">-</strong>
+                    </small>
+                </div>
+                <button class="modal-close" onclick="closeModal('viewSavedReportModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="viewReportBody" style="padding: 12px;">
+                <!-- Full saved report matrix rendered dynamically -->
+            </div>
+        </div>
+    </div>
+
     <!-- Login Screen Overlay Modal -->
     <div id="loginOverlay" class="login-overlay-backdrop">
         <div class="login-box shadow-lg">
@@ -677,6 +730,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=1100"></script>
+    <script src="/static/app.js?v=1200"></script>
 </body>
 </html>

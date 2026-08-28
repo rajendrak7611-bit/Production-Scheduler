@@ -202,6 +202,60 @@ document.addEventListener("DOMContentLoaded", () => {
             tr.onclick = () => viewLogSlNoModal(index);
             tbody.appendChild(tr);
         });
+
+        // Render Recent Quality Inspection Logs table on Dashboard
+        const inspTbody = document.getElementById("recentInspectionLogsBody");
+        if (inspTbody) {
+            inspTbody.innerHTML = "";
+            const inspLogs = data.recent_inspection_logs || [];
+            if (inspLogs.length === 0) {
+                inspTbody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: var(--text-secondary);">No quality inspection logs recorded yet</td></tr>`;
+            } else {
+                inspLogs.forEach(r => {
+                    const tr = document.createElement("tr");
+                    tr.style.cursor = "pointer";
+
+                    let totalReadings = 0;
+                    try {
+                        const rObj = JSON.parse(r.readings_json || "{}");
+                        Object.values(rObj).forEach(row => {
+                            Object.values(row).forEach(v => {
+                                if (v !== "" && !isNaN(v)) {
+                                    totalReadings++;
+                                }
+                            });
+                        });
+                    } catch(e){}
+
+                    const statusBadge = totalReadings > 0 
+                        ? `<span class="badge badge-success"><i class="fa-solid fa-check"></i> Recorded (${totalReadings})</span>`
+                        : `<span class="badge badge-warning">Template Only</span>`;
+
+                    tr.innerHTML = `
+                        <td><strong style="color: var(--primary);">${r.report_code || 'IR-' + r.id}</strong></td>
+                        <td>${r.inspection_date || '-'}</td>
+                        <td><strong>${r.part_no}</strong></td>
+                        <td>Opn ${r.opn_no}</td>
+                        <td>${r.batch_qty} pcs</td>
+                        <td>${r.machine_name || '-'}</td>
+                        <td>${r.operator_name || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <div style="display: flex; gap: 4px;">
+                                <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); viewSavedInspectionReportModal(${r.id})" title="View Full Report">
+                                    <i class="fa-solid fa-eye" style="color: var(--primary);"></i> View
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteInspectionReport(${r.id})" title="Delete">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tr.onclick = () => viewSavedInspectionReportModal(r.id);
+                    inspTbody.appendChild(tr);
+                });
+            }
+        }
     }
 
     async function loadDashboardStats() {
@@ -843,6 +897,166 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             inputElem.style.backgroundColor = '#ffffff';
             inputElem.style.color = '#000000';
+        }
+    };
+
+    window.saveLoggerInspectionReportData = async function() {
+        const partNo = document.getElementById("logPart")?.value.trim() || "";
+        const opnNo = document.getElementById("logOpnNo")?.value.trim() || "";
+
+        if (!partNo || !opnNo) {
+            alert("Please select Part Number and Operation No first.");
+            return;
+        }
+
+        const rows = document.querySelectorAll("#loggerMatrixBody tr");
+        const compInputs = document.querySelectorAll(".logger-comp-sl");
+        const compSlList = [];
+        compInputs.forEach(i => compSlList.push(i.value.trim()));
+        const compSlNosStr = compSlList.join(",");
+
+        const readingsObj = {};
+        rows.forEach((tr, pIdx) => {
+            const pId = tr.getAttribute("data-param-id") || `param_${pIdx + 1}`;
+            const rowReadings = {};
+            const readingInputs = tr.querySelectorAll(".logger-reading");
+            readingInputs.forEach(inp => {
+                const col = inp.getAttribute("data-col");
+                rowReadings[`col_${col}`] = inp.value;
+            });
+            readingsObj[pId] = rowReadings;
+        });
+
+        const reportPayload = {
+            report_code: window.currentLoggerReportCode,
+            part_no: partNo,
+            opn_no: opnNo,
+            batch_qty: selectedSlNos.size > 0 ? selectedSlNos.size : 5,
+            machine_name: document.getElementById("logMachine")?.value || "",
+            operator_name: document.getElementById("logOperator")?.value || "",
+            comp_sl_nos: compSlNosStr,
+            readings_json: JSON.stringify(readingsObj)
+        };
+
+        try {
+            const res = await fetch("/api/inspection-reports", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(reportPayload)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Quality Inspection Report saved successfully!\nTraceability ID: ${data.report_code}`);
+                loadDashboardStats();
+                syncLoggerInspectionSection();
+            } else {
+                alert("Failed to save inspection report.");
+            }
+        } catch (err) {
+            console.error("Error saving inspection report:", err);
+        }
+    };
+
+    window.viewSavedInspectionReportModal = async function(reportId) {
+        try {
+            const res = await fetch(`/api/inspection-reports/by-id/${reportId}`);
+            if (!res.ok) return alert("Report not found");
+            const r = await res.json();
+
+            document.getElementById("viewReportCodeBadge").innerText = r.report_code || `IR-${r.id}`;
+            document.getElementById("viewReportTitle").innerText = `Saved Quality Inspection Report (${r.part_no} - Opn ${r.opn_no})`;
+
+            const pRes = await fetch(`/api/inspection-parameters?part_no=${encodeURIComponent(r.part_no)}&opn_no=${encodeURIComponent(r.opn_no)}`);
+            const params = await pRes.json();
+
+            const compList = r.comp_sl_nos ? r.comp_sl_nos.split(",") : ["1","2","3","4","5"];
+            let readingsObj = {};
+            try { readingsObj = JSON.parse(r.readings_json || "{}"); } catch(e){}
+
+            let html = `
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 0.78rem;">
+                    <div><strong>Date:</strong> ${r.inspection_date || '-'}</div>
+                    <div><strong>Part No:</strong> <span style="color:var(--primary); font-weight:700;">${r.part_no}</span></div>
+                    <div><strong>Opn No:</strong> Opn ${r.opn_no}</div>
+                    <div><strong>Batch Qty:</strong> ${r.batch_qty} pcs</div>
+                    <div><strong>Machine:</strong> ${r.machine_name || '-'}</div>
+                    <div><strong>Operator:</strong> ${r.operator_name || '-'}</div>
+                </div>
+
+                <div class="table-responsive" style="overflow-x: auto; max-height: 380px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <table class="data-table" style="font-size: 0.78rem; border-collapse: separate; border-spacing: 0; min-width: 580px;">
+                        <thead>
+                            <tr style="background: #f1f5f9;">
+                                <th style="position: sticky; left: 0px; z-index: 4; background: #f1f5f9; width: 105px;">Desc</th>
+                                <th style="position: sticky; left: 105px; z-index: 4; background: #f1f5f9; width: 60px; text-align: right;">Nom</th>
+                                <th style="position: sticky; left: 165px; z-index: 4; background: #f1f5f9; width: 50px; text-align: right;">Lo</th>
+                                <th style="position: sticky; left: 215px; z-index: 4; background: #f1f5f9; width: 50px; text-align: right; border-right: 2px solid #cbd5e1;">Hi</th>
+                                ${compList.map(c => `<th style="width: 62px; text-align: center;">C<br><strong>${c}</strong></th>`).join("")}
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            if (!params || params.length === 0) {
+                html += `<tr><td colspan="9" class="text-center" style="padding: 12px;">No parameter definitions recorded.</td></tr>`;
+            } else {
+                params.forEach((p, pIdx) => {
+                    const nom = parseFloat(p.nominal_dimension || 0);
+                    const lo = parseFloat(p.lo_tol || 0);
+                    const hi = parseFloat(p.hi_tol || 0);
+                    const minVal = nom - lo;
+                    const maxVal = nom + hi;
+
+                    const rowVals = readingsObj[p.id] || readingsObj[`param_${pIdx + 1}`] || {};
+
+                    html += `
+                        <tr>
+                            <td style="position: sticky; left: 0px; z-index: 2; background: #ffffff; width: 105px; font-weight: 600;">${p.description}</td>
+                            <td style="position: sticky; left: 105px; z-index: 2; background: #ffffff; width: 60px; text-align: right;">${nom}</td>
+                            <td style="position: sticky; left: 165px; z-index: 2; background: #ffffff; width: 50px; text-align: right;">${lo}</td>
+                            <td style="position: sticky; left: 215px; z-index: 2; background: #ffffff; width: 50px; text-align: right; border-right: 2px solid #cbd5e1;">${hi}</td>
+                    `;
+
+                    for (let col = 0; col < compList.length; col++) {
+                        const val = rowVals[`col_${col}`] !== undefined ? rowVals[`col_${col}`] : "";
+                        let bg = "#ffffff";
+                        let fg = "#000000";
+                        if (val !== "" && !isNaN(val)) {
+                            const v = parseFloat(val);
+                            if (v >= minVal && v <= maxVal) { bg = "#d1fae5"; fg = "#065f46"; }
+                            else { bg = "#fee2e2"; fg = "#991b1b"; }
+                        }
+                        html += `<td style="text-align: center; background-color: ${bg}; color: ${fg}; font-weight: 700;">${val !== "" ? val : "-"}</td>`;
+                    }
+                    html += `</tr>`;
+                });
+            }
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            document.getElementById("viewReportBody").innerHTML = html;
+            openModal("viewSavedReportModal");
+        } catch(e) {
+            console.error("Error viewing saved report:", e);
+        }
+    };
+
+    window.deleteInspectionReport = async function(reportId) {
+        if (!confirm("Are you sure you want to delete this inspection report instance?")) return;
+        try {
+            const res = await fetch(`/api/inspection-reports/${reportId}`, { method: "DELETE" });
+            if (res.ok) {
+                loadDashboardStats();
+            } else {
+                alert("Failed to delete inspection report.");
+            }
+        } catch(e) {
+            console.error("Error deleting inspection report:", e);
         }
     };
 
