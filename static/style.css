@@ -761,12 +761,32 @@ body {
     background: #ffffff;
     color: var(--primary);
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}    -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile Optimization for Quality Inspection Report Modal */
+#partInspectionModal .modal-content {
+    max-width: 720px;
+    width: 96%;
+    padding: 14px;
+    border-radius: 12px;
+}
+
+@media (max-width: 768px) {
+    #partInspectionModal .modal-content {
+        padding: 8px;
+        width: 98%;
+        max-height: 94vh;
+        overflow-y: auto;
     }
 
-    .grid-quick-actions {
-        flex-wrap: wrap;
-        justify-content: center;
+    #inspectionMatrixTable th, 
+    #inspectionMatrixTable td {
+        padding: 1px;
+    }
+
+    .insp-reading, .param-desc, .param-nom, .param-lo, .param-hi {
+        font-size: 0.75rem !important;
+        height: 26px !important;
     }
 }
 

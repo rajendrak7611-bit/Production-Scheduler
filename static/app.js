@@ -1564,8 +1564,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const report = window.currentInspectionReport || {};
         const params = window.currentInspectionParams || [];
 
-        const compSlNos = (report.comp_sl_nos || "1,2,3,4,5,6,7,8,9,10").split(",").map(s => s.trim());
-        while (compSlNos.length < 10) {
+        const compSlNos = (report.comp_sl_nos || "1,2,3,4,5").split(",").map(s => s.trim());
+        while (compSlNos.length < 5) {
             compSlNos.push(String(compSlNos.length + 1));
         }
 
@@ -1577,63 +1577,62 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         let html = `
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 16px; border-radius: 8px; margin-bottom: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; font-size: 0.85rem;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 0.82rem;">
                 <div>
-                    <label style="font-weight:700; color:#475569;">Inspection Date</label>
-                    <input type="date" id="inspDate" value="${report.inspection_date || new Date().toISOString().split('T')[0]}" class="form-control" style="padding: 4px 8px; font-size: 0.82rem;">
+                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Date</label>
+                    <input type="date" id="inspDate" value="${report.inspection_date || new Date().toISOString().split('T')[0]}" class="form-control" style="padding: 2px 4px; font-size: 0.78rem;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569;">Part No</label>
-                    <input type="text" id="inspPartNo" value="${window.currentInspectionPartNo}" class="form-control" style="padding: 4px 8px; font-size: 0.82rem; font-weight: 700;">
+                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Part No</label>
+                    <input type="text" id="inspPartNo" value="${window.currentInspectionPartNo}" class="form-control" style="padding: 2px 4px; font-size: 0.78rem; font-weight: 700;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569;">Opn No</label>
-                    <input type="text" id="inspOpnNo" value="${window.currentInspectionOpnNo}" class="form-control" style="padding: 4px 8px; font-size: 0.82rem; font-weight: 700;">
+                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Opn No</label>
+                    <input type="text" id="inspOpnNo" value="${window.currentInspectionOpnNo}" class="form-control" style="padding: 2px 4px; font-size: 0.78rem; font-weight: 700;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569;">Batch Qty</label>
-                    <input type="number" id="inspBatchQty" value="${report.batch_qty || 10}" class="form-control" style="padding: 4px 8px; font-size: 0.82rem;">
+                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Batch Qty</label>
+                    <input type="number" id="inspBatchQty" value="${report.batch_qty || 5}" class="form-control" style="padding: 2px 4px; font-size: 0.78rem;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569;">Machine</label>
-                    <input type="text" id="inspMachine" value="${report.machine_name || ''}" placeholder="e.g. AMS" class="form-control" style="padding: 4px 8px; font-size: 0.82rem;">
+                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Machine</label>
+                    <input type="text" id="inspMachine" value="${report.machine_name || ''}" placeholder="e.g. AMS" class="form-control" style="padding: 2px 4px; font-size: 0.78rem;">
                 </div>
                 <div>
-                    <label style="font-weight:700; color:#475569;">Operator</label>
-                    <input type="text" id="inspOperator" value="${report.operator_name || ''}" placeholder="e.g. ABHISHEK P" class="form-control" style="padding: 4px 8px; font-size: 0.82rem;">
+                    <label style="font-weight:700; color:#475569; font-size:0.75rem;">Operator</label>
+                    <input type="text" id="inspOperator" value="${report.operator_name || ''}" placeholder="e.g. ABHISHEK" class="form-control" style="padding: 2px 4px; font-size: 0.78rem;">
                 </div>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h4 style="font-size: 0.95rem; font-weight: 700;"><i class="fa-solid fa-sliders"></i> Inspection Parameters & Component Serial Numbers</h4>
-                <button type="button" class="btn btn-sm btn-outline" onclick="addInspectionParamRow()">
-                    <i class="fa-solid fa-plus"></i> Add Parameter Row
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0;"><i class="fa-solid fa-sliders"></i> Parameters & 5 Component Readings</h4>
+                <button type="button" class="btn btn-sm btn-outline" style="padding: 2px 8px; font-size: 0.78rem;" onclick="addInspectionParamRow()">
+                    <i class="fa-solid fa-plus"></i> Add Row
                 </button>
             </div>
 
-            <div class="table-responsive" style="overflow-x: auto;">
-                <table class="data-table" id="inspectionMatrixTable" style="font-size: 0.82rem; min-width: 1000px;">
+            <div class="table-responsive" style="overflow-x: auto; max-height: 420px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                <table class="data-table" id="inspectionMatrixTable" style="font-size: 0.78rem; border-collapse: separate; border-spacing: 0; min-width: 580px;">
                     <thead>
                         <tr style="background: #f1f5f9;">
-                            <th style="width: 50px;">Sl No</th>
-                            <th style="width: 130px;">Desc</th>
-                            <th style="width: 90px;">Nom Dimen</th>
-                            <th style="width: 75px;">Lo Tol</th>
-                            <th style="width: 75px;">Hi Tol</th>
-                            ${compSlNos.slice(0, 10).map((s, idx) => `
-                                <th style="width: 75px; text-align: center;">
-                                    Comp ${idx + 1}<br>
-                                    <input type="text" class="insp-comp-sl" data-col="${idx}" value="${s}" placeholder="Sl No" style="width: 100%; text-align: center; font-size: 0.78rem; font-weight: 700; padding: 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
+                            <th style="position: sticky; left: 0px; z-index: 4; background: #f1f5f9; width: 105px; min-width: 105px; max-width: 105px; border-bottom: 2px solid #cbd5e1;">Desc</th>
+                            <th style="position: sticky; left: 105px; z-index: 4; background: #f1f5f9; width: 60px; min-width: 60px; max-width: 60px; border-bottom: 2px solid #cbd5e1; text-align: right;">Nom</th>
+                            <th style="position: sticky; left: 165px; z-index: 4; background: #f1f5f9; width: 50px; min-width: 50px; max-width: 50px; border-bottom: 2px solid #cbd5e1; text-align: right;">Lo</th>
+                            <th style="position: sticky; left: 215px; z-index: 4; background: #f1f5f9; width: 50px; min-width: 50px; max-width: 50px; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06); text-align: right;">Hi</th>
+                            ${compSlNos.slice(0, 5).map((s, idx) => `
+                                <th style="width: 62px; min-width: 62px; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
+                                    C${idx + 1}<br>
+                                    <input type="text" class="insp-comp-sl" data-col="${idx}" value="${s}" placeholder="Sl No" style="width: 56px; text-align: center; font-size: 0.75rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
                                 </th>
                             `).join("")}
-                            <th style="width: 40px;"></th>
+                            <th style="width: 32px; border-bottom: 2px solid #cbd5e1;"></th>
                         </tr>
                     </thead>
                     <tbody id="inspectionMatrixBody">
         `;
 
         if (params.length === 0) {
-            html += `<tr><td colspan="16" class="text-center">No inspection parameters defined. Click '+ Add Parameter Row' to add.</td></tr>`;
+            html += `<tr><td colspan="10" class="text-center" style="padding: 15px;">No inspection parameters defined. Click '+ Add Row' to add.</td></tr>`;
         } else {
             params.forEach((p, pIdx) => {
                 const paramReadings = readings[p.id] || readings[`temp_${pIdx + 1}`] || {};
@@ -1645,22 +1644,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 html += `
                     <tr data-param-id="${p.id || ''}">
-                        <td style="text-align: center; font-weight: 700;">${pIdx + 1}</td>
-                        <td>
-                            <input type="text" class="param-desc form-control" value="${p.description || ''}" style="padding: 2px 6px; font-size: 0.8rem;">
+                        <td style="position: sticky; left: 0px; z-index: 2; background: #ffffff; width: 105px; min-width: 105px; max-width: 105px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="text" class="param-desc form-control" value="${p.description || ''}" style="width: 101px; padding: 2px 4px; font-size: 0.78rem;">
                         </td>
-                        <td>
-                            <input type="number" step="0.001" class="param-nom form-control" value="${nom}" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;">
+                        <td style="position: sticky; left: 105px; z-index: 2; background: #ffffff; width: 60px; min-width: 60px; max-width: 60px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="number" step="0.001" class="param-nom form-control" value="${nom}" onchange="recalculateToleranceColors()" style="width: 56px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
                         </td>
-                        <td>
-                            <input type="number" step="0.001" class="param-lo form-control" value="${lo}" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;">
+                        <td style="position: sticky; left: 165px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="number" step="0.001" class="param-lo form-control" value="${lo}" onchange="recalculateToleranceColors()" style="width: 46px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
                         </td>
-                        <td>
-                            <input type="number" step="0.001" class="param-hi form-control" value="${hi}" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;">
+                        <td style="position: sticky; left: 215px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06);">
+                            <input type="number" step="0.001" class="param-hi form-control" value="${hi}" onchange="recalculateToleranceColors()" style="width: 46px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
                         </td>
                 `;
 
-                for (let col = 0; col < 10; col++) {
+                for (let col = 0; col < 5; col++) {
                     const valStr = paramReadings[`col_${col}`] !== undefined ? paramReadings[`col_${col}`] : '';
                     let cellBg = '#ffffff';
                     let cellColor = '#000000';
@@ -1676,15 +1674,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                     html += `
-                        <td style="padding: 2px;">
-                            <input type="number" step="0.001" class="insp-reading form-control" data-col="${col}" value="${valStr}" oninput="validateReadingCell(this)" style="padding: 2px 4px; font-size: 0.8rem; text-align: center; background-color: ${cellBg}; color: ${cellColor}; font-weight: 600;">
+                        <td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 62px; min-width: 62px;">
+                            <input type="number" step="0.001" class="insp-reading form-control" data-col="${col}" value="${valStr}" oninput="validateReadingCell(this)" style="width: 58px; padding: 2px 2px; font-size: 0.78rem; text-align: center; background-color: ${cellBg}; color: ${cellColor}; font-weight: 600;">
                         </td>
                     `;
                 }
 
                 html += `
-                        <td style="text-align: center;">
-                            <button type="button" class="btn btn-sm btn-danger" style="padding: 2px 6px;" onclick="removeInspectionParamRow(this)">
+                        <td style="text-align: center; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <button type="button" class="btn btn-sm btn-danger" style="padding: 1px 4px; font-size: 0.7rem;" onclick="removeInspectionParamRow(this)">
                                 <i class="fa-solid fa-xmark"></i>
                             </button>
                         </td>
@@ -1698,15 +1696,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 </table>
             </div>
 
-            <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 12px;">
-                <div style="font-size: 0.78rem; color: #64748b;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 2px; vertical-align: middle; margin-right: 4px;"></span> In Spec (Green)
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 2px; vertical-align: middle; margin-left: 10px; margin-right: 4px;"></span> Out of Spec (Red)
+            <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+                <div style="font-size: 0.75rem; color: #64748b;">
+                    <span style="display: inline-block; width: 10px; height: 10px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 2px; vertical-align: middle; margin-right: 3px;"></span> In Spec
+                    <span style="display: inline-block; width: 10px; height: 10px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 2px; vertical-align: middle; margin-left: 8px; margin-right: 3px;"></span> Out Spec
                 </div>
-                <div style="display: flex; gap: 8px;">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('partInspectionModal')">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="saveInspectionReportData()">
-                        <i class="fa-solid fa-floppy-disk"></i> Save Inspection Report
+                <div style="display: flex; gap: 6px;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('partInspectionModal')">Close</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveInspectionReportData()">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Report
                     </button>
                 </div>
             </div>
@@ -1760,20 +1758,27 @@ document.addEventListener("DOMContentLoaded", () => {
         tr.setAttribute("data-param-id", "");
 
         let html = `
-            <td style="text-align: center; font-weight: 700;">${idx}</td>
-            <td><input type="text" class="param-desc form-control" placeholder="Desc (e.g. Bore)" style="padding: 2px 6px; font-size: 0.8rem;"></td>
-            <td><input type="number" step="0.001" class="param-nom form-control" value="0.0" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;"></td>
-            <td><input type="number" step="0.001" class="param-lo form-control" value="0.0" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;"></td>
-            <td><input type="number" step="0.001" class="param-hi form-control" value="0.0" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;"></td>
+            <td style="position: sticky; left: 0px; z-index: 2; background: #ffffff; width: 105px; min-width: 105px; max-width: 105px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                <input type="text" class="param-desc form-control" placeholder="Desc" style="width: 101px; padding: 2px 4px; font-size: 0.78rem;">
+            </td>
+            <td style="position: sticky; left: 105px; z-index: 2; background: #ffffff; width: 60px; min-width: 60px; max-width: 60px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                <input type="number" step="0.001" class="param-nom form-control" value="0.0" onchange="recalculateToleranceColors()" style="width: 56px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
+            </td>
+            <td style="position: sticky; left: 165px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                <input type="number" step="0.001" class="param-lo form-control" value="0.0" onchange="recalculateToleranceColors()" style="width: 46px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
+            </td>
+            <td style="position: sticky; left: 215px; z-index: 2; background: #ffffff; width: 50px; min-width: 50px; max-width: 50px; padding: 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1; box-shadow: 3px 0 5px rgba(0,0,0,0.06);">
+                <input type="number" step="0.001" class="param-hi form-control" value="0.0" onchange="recalculateToleranceColors()" style="width: 46px; padding: 2px 2px; font-size: 0.78rem; text-align: right;">
+            </td>
         `;
 
-        for (let col = 0; col < 10; col++) {
-            html += `<td style="padding: 2px;"><input type="number" step="0.001" class="insp-reading form-control" data-col="${col}" value="" oninput="validateReadingCell(this)" style="padding: 2px 4px; font-size: 0.8rem; text-align: center; background-color: #ffffff; color: #000000; font-weight: 600;"></td>`;
+        for (let col = 0; col < 5; col++) {
+            html += `<td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 62px; min-width: 62px;"><input type="number" step="0.001" class="insp-reading form-control" data-col="${col}" value="" oninput="validateReadingCell(this)" style="width: 58px; padding: 2px 2px; font-size: 0.78rem; text-align: center; background-color: #ffffff; color: #000000; font-weight: 600;"></td>`;
         }
 
         html += `
-            <td style="text-align: center;">
-                <button type="button" class="btn btn-sm btn-danger" style="padding: 2px 6px;" onclick="removeInspectionParamRow(this)">
+            <td style="text-align: center; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                <button type="button" class="btn btn-sm btn-danger" style="padding: 1px 4px; font-size: 0.7rem;" onclick="removeInspectionParamRow(this)">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </td>

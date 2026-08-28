@@ -906,8 +906,6 @@ DEFAULT_INSPECTION_PARAMS = [
     {"sl_no": 3, "description": "Dim", "nominal_dimension": 95.0, "lo_tol": 0.10, "hi_tol": 0.10},
     {"sl_no": 4, "description": "Dim", "nominal_dimension": 50.0, "lo_tol": 0.30, "hi_tol": 0.30},
     {"sl_no": 5, "description": "OD", "nominal_dimension": 142.0, "lo_tol": 0.30, "hi_tol": 0.30},
-    {"sl_no": 6, "description": "Length", "nominal_dimension": 12.0, "lo_tol": 0.20, "hi_tol": 0.20},
-    {"sl_no": 7, "description": "Dim", "nominal_dimension": 110.0, "lo_tol": 0.00, "hi_tol": 0.50},
 ]
 
 @app.get("/api/inspection-parameters", response_model=List[InspectionParamResponse])
@@ -993,11 +991,11 @@ def get_inspection_report(part_no: str, opn_no: str, db: Session = Depends(get_d
         return {
             "part_no": part_no,
             "opn_no": opn_no,
-            "batch_qty": 10,
+            "batch_qty": 5,
             "machine_name": "",
             "operator_name": "",
             "inspection_date": get_now_ist().strftime("%Y-%m-%d"),
-            "comp_sl_nos": "1,2,3,4,5,6,7,8,9,10",
+            "comp_sl_nos": "1,2,3,4,5",
             "readings_json": "{}"
         }
     return report
