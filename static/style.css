@@ -795,64 +795,46 @@ body {
     }
 }
 
-/* On-Screen Numeric Keypad for Mobile Shop Floor Entry */
-.custom-keypad-container {
-    margin-top: 12px;
-    background: #f8fafc;
-    padding: 10px;
-    border-radius: 10px;
-    border: 1px solid #cbd5e1;
-    max-width: 300px;
-    margin-left: auto;
-    margin-right: auto;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
+/* Full Mobile Width Overrides (Zero Side Margins/Paddings for Edge-to-Edge Span) */
+@media (max-width: 768px) {
+    .app-container {
+        padding: 0 !important;
+    }
 
-.btn-keypad {
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    padding: 9px 0;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #1e293b;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    cursor: pointer;
-    touch-action: manipulation;
-    user-select: none;
-    transition: background 0.15s ease, transform 0.1s ease;
-}
+    .main-content {
+        padding: 4px !important;
+    }
 
-.btn-keypad:active {
-    background: #cbd5e1 !important;
-    transform: scale(0.95);
-}
+    .card {
+        padding: 8px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        border-radius: 8px !important;
+    }
 
-.btn-keypad.action {
-    background: #fee2e2;
-    color: #991b1b;
-    border-color: #fca5a5;
-}
+    #loggerInspectionCard {
+        margin-left: -4px !important;
+        margin-right: -4px !important;
+        width: calc(100% + 8px) !important;
+        border-radius: 0 !important;
+    }
 
-.btn-keypad.action-danger {
-    background: #ef4444;
-    color: #ffffff;
-    font-size: 0.85rem;
-    padding: 8px 0;
-}
+    #loggerInspectionCard .card-body {
+        padding: 2px !important;
+    }
 
-.btn-keypad.action-success {
-    background: #10b981;
-    color: #ffffff;
-    font-size: 0.85rem;
-    padding: 8px 0;
-}
+    .table-responsive {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        overflow-x: hidden !important;
+    }
 
-/* Highlight focused/active input cell */
-.input-active-cell {
-    border: 2px solid var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25) !important;
-    background-color: #eff6ff !important;
+    #loggerMatrixTable, #inspectionMatrixTable {
+        width: 100% !important;
+        min-width: 100% !important;
+        table-layout: fixed !important;
+    }
 }
 
 

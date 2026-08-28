@@ -755,82 +755,6 @@ document.addEventListener("DOMContentLoaded", () => {
         logOpnSelectElem.addEventListener("input", () => syncLoggerInspectionSection());
     }
 
-    // --- Custom On-Screen Touch Keypad Helpers ---
-    window.activeKeypadInput = null;
-
-    window.setActiveKeypadInput = function(elem) {
-        if (window.activeKeypadInput) {
-            window.activeKeypadInput.classList.remove("input-active-cell");
-        }
-        window.activeKeypadInput = elem;
-        if (elem) {
-            elem.classList.add("input-active-cell");
-        }
-    };
-
-    window.keypadKeyPress = function(char) {
-        if (!window.activeKeypadInput) return;
-        const elem = window.activeKeypadInput;
-        elem.value = (elem.value || "") + char;
-        elem.dispatchEvent(new Event("input", { bubbles: true }));
-    };
-
-    window.keypadBackspace = function() {
-        if (!window.activeKeypadInput) return;
-        const elem = window.activeKeypadInput;
-        elem.value = (elem.value || "").slice(0, -1);
-        elem.dispatchEvent(new Event("input", { bubbles: true }));
-    };
-
-    window.keypadClear = function() {
-        if (!window.activeKeypadInput) return;
-        const elem = window.activeKeypadInput;
-        elem.value = "";
-        elem.dispatchEvent(new Event("input", { bubbles: true }));
-    };
-
-    window.keypadNextRow = function() {
-        if (!window.activeKeypadInput) return;
-        const current = window.activeKeypadInput;
-        const tr = current.closest("tr");
-        if (tr && tr.nextElementSibling) {
-            const nextInput = tr.nextElementSibling.querySelector(".logger-reading, .insp-reading");
-            if (nextInput) {
-                nextInput.focus();
-                window.setActiveKeypadInput(nextInput);
-            }
-        }
-    };
-
-    window.renderKeypadHtml = function() {
-        return `
-            <div class="custom-keypad-container">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <small style="font-weight: 700; color: #475569; font-size: 0.75rem;"><i class="fa-solid fa-calculator"></i> Touch Numeric Keypad</small>
-                    <small style="color: #64748b; font-size: 0.7rem;">Tap box & use keys below</small>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('7')">7</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('8')">8</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('9')">9</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('4')">4</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('5')">5</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('6')">6</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('1')">1</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('2')">2</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('3')">3</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('.')">.</button>
-                    <button type="button" class="btn-keypad" onclick="keypadKeyPress('0')">0</button>
-                    <button type="button" class="btn-keypad action" onclick="keypadBackspace()"><i class="fa-solid fa-backspace"></i></button>
-                </div>
-                <div style="display: flex; gap: 6px; margin-top: 6px;">
-                    <button type="button" class="btn-keypad action-danger" style="flex: 1;" onclick="keypadClear()">Clear</button>
-                    <button type="button" class="btn-keypad action-success" style="flex: 1;" onclick="keypadNextRow()">Next ⬇</button>
-                </div>
-            </div>
-        `;
-    };
-
     // --- Production Logger Integrated Quality Inspection Section ---
     window.currentLoggerReportCode = "";
 
@@ -870,7 +794,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (codeBadge) codeBadge.innerText = window.currentLoggerReportCode;
 
             let html = `
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 6px; margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 4px; font-size: 0.75rem;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 6px; margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 4px; font-size: 0.75rem;">
                     <div><strong>Date:</strong> ${new Date().toISOString().split('T')[0]}</div>
                     <div><strong>Part No:</strong> <span style="color:var(--primary); font-weight:700;">${partNo}</span></div>
                     <div><strong>Opn:</strong> ${opnNo}</div>
@@ -878,17 +802,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div><strong>Operator:</strong> ${operator || '-'}</div>
                 </div>
 
-                <div class="table-responsive" style="overflow-x: auto; max-height: 380px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                    <table class="data-table" id="loggerMatrixTable" style="font-size: 0.75rem; border-collapse: separate; border-spacing: 0; min-width: 240px; width: 100%;">
+                <div class="table-responsive" style="overflow-x: hidden; width: 100%; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <table class="data-table" id="loggerMatrixTable" style="font-size: 0.75rem; border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed;">
                         <thead>
                             <tr style="background: #f1f5f9;">
-                                <th style="width: 75px; min-width: 75px; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Desc</th>
-                                <th style="width: 40px; min-width: 40px; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Nom</th>
-                                <th style="width: 32px; min-width: 32px; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Lo</th>
-                                <th style="width: 32px; min-width: 32px; text-align: right; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; padding: 4px 2px;">Hi</th>
-                                <th style="width: 65px; min-width: 65px; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
+                                <th style="width: 32%; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Desc</th>
+                                <th style="width: 17%; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Nom</th>
+                                <th style="width: 14%; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Lo</th>
+                                <th style="width: 14%; text-align: right; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; padding: 4px 2px;">Hi</th>
+                                <th style="width: 23%; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
                                     Reading<br>
-                                    <input type="text" class="logger-comp-sl" data-col="0" value="${compSlNoVal}" placeholder="Sl No" inputmode="decimal" onfocus="setActiveKeypadInput(this)" style="width: 58px; text-align: center; font-size: 0.72rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
+                                    <input type="text" class="logger-comp-sl" data-col="0" value="${compSlNoVal}" placeholder="Sl No" inputmode="decimal" style="width: 90%; max-width: 58px; text-align: center; font-size: 0.72rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
                                 </th>
                             </tr>
                         </thead>
@@ -905,20 +829,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     html += `
                         <tr data-param-id="${p.id}">
-                            <td style="width: 75px; min-width: 75px; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; font-weight: 600; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.description}">
+                            <td style="width: 32%; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; font-weight: 600; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.description}">
                                 ${p.description}
                             </td>
-                            <td style="width: 40px; min-width: 40px; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 0.72rem;">
+                            <td style="width: 17%; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 0.72rem;">
                                 ${nom}
                             </td>
-                            <td style="width: 32px; min-width: 32px; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 0.72rem;">
+                            <td style="width: 14%; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 0.72rem;">
                                 ${lo}
                             </td>
-                            <td style="width: 32px; min-width: 32px; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1; text-align: right; font-size: 0.72rem;">
+                            <td style="width: 14%; padding: 4px 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1; text-align: right; font-size: 0.72rem;">
                                 ${hi}
                             </td>
-                            <td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 65px; min-width: 65px;">
-                                <input type="number" step="0.001" inputmode="decimal" class="logger-reading form-control" data-nom="${nom}" data-lo="${lo}" data-hi="${hi}" data-col="0" value="" oninput="validateLoggerReadingCell(this)" onfocus="setActiveKeypadInput(this)" style="width: 58px; padding: 3px 2px; font-size: 0.75rem; text-align: center; background-color: #ffffff; color: #000000; font-weight: 700;">
+                            <td style="width: 23%; padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0;">
+                                <input type="number" step="0.001" inputmode="decimal" class="logger-reading form-control" data-nom="${nom}" data-lo="${lo}" data-hi="${hi}" data-col="0" value="" oninput="validateLoggerReadingCell(this)" style="width: 90%; max-width: 58px; padding: 3px 2px; font-size: 0.75rem; text-align: center; background-color: #ffffff; color: #000000; font-weight: 700;">
                             </td>
                         </tr>
                     `;
@@ -934,8 +858,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span><span style="display: inline-block; width: 10px; height: 10px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 2px; vertical-align: middle;"></span> In Spec</span>
                     <span><span style="display: inline-block; width: 10px; height: 10px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 2px; vertical-align: middle;"></span> Out Spec</span>
                 </div>
-
-                ${renderKeypadHtml()}
             `;
 
             body.innerHTML = html;
@@ -2091,19 +2013,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 </button>
             </div>
 
-            <div class="table-responsive" style="overflow-x: auto; max-height: 360px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                <table class="data-table" id="inspectionMatrixTable" style="font-size: 0.75rem; border-collapse: separate; border-spacing: 0; min-width: 240px; width: 100%;">
+            <div class="table-responsive" style="overflow-x: hidden; width: 100%; border: 1px solid #cbd5e1; border-radius: 6px;">
+                <table class="data-table" id="inspectionMatrixTable" style="font-size: 0.75rem; border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed;">
                     <thead>
                         <tr style="background: #f1f5f9;">
-                            <th style="width: 75px; min-width: 75px; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Desc</th>
-                            <th style="width: 40px; min-width: 40px; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Nom</th>
-                            <th style="width: 32px; min-width: 32px; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Lo</th>
-                            <th style="width: 32px; min-width: 32px; text-align: right; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; padding: 4px 2px;">Hi</th>
-                            <th style="width: 65px; min-width: 65px; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
+                            <th style="width: 30%; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Desc</th>
+                            <th style="width: 16%; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Nom</th>
+                            <th style="width: 13%; text-align: right; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">Lo</th>
+                            <th style="width: 13%; text-align: right; border-bottom: 2px solid #cbd5e1; border-right: 2px solid #cbd5e1; padding: 4px 2px;">Hi</th>
+                            <th style="width: 22%; text-align: center; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;">
                                 Reading<br>
-                                <input type="text" class="insp-comp-sl" data-col="0" value="${compSlNos[0] || '1'}" placeholder="Sl No" inputmode="decimal" onfocus="setActiveKeypadInput(this)" style="width: 58px; text-align: center; font-size: 0.72rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
+                                <input type="text" class="insp-comp-sl" data-col="0" value="${compSlNos[0] || '1'}" placeholder="Sl No" inputmode="decimal" style="width: 90%; max-width: 58px; text-align: center; font-size: 0.72rem; font-weight: 700; padding: 1px 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
                             </th>
-                            <th style="width: 26px; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;"></th>
+                            <th style="width: 6%; border-bottom: 2px solid #cbd5e1; padding: 4px 2px;"></th>
                         </tr>
                     </thead>
                     <tbody id="inspectionMatrixBody">
@@ -2136,22 +2058,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 html += `
                     <tr data-param-id="${p.id || ''}">
-                        <td style="width: 75px; min-width: 75px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
-                            <input type="text" class="param-desc form-control" value="${p.description || ''}" onfocus="setActiveKeypadInput(this)" style="width: 71px; padding: 2px 2px; font-size: 0.72rem;">
+                        <td style="width: 30%; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="text" class="param-desc form-control" value="${p.description || ''}" style="width: 95%; padding: 2px 2px; font-size: 0.72rem;">
                         </td>
-                        <td style="width: 40px; min-width: 40px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
-                            <input type="number" step="0.001" inputmode="decimal" class="param-nom form-control" value="${nom}" onchange="recalculateToleranceColors()" onfocus="setActiveKeypadInput(this)" style="width: 36px; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
+                        <td style="width: 16%; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="number" step="0.001" inputmode="decimal" class="param-nom form-control" value="${nom}" onchange="recalculateToleranceColors()" style="width: 92%; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
                         </td>
-                        <td style="width: 32px; min-width: 32px; padding: 2px; border-bottom: 1px solid #e2e8f0;">
-                            <input type="number" step="0.001" inputmode="decimal" class="param-lo form-control" value="${lo}" onchange="recalculateToleranceColors()" onfocus="setActiveKeypadInput(this)" style="width: 28px; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
+                        <td style="width: 13%; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="number" step="0.001" inputmode="decimal" class="param-lo form-control" value="${lo}" onchange="recalculateToleranceColors()" style="width: 92%; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
                         </td>
-                        <td style="width: 32px; min-width: 32px; padding: 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1;">
-                            <input type="number" step="0.001" inputmode="decimal" class="param-hi form-control" value="${hi}" onchange="recalculateToleranceColors()" onfocus="setActiveKeypadInput(this)" style="width: 28px; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
+                        <td style="width: 13%; padding: 2px; border-bottom: 1px solid #e2e8f0; border-right: 2px solid #cbd5e1;">
+                            <input type="number" step="0.001" inputmode="decimal" class="param-hi form-control" value="${hi}" onchange="recalculateToleranceColors()" style="width: 92%; padding: 2px 1px; font-size: 0.72rem; text-align: right;">
                         </td>
-                        <td style="padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 65px; min-width: 65px;">
-                            <input type="number" step="0.001" inputmode="decimal" class="insp-reading form-control" data-col="0" value="${valStr}" oninput="validateReadingCell(this)" onfocus="setActiveKeypadInput(this)" style="width: 58px; padding: 2px 2px; font-size: 0.75rem; text-align: center; background-color: ${cellBg}; color: ${cellColor}; font-weight: 700;">
+                        <td style="width: 22%; padding: 2px; text-align: center; border-bottom: 1px solid #e2e8f0;">
+                            <input type="number" step="0.001" inputmode="decimal" class="insp-reading form-control" data-col="0" value="${valStr}" oninput="validateReadingCell(this)" style="width: 90%; max-width: 58px; padding: 2px 2px; font-size: 0.75rem; text-align: center; background-color: ${cellBg}; color: ${cellColor}; font-weight: 700;">
                         </td>
-                        <td style="text-align: center; padding: 2px; border-bottom: 1px solid #e2e8f0;">
+                        <td style="width: 6%; text-align: center; padding: 2px; border-bottom: 1px solid #e2e8f0;">
                             <button type="button" class="btn btn-sm btn-danger" style="padding: 1px 3px; font-size: 0.68rem;" onclick="removeInspectionParamRow(this)">
                                 <i class="fa-solid fa-xmark"></i>
                             </button>
@@ -2178,8 +2100,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     </button>
                 </div>
             </div>
-
-            ${renderKeypadHtml()}
         `;
 
         body.innerHTML = html;
