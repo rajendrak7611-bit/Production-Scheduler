@@ -315,6 +315,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let selectedSlNos = new Set();
     let alreadyCompletedSlNos = new Set();
     let prevCompletedSlNos = new Set();
+    let availableSlNos = new Set();
     let isFirstOperation = true;
     let previousOpnNo = null;
 
@@ -327,28 +328,7 @@ document.addEventListener("DOMContentLoaded", () => {
         selectedSlNos.clear();
         alreadyCompletedSlNos.clear();
         prevCompletedSlNos.clear();
-        
-        const cleanOpnNum = parseFloat((opnNo.match(/\d+/) || [10])[0]);
-        
-        // Find lowest operation for this part from Part Master to check if this is initial operation
-        let minOpnNum = 10;
-        if (partNo && allParts) {
-            const part = allParts.find(p => p.part_no.toUpperCase() === partNo.toUpperCase());
-            if (part && part.operations && part.operations.length > 0) {
-                const opNums = part.operations.map(op => parseFloat((String(op.opn_no).match(/\d+/) || [10])[0]));
-                if (opNums.length > 0) {
-                    minOpnNum = Math.min(...opNums);
-                }
-            }
-        }
-
-        if (cleanOpnNum <= minOpnNum) {
-            isFirstOperation = true;
-            previousOpnNo = null;
-        } else {
-            isFirstOperation = false;
-            previousOpnNo = String(minOpnNum);
-        }
+        availableSlNos.clear();
 
         if (!partNo || !opnNo) {
             renderOperatorGrid();
@@ -363,6 +343,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 prevCompletedSlNos = new Set(data.prev_completed_sl_nos || []);
                 isFirstOperation = (data.is_first_opn === true);
                 previousOpnNo = data.prev_opn_no;
+
+                const maxGrid = getCurrentScheduleQty();
+                if (isFirstOperation) {
+                    // First Operation: All serial numbers NOT YET logged in this operation are available!
+                    const availList = [];
+                    for (let i = 1; i <= maxGrid; i++) {
+                        if (!alreadyCompletedSlNos.has(i)) {
+                            availList.push(i);
+                        }
+                    }
+                    availableSlNos = new Set(availList);
+                } else {
+                    // Subsequent Operation: Available = (Completed in Prev Opn) MINUS (Already logged in Curr Opn)
+                    const availList = (data.prev_completed_sl_nos || []).filter(s => !alreadyCompletedSlNos.has(s));
+                    availableSlNos = new Set(availList);
+                }
             }
         } catch (err) {
             console.error("Error fetching completed Sl Nos:", err);
@@ -386,7 +382,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const legendPrev = document.getElementById("legendPrevOpn");
         if (legendPrev) {
-            legendPrev.style.display = (!currentOpnNo || isFirstOperation) ? "none" : "inline-flex";
+            legendPrev.style.display = "none";
         }
 
         const alertBanner = document.getElementById("opnGridStatusBanner");
@@ -396,17 +392,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 alertBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <strong>Please select an Operation No</strong> above to view available serial numbers.`;
                 alertBanner.style.display = "block";
             } else if (isFirstOperation) {
+                const availCount = availableSlNos.size;
                 alertBanner.className = "alert alert-info";
-                alertBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> <strong>Initial Operation (Opn ${currentOpnNo}):</strong> All serial numbers are open for initial entry. Click boxes to toggle selection (Light Green).`;
+                alertBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> <strong>Initial Operation (Opn ${currentOpnNo}):</strong> Showing ${availCount} remaining serial numbers available (White). Click boxes to select for Opn ${currentOpnNo} (Light Green).`;
                 alertBanner.style.display = "block";
             } else {
-                const prevCount = prevCompletedSlNos.size;
-                if (prevCount > 0) {
+                const availCount = availableSlNos.size;
+                if (availCount > 0) {
                     alertBanner.className = "alert alert-success";
-                    alertBanner.innerHTML = `<i class="fa-solid fa-check-circle"></i> <strong>Subsequent Operation (Opn ${currentOpnNo}):</strong> Showing ${prevCount} serial numbers completed in Opn ${previousOpnNo || 'Prev'} (highlighted in <strong>Light Blue</strong>). Click Light Blue boxes to complete Opn ${currentOpnNo}.`;
+                    alertBanner.innerHTML = `<i class="fa-solid fa-check-circle"></i> <strong>Opn ${currentOpnNo} Active:</strong> Showing ${availCount} serial numbers received from Opn ${previousOpnNo || 'Prev'} (White). Click boxes to select for Opn ${currentOpnNo} (Light Green).`;
                 } else {
                     alertBanner.className = "alert alert-warning";
-                    alertBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <strong>Opn ${currentOpnNo} Locked:</strong> No serial numbers have been logged for Opn ${previousOpnNo || 'Prev'} yet. Please log Opn ${previousOpnNo || 'Prev'} first.`;
+                    alertBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <strong>Opn ${currentOpnNo}:</strong> No serial numbers are currently available from Opn ${previousOpnNo || 'Prev'}. Complete Opn ${previousOpnNo || 'Prev'} first to move parts forward.`;
                 }
                 alertBanner.style.display = "block";
             }
@@ -414,24 +411,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         for (let i = 1; i <= maxGrid; i++) {
             const cell = document.createElement("div");
+            const isAvailable = availableSlNos.has(i);
+            const isSelectedNow = selectedSlNos.has(i);
 
             if (!currentOpnNo) {
-                // No operation selected yet: Lock all grid cells
                 cell.className = `grid-cell disabled`;
                 cell.innerText = i;
                 cell.title = `Sl No ${i} (Locked - Select an Operation No first)`;
                 cell.onclick = () => {
                     alert("Please select an Operation No before selecting serial numbers!");
                 };
-            } else if (isFirstOperation) {
-                // First Operation (e.g. Opn 20 for H44): Random selection allowed
-                const isSelectedNow = selectedSlNos.has(i);
-                const isAlreadyDone = alreadyCompletedSlNos.has(i);
-                const isGreen = isSelectedNow || isAlreadyDone;
-
-                cell.className = `grid-cell ${isGreen ? 'done' : 'pending'}`;
+            } else if (isAvailable) {
+                // Available for this operation: Render WHITE (#ffffff) by default, turns LIGHT GREEN (#86efac) on selection!
+                cell.className = `grid-cell ${isSelectedNow ? 'done' : 'pending'}`;
                 cell.innerText = i;
-                cell.title = `Sl No ${i} ${isGreen ? '(Selected - Light Green)' : '(Click to pick)'}`;
+                cell.title = `Sl No ${i} ${isSelectedNow ? '(Selected - Light Green)' : '(Available for Opn ' + currentOpnNo + ' - Click to pick)'}`;
 
                 cell.onclick = () => {
                     if (selectedSlNos.has(i)) {
@@ -442,35 +436,22 @@ document.addEventListener("DOMContentLoaded", () => {
                     renderOperatorGrid();
                 };
             } else {
-                // Subsequent Operation (e.g. Opn 30 for H44): Must be completed in previous operation (Light Blue)
-                const isSelectedNow = selectedSlNos.has(i);
-                const isAlreadyDone = alreadyCompletedSlNos.has(i);
-                const isPrevDone = prevCompletedSlNos.has(i);
-                const isGreen = isSelectedNow || isAlreadyDone;
-
-                if (isPrevDone) {
-                    // Completed in Opn 20 -> Light Blue, turns Light Green on selection
-                    cell.className = `grid-cell ${isGreen ? 'done' : 'prev-done'}`;
-                    cell.innerText = i;
-                    cell.title = `Sl No ${i} ${isGreen ? '(Selected - Light Green)' : '(Completed in Opn ' + (previousOpnNo || 'Prev') + ' - Light Blue - Click to pick)'}`;
-
+                // Not in available pool for this operation
+                const isAlreadyLoggedHere = alreadyCompletedSlNos.has(i);
+                cell.className = `grid-cell disabled`;
+                cell.innerText = i;
+                if (isAlreadyLoggedHere) {
+                    cell.title = `Sl No ${i} (Completed in Opn ${currentOpnNo} - Moved to Next Opn)`;
                     cell.onclick = () => {
-                        if (selectedSlNos.has(i)) {
-                            selectedSlNos.delete(i);
-                        } else {
-                            selectedSlNos.add(i);
-                        }
-                        renderOperatorGrid();
+                        alert(`Sl No ${i} has already been logged for Opn ${currentOpnNo} and moved to the next operation!`);
+                    };
+                } else if (!isFirstOperation) {
+                    cell.title = `Sl No ${i} (Locked - Pending completion in Opn ${previousOpnNo || 'Prev'})`;
+                    cell.onclick = () => {
+                        alert(`Sl No ${i} is not available for Opn ${currentOpnNo} yet. It must first be completed in Opn ${previousOpnNo || 'Prev'}!`);
                     };
                 } else {
-                    // Locked / Disabled because previous operation (Opn 20) is NOT completed
-                    cell.className = `grid-cell disabled`;
-                    cell.innerText = i;
-                    cell.title = `Sl No ${i} (Locked - Operation Opn ${previousOpnNo || ''} not completed yet)`;
-
-                    cell.onclick = () => {
-                        alert(`Sl No ${i} cannot be selected because previous Operation (Opn ${previousOpnNo || ''}) is not completed yet!`);
-                    };
+                    cell.title = `Sl No ${i} (Not Available)`;
                 }
             }
             grid.appendChild(cell);

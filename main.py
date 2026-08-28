@@ -723,16 +723,6 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
         # Determine position of curr_num in sorted operation sequence for this part
         idx = all_opn_nums.index(curr_num) if curr_num in all_opn_nums else 0
 
-        if idx == 0:
-            # First operation in sequence (e.g. Opn 20 for 214, H44, M50, DK7)
-            is_first_opn = True
-            prev_opn_no = None
-        else:
-            # Subsequent operation in sequence! Previous operation is index - 1!
-            is_first_opn = False
-            p_num = all_opn_nums[idx - 1]
-            prev_opn_no = safe_str_opn(p_num)
-
         def extract_sl_nos(target_opn_str, target_num):
             sl_set = set()
             for l in logs:
@@ -746,14 +736,29 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
             return sorted(list(sl_set))
 
         curr_completed = extract_sl_nos(curr_opn_str, curr_num)
-        prev_num, _ = extract_clean_opn(prev_opn_no) if prev_opn_no else (None, "")
-        prev_completed = extract_sl_nos(prev_opn_no, prev_num) if (not is_first_opn and prev_opn_no) else []
+
+        if idx == 0:
+            # First operation in sequence (e.g. Opn 20 for 214, H44, M50, DK7, U34)
+            is_first_opn = True
+            prev_opn_no = None
+            prev_completed = []
+            available_sl_nos = []  # Frontend will compute: {1..maxGrid} minus curr_completed
+        else:
+            # Subsequent operation in sequence! Predecessor operation is index - 1!
+            is_first_opn = False
+            p_num = all_opn_nums[idx - 1]
+            prev_opn_no = safe_str_opn(p_num)
+            prev_num, _ = extract_clean_opn(prev_opn_no) if prev_opn_no else (None, "")
+            prev_completed = extract_sl_nos(prev_opn_no, prev_num)
+            # Available for current opn = (Completed in predecessor opn) MINUS (Already logged in current opn)
+            available_sl_nos = [s for s in prev_completed if s not in curr_completed]
 
         return {
             "is_first_opn": is_first_opn,
             "prev_opn_no": prev_opn_no,
             "prev_completed_sl_nos": prev_completed,
-            "completed_sl_nos": curr_completed
+            "completed_sl_nos": curr_completed,
+            "available_sl_nos": available_sl_nos
         }
     except Exception as e:
         import traceback
