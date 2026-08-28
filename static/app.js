@@ -319,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let isFirstOperation = true;
     let previousOpnNo = null;
 
-    async function fetchCompletedSlNos() {
+    window.fetchCompletedSlNos = async function fetchCompletedSlNos() {
         const pElem = document.getElementById("logPart");
         const opnElem = document.getElementById("logOpnNo");
         const partNo = pElem ? pElem.value.trim() : "";
@@ -365,13 +365,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         renderOperatorGrid();
+    };
+
+    const opnSelectElem = document.getElementById("logOpnNo");
+    if (opnSelectElem) {
+        opnSelectElem.addEventListener("change", window.fetchCompletedSlNos);
+        opnSelectElem.addEventListener("input", window.fetchCompletedSlNos);
     }
 
     function strCleanOpn(num) {
         return (typeof num === 'number' && Number.isInteger(num)) ? String(num) : String(num);
     }
 
-    function renderOperatorGrid() {
+    window.renderOperatorGrid = function renderOperatorGrid() {
         const maxGrid = getCurrentScheduleQty();
         const grid = document.getElementById("operatorNumberGrid");
         if (!grid) return;
