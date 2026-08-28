@@ -220,6 +220,33 @@ class ToolingResponse(ToolingBase):
     class Config:
         from_attributes = True
 
+class InspectionParamBase(BaseModel):
+    part_no: str
+    opn_no: str
+    sl_no: Optional[int] = 1
+    description: str
+    nominal_dimension: Optional[float] = 0.0
+    lo_tol: Optional[float] = 0.0
+    hi_tol: Optional[float] = 0.0
+
+class InspectionParamCreate(InspectionParamBase):
+    pass
+
+class InspectionParamResponse(InspectionParamBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class InspectionReportSave(BaseModel):
+    part_no: str
+    opn_no: str
+    batch_qty: Optional[int] = 10
+    machine_name: Optional[str] = None
+    operator_name: Optional[str] = None
+    inspection_date: Optional[str] = None
+    comp_sl_nos: Optional[str] = "1,2,3,4,5,6,7,8,9,10"
+    readings_json: Optional[str] = "{}"
+
 
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
@@ -870,6 +897,143 @@ def delete_tooling(tool_id: int, db: Session = Depends(get_db)):
     db.delete(db_tool)
     db.commit()
     return {"message": "Tooling item deleted"}
+
+# --- Inspection Parameters & Reports API ---
+
+DEFAULT_INSPECTION_PARAMS = [
+    {"sl_no": 1, "description": "Bore", "nominal_dimension": 115.0, "lo_tol": 0.03, "hi_tol": 0.03},
+    {"sl_no": 2, "description": "Bore", "nominal_dimension": 110.0, "lo_tol": 0.30, "hi_tol": 0.30},
+    {"sl_no": 3, "description": "Dim", "nominal_dimension": 95.0, "lo_tol": 0.10, "hi_tol": 0.10},
+    {"sl_no": 4, "description": "Dim", "nominal_dimension": 50.0, "lo_tol": 0.30, "hi_tol": 0.30},
+    {"sl_no": 5, "description": "OD", "nominal_dimension": 142.0, "lo_tol": 0.30, "hi_tol": 0.30},
+    {"sl_no": 6, "description": "Length", "nominal_dimension": 12.0, "lo_tol": 0.20, "hi_tol": 0.20},
+    {"sl_no": 7, "description": "Dim", "nominal_dimension": 110.0, "lo_tol": 0.00, "hi_tol": 0.50},
+]
+
+@app.get("/api/inspection-parameters", response_model=List[InspectionParamResponse])
+def get_inspection_parameters(part_no: str, opn_no: Optional[str] = None, db: Session = Depends(get_db)):
+    clean_p = part_no.strip().lower()
+    clean_op = opn_no.strip().lower() if opn_no else None
+
+    query = db.query(models.InspectionParameter).filter(func.lower(models.InspectionParameter.part_no) == clean_p)
+    if clean_op:
+        query = query.filter(func.lower(models.InspectionParameter.opn_no) == clean_op)
+    
+    params = query.order_by(models.InspectionParameter.sl_no.asc()).all()
+
+    # Seed default parameters matching user template if none exist for this part & operation
+    if not params and opn_no:
+        for p in DEFAULT_INSPECTION_PARAMS:
+            db_param = models.InspectionParameter(
+                part_no=part_no.strip(),
+                opn_no=opn_no.strip(),
+                sl_no=p["sl_no"],
+                description=p["description"],
+                nominal_dimension=p["nominal_dimension"],
+                lo_tol=p["lo_tol"],
+                hi_tol=p["hi_tol"]
+            )
+            db.add(db_param)
+        db.commit()
+        params = db.query(models.InspectionParameter).filter(
+            func.lower(models.InspectionParameter.part_no) == clean_p,
+            func.lower(models.InspectionParameter.opn_no) == clean_op
+        ).order_by(models.InspectionParameter.sl_no.asc()).all()
+
+    return params
+
+@app.post("/api/inspection-parameters")
+def save_inspection_parameters(param_list: List[InspectionParamCreate], db: Session = Depends(get_db)):
+    if not param_list:
+        return {"message": "No parameters provided"}
+    
+    p_no = param_list[0].part_no.strip()
+    op_no = param_list[0].opn_no.strip()
+
+    db.query(models.InspectionParameter).filter(
+        func.lower(models.InspectionParameter.part_no) == p_no.lower(),
+        func.lower(models.InspectionParameter.opn_no) == op_no.lower()
+    ).delete(synchronize_session=False)
+
+    for idx, item in enumerate(param_list, start=1):
+        db_param = models.InspectionParameter(
+            part_no=p_no,
+            opn_no=op_no,
+            sl_no=idx,
+            description=item.description,
+            nominal_dimension=item.nominal_dimension,
+            lo_tol=item.lo_tol,
+            hi_tol=item.hi_tol
+        )
+        db.add(db_param)
+
+    db.commit()
+    return {"message": "Inspection parameters saved successfully!"}
+
+@app.delete("/api/inspection-parameters/{param_id}")
+def delete_inspection_parameter(param_id: int, db: Session = Depends(get_db)):
+    p = db.query(models.InspectionParameter).filter(models.InspectionParameter.id == param_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Parameter not found")
+    db.delete(p)
+    db.commit()
+    return {"message": "Parameter deleted"}
+
+@app.get("/api/inspection-reports")
+def get_inspection_report(part_no: str, opn_no: str, db: Session = Depends(get_db)):
+    clean_p = part_no.strip().lower()
+    clean_op = opn_no.strip().lower()
+
+    report = db.query(models.InspectionReport).filter(
+        func.lower(models.InspectionReport.part_no) == clean_p,
+        func.lower(models.InspectionReport.opn_no) == clean_op
+    ).order_by(models.InspectionReport.id.desc()).first()
+
+    if not report:
+        return {
+            "part_no": part_no,
+            "opn_no": opn_no,
+            "batch_qty": 10,
+            "machine_name": "",
+            "operator_name": "",
+            "inspection_date": get_now_ist().strftime("%Y-%m-%d"),
+            "comp_sl_nos": "1,2,3,4,5,6,7,8,9,10",
+            "readings_json": "{}"
+        }
+    return report
+
+@app.post("/api/inspection-reports")
+def save_inspection_report(req: InspectionReportSave, db: Session = Depends(get_db)):
+    clean_p = req.part_no.strip().lower()
+    clean_op = req.opn_no.strip().lower()
+
+    report = db.query(models.InspectionReport).filter(
+        func.lower(models.InspectionReport.part_no) == clean_p,
+        func.lower(models.InspectionReport.opn_no) == clean_op
+    ).first()
+
+    if not report:
+        report = models.InspectionReport(
+            part_no=req.part_no.strip(),
+            opn_no=req.opn_no.strip(),
+            batch_qty=req.batch_qty,
+            machine_name=req.machine_name,
+            operator_name=req.operator_name,
+            inspection_date=req.inspection_date or get_now_ist().strftime("%Y-%m-%d"),
+            comp_sl_nos=req.comp_sl_nos,
+            readings_json=req.readings_json
+        )
+        db.add(report)
+    else:
+        report.batch_qty = req.batch_qty
+        report.machine_name = req.machine_name
+        report.operator_name = req.operator_name
+        report.inspection_date = req.inspection_date or report.inspection_date
+        report.comp_sl_nos = req.comp_sl_nos
+        report.readings_json = req.readings_json
+
+    db.commit()
+    return {"message": "Inspection Report saved successfully!"}
 
 # --- Serve Static Files ---
 @app.middleware("http")

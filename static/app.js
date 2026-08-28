@@ -933,7 +933,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const tbody = document.getElementById("partsTableBody");
         tbody.innerHTML = "";
         if (!data || data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" class="text-center">No parts found</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center">No parts found</td></tr>`;
             return;
         }
 
@@ -950,6 +950,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span class="badge badge-success" style="font-size: 0.88rem; padding: 6px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" onclick="viewPartOperations(${index})">
                         <i class="fa-solid fa-layer-group"></i> ${opCount} Operations (Click for Details)
                     </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline" style="border-color: var(--primary); color: var(--primary); font-weight: 600;" onclick="openPartInspectionModal('${p.part_no}')">
+                        <i class="fa-solid fa-clipboard-check" style="color: var(--primary);"></i> Inspection Reports (${opCount})
+                    </button>
                 </td>
                 <td>
                     <div style="display: flex; gap: 6px;">
@@ -1479,6 +1484,405 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Error adding tooling:", err);
         }
     });
+
+    // --- Quality Inspection Report Modal Functions ---
+    window.currentInspectionPartNo = "";
+    window.currentInspectionOpnNo = "";
+    window.currentInspectionParams = [];
+    window.currentInspectionReport = null;
+
+    window.openPartInspectionModal = async function(partNo) {
+        window.currentInspectionPartNo = partNo;
+        const part = allParts.find(p => p.part_no.toUpperCase() === partNo.toUpperCase());
+        
+        let opList = [];
+        if (part && part.operations && part.operations.length > 0) {
+            const sortedOps = part.operations.slice().sort((a, b) => {
+                const numA = parseFloat((String(a.opn_no).match(/\d+/) || [0])[0]);
+                const numB = parseFloat((String(b.opn_no).match(/\d+/) || [0])[0]);
+                return numA - numB;
+            });
+            opList = sortedOps.map(op => {
+                const m = String(op.opn_no).match(/\d+/);
+                return m ? m[0] : String(op.opn_no).trim();
+            });
+        } else {
+            opList = ["20", "30", "40"];
+        }
+
+        const tabsContainer = document.getElementById("inspectionOpnTabs");
+        if (tabsContainer) {
+            tabsContainer.innerHTML = opList.map((op, idx) => `
+                <button type="button" class="role-tab ${idx === 0 ? 'active' : ''}" onclick="switchInspectionOpnTab('${partNo}', '${op}', this)">
+                    <i class="fa-solid fa-clipboard-check"></i> Opn ${op} Inspection
+                </button>
+            `).join("");
+        }
+
+        window.currentInspectionOpnNo = opList[0] || "20";
+        openModal("partInspectionModal");
+        await loadInspectionReportForOpn(partNo, window.currentInspectionOpnNo);
+    };
+
+    window.switchInspectionOpnTab = async function(partNo, opnNo, btnElem) {
+        window.currentInspectionOpnNo = opnNo;
+        const tabs = document.querySelectorAll("#inspectionOpnTabs .role-tab");
+        tabs.forEach(t => t.classList.remove("active"));
+        if (btnElem) btnElem.classList.add("active");
+        await loadInspectionReportForOpn(partNo, opnNo);
+    };
+
+    window.loadInspectionReportForOpn = async function(partNo, opnNo) {
+        const title = document.getElementById("inspectionModalTitle");
+        const body = document.getElementById("inspectionModalBody");
+        if (title) {
+            title.innerHTML = `<i class="fa-solid fa-clipboard-check" style="color: var(--primary);"></i> Quality Inspection Report — Part <span style="color:var(--primary-dark);">${partNo}</span> (Opn ${opnNo})`;
+        }
+        if (!body) return;
+        body.innerHTML = `<div class="text-center" style="padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading inspection data...</div>`;
+
+        try {
+            const [pRes, rRes] = await Promise.all([
+                fetch(`/api/inspection-parameters?part_no=${encodeURIComponent(partNo)}&opn_no=${encodeURIComponent(opnNo)}`),
+                fetch(`/api/inspection-reports?part_no=${encodeURIComponent(partNo)}&opn_no=${encodeURIComponent(opnNo)}`)
+            ]);
+
+            window.currentInspectionParams = await pRes.json();
+            window.currentInspectionReport = await rRes.json();
+
+            renderInspectionReportMatrix();
+        } catch (err) {
+            console.error("Error loading inspection report:", err);
+            if (body) body.innerHTML = `<div class="alert alert-danger">Error loading inspection report.</div>`;
+        }
+    };
+
+    window.renderInspectionReportMatrix = function() {
+        const body = document.getElementById("inspectionModalBody");
+        if (!body) return;
+
+        const report = window.currentInspectionReport || {};
+        const params = window.currentInspectionParams || [];
+
+        const compSlNos = (report.comp_sl_nos || "1,2,3,4,5,6,7,8,9,10").split(",").map(s => s.trim());
+        while (compSlNos.length < 10) {
+            compSlNos.push(String(compSlNos.length + 1));
+        }
+
+        let readings = {};
+        try {
+            readings = JSON.parse(report.readings_json || "{}");
+        } catch (e) {
+            readings = {};
+        }
+
+        let html = `
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 16px; border-radius: 8px; margin-bottom: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; font-size: 0.85rem;">
+                <div>
+                    <label style="font-weight:700; color:#475569;">Inspection Date</label>
+                    <input type="date" id="inspDate" value="${report.inspection_date || new Date().toISOString().split('T')[0]}" class="form-control" style="padding: 4px 8px; font-size: 0.82rem;">
+                </div>
+                <div>
+                    <label style="font-weight:700; color:#475569;">Part No</label>
+                    <input type="text" id="inspPartNo" value="${window.currentInspectionPartNo}" class="form-control" style="padding: 4px 8px; font-size: 0.82rem; font-weight: 700;">
+                </div>
+                <div>
+                    <label style="font-weight:700; color:#475569;">Opn No</label>
+                    <input type="text" id="inspOpnNo" value="${window.currentInspectionOpnNo}" class="form-control" style="padding: 4px 8px; font-size: 0.82rem; font-weight: 700;">
+                </div>
+                <div>
+                    <label style="font-weight:700; color:#475569;">Batch Qty</label>
+                    <input type="number" id="inspBatchQty" value="${report.batch_qty || 10}" class="form-control" style="padding: 4px 8px; font-size: 0.82rem;">
+                </div>
+                <div>
+                    <label style="font-weight:700; color:#475569;">Machine</label>
+                    <input type="text" id="inspMachine" value="${report.machine_name || ''}" placeholder="e.g. AMS" class="form-control" style="padding: 4px 8px; font-size: 0.82rem;">
+                </div>
+                <div>
+                    <label style="font-weight:700; color:#475569;">Operator</label>
+                    <input type="text" id="inspOperator" value="${report.operator_name || ''}" placeholder="e.g. ABHISHEK P" class="form-control" style="padding: 4px 8px; font-size: 0.82rem;">
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="font-size: 0.95rem; font-weight: 700;"><i class="fa-solid fa-sliders"></i> Inspection Parameters & Component Serial Numbers</h4>
+                <button type="button" class="btn btn-sm btn-outline" onclick="addInspectionParamRow()">
+                    <i class="fa-solid fa-plus"></i> Add Parameter Row
+                </button>
+            </div>
+
+            <div class="table-responsive" style="overflow-x: auto;">
+                <table class="data-table" id="inspectionMatrixTable" style="font-size: 0.82rem; min-width: 1000px;">
+                    <thead>
+                        <tr style="background: #f1f5f9;">
+                            <th style="width: 50px;">Sl No</th>
+                            <th style="width: 130px;">Desc</th>
+                            <th style="width: 90px;">Nom Dimen</th>
+                            <th style="width: 75px;">Lo Tol</th>
+                            <th style="width: 75px;">Hi Tol</th>
+                            ${compSlNos.slice(0, 10).map((s, idx) => `
+                                <th style="width: 75px; text-align: center;">
+                                    Comp ${idx + 1}<br>
+                                    <input type="text" class="insp-comp-sl" data-col="${idx}" value="${s}" placeholder="Sl No" style="width: 100%; text-align: center; font-size: 0.78rem; font-weight: 700; padding: 2px; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 2px; background: #ffffff;">
+                                </th>
+                            `).join("")}
+                            <th style="width: 40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="inspectionMatrixBody">
+        `;
+
+        if (params.length === 0) {
+            html += `<tr><td colspan="16" class="text-center">No inspection parameters defined. Click '+ Add Parameter Row' to add.</td></tr>`;
+        } else {
+            params.forEach((p, pIdx) => {
+                const paramReadings = readings[p.id] || readings[`temp_${pIdx + 1}`] || {};
+                const nom = parseFloat(p.nominal_dimension || 0);
+                const lo = parseFloat(p.lo_tol || 0);
+                const hi = parseFloat(p.hi_tol || 0);
+                const minVal = nom - lo;
+                const maxVal = nom + hi;
+
+                html += `
+                    <tr data-param-id="${p.id || ''}">
+                        <td style="text-align: center; font-weight: 700;">${pIdx + 1}</td>
+                        <td>
+                            <input type="text" class="param-desc form-control" value="${p.description || ''}" style="padding: 2px 6px; font-size: 0.8rem;">
+                        </td>
+                        <td>
+                            <input type="number" step="0.001" class="param-nom form-control" value="${nom}" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;">
+                        </td>
+                        <td>
+                            <input type="number" step="0.001" class="param-lo form-control" value="${lo}" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;">
+                        </td>
+                        <td>
+                            <input type="number" step="0.001" class="param-hi form-control" value="${hi}" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;">
+                        </td>
+                `;
+
+                for (let col = 0; col < 10; col++) {
+                    const valStr = paramReadings[`col_${col}`] !== undefined ? paramReadings[`col_${col}`] : '';
+                    let cellBg = '#ffffff';
+                    let cellColor = '#000000';
+                    if (valStr !== '' && !isNaN(valStr)) {
+                        const v = parseFloat(valStr);
+                        if (v >= minVal && v <= maxVal) {
+                            cellBg = '#d1fae5';
+                            cellColor = '#065f46';
+                        } else {
+                            cellBg = '#fee2e2';
+                            cellColor = '#991b1b';
+                        }
+                    }
+
+                    html += `
+                        <td style="padding: 2px;">
+                            <input type="number" step="0.001" class="insp-reading form-control" data-col="${col}" value="${valStr}" oninput="validateReadingCell(this)" style="padding: 2px 4px; font-size: 0.8rem; text-align: center; background-color: ${cellBg}; color: ${cellColor}; font-weight: 600;">
+                        </td>
+                    `;
+                }
+
+                html += `
+                        <td style="text-align: center;">
+                            <button type="button" class="btn btn-sm btn-danger" style="padding: 2px 6px;" onclick="removeInspectionParamRow(this)">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                <div style="font-size: 0.78rem; color: #64748b;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 2px; vertical-align: middle; margin-right: 4px;"></span> In Spec (Green)
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 2px; vertical-align: middle; margin-left: 10px; margin-right: 4px;"></span> Out of Spec (Red)
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('partInspectionModal')">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="saveInspectionReportData()">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Inspection Report
+                    </button>
+                </div>
+            </div>
+        `;
+
+        body.innerHTML = html;
+    };
+
+    window.validateReadingCell = function(inputElem) {
+        const tr = inputElem.closest("tr");
+        if (!tr) return;
+
+        const nom = parseFloat(tr.querySelector(".param-nom")?.value || 0);
+        const lo = parseFloat(tr.querySelector(".param-lo")?.value || 0);
+        const hi = parseFloat(tr.querySelector(".param-hi")?.value || 0);
+        const minVal = nom - lo;
+        const maxVal = nom + hi;
+
+        const valStr = inputElem.value.trim();
+        if (valStr !== '' && !isNaN(valStr)) {
+            const v = parseFloat(valStr);
+            if (v >= minVal && v <= maxVal) {
+                inputElem.style.backgroundColor = '#d1fae5';
+                inputElem.style.color = '#065f46';
+            } else {
+                inputElem.style.backgroundColor = '#fee2e2';
+                inputElem.style.color = '#991b1b';
+            }
+        } else {
+            inputElem.style.backgroundColor = '#ffffff';
+            inputElem.style.color = '#000000';
+        }
+    };
+
+    window.recalculateToleranceColors = function() {
+        const rows = document.querySelectorAll("#inspectionMatrixBody tr");
+        rows.forEach(tr => {
+            const inputs = tr.querySelectorAll(".insp-reading");
+            inputs.forEach(inp => validateReadingCell(inp));
+        });
+    };
+
+    window.addInspectionParamRow = function() {
+        const tbody = document.getElementById("inspectionMatrixBody");
+        if (!tbody) return;
+
+        const rows = tbody.querySelectorAll("tr");
+        const idx = rows.length + 1;
+
+        const tr = document.createElement("tr");
+        tr.setAttribute("data-param-id", "");
+
+        let html = `
+            <td style="text-align: center; font-weight: 700;">${idx}</td>
+            <td><input type="text" class="param-desc form-control" placeholder="Desc (e.g. Bore)" style="padding: 2px 6px; font-size: 0.8rem;"></td>
+            <td><input type="number" step="0.001" class="param-nom form-control" value="0.0" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;"></td>
+            <td><input type="number" step="0.001" class="param-lo form-control" value="0.0" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;"></td>
+            <td><input type="number" step="0.001" class="param-hi form-control" value="0.0" onchange="recalculateToleranceColors()" style="padding: 2px 6px; font-size: 0.8rem;"></td>
+        `;
+
+        for (let col = 0; col < 10; col++) {
+            html += `<td style="padding: 2px;"><input type="number" step="0.001" class="insp-reading form-control" data-col="${col}" value="" oninput="validateReadingCell(this)" style="padding: 2px 4px; font-size: 0.8rem; text-align: center; background-color: #ffffff; color: #000000; font-weight: 600;"></td>`;
+        }
+
+        html += `
+            <td style="text-align: center;">
+                <button type="button" class="btn btn-sm btn-danger" style="padding: 2px 6px;" onclick="removeInspectionParamRow(this)">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </td>
+        `;
+
+        tr.innerHTML = html;
+        tbody.appendChild(tr);
+    };
+
+    window.removeInspectionParamRow = function(btnElem) {
+        const tr = btnElem.closest("tr");
+        if (tr) tr.remove();
+        reindexParamRows();
+    };
+
+    function reindexParamRows() {
+        const rows = document.querySelectorAll("#inspectionMatrixBody tr");
+        rows.forEach((tr, i) => {
+            const td = tr.querySelector("td");
+            if (td) td.innerText = i + 1;
+        });
+    }
+
+    window.saveInspectionReportData = async function() {
+        const partNo = document.getElementById("inspPartNo")?.value.trim() || window.currentInspectionPartNo;
+        const opnNo = document.getElementById("inspOpnNo")?.value.trim() || window.currentInspectionOpnNo;
+        const batchQty = parseInt(document.getElementById("inspBatchQty")?.value || 10);
+        const machine = document.getElementById("inspMachine")?.value.trim() || "";
+        const operator = document.getElementById("inspOperator")?.value.trim() || "";
+        const inspDate = document.getElementById("inspDate")?.value || "";
+
+        // Collect Component Sl Nos
+        const compInputs = document.querySelectorAll(".insp-comp-sl");
+        const compSlList = [];
+        compInputs.forEach(i => compSlList.push(i.value.trim()));
+        const compSlNosStr = compSlList.join(",");
+
+        // Collect Parameters
+        const rows = document.querySelectorAll("#inspectionMatrixBody tr");
+        const paramPayloadList = [];
+        const readingsObj = {};
+
+        rows.forEach((tr, pIdx) => {
+            const desc = tr.querySelector(".param-desc")?.value.trim() || "";
+            const nom = parseFloat(tr.querySelector(".param-nom")?.value || 0);
+            const lo = parseFloat(tr.querySelector(".param-lo")?.value || 0);
+            const hi = parseFloat(tr.querySelector(".param-hi")?.value || 0);
+
+            if (desc) {
+                paramPayloadList.push({
+                    part_no: partNo,
+                    opn_no: opnNo,
+                    sl_no: pIdx + 1,
+                    description: desc,
+                    nominal_dimension: nom,
+                    lo_tol: lo,
+                    hi_tol: hi
+                });
+
+                const pId = tr.getAttribute("data-param-id") || `temp_${pIdx + 1}`;
+                const rowReadings = {};
+                const readingInputs = tr.querySelectorAll(".insp-reading");
+                readingInputs.forEach(inp => {
+                    const col = inp.getAttribute("data-col");
+                    rowReadings[`col_${col}`] = inp.value;
+                });
+                readingsObj[pId] = rowReadings;
+            }
+        });
+
+        try {
+            // Save parameters first
+            if (paramPayloadList.length > 0) {
+                await fetch("/api/inspection-parameters", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(paramPayloadList)
+                });
+            }
+
+            // Save report metadata & readings
+            const reportPayload = {
+                part_no: partNo,
+                opn_no: opnNo,
+                batch_qty: batchQty,
+                machine_name: machine,
+                operator_name: operator,
+                inspection_date: inspDate,
+                comp_sl_nos: compSlNosStr,
+                readings_json: JSON.stringify(readingsObj)
+            };
+
+            const res = await fetch("/api/inspection-reports", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(reportPayload)
+            });
+
+            if (res.ok) {
+                alert(`Inspection Report for Part ${partNo} (Opn ${opnNo}) saved successfully!`);
+                await loadInspectionReportForOpn(partNo, opnNo);
+            } else {
+                alert("Failed to save Inspection Report.");
+            }
+        } catch (err) {
+            console.error("Error saving inspection report:", err);
+            alert("Error saving inspection report.");
+        }
+    };
 
     // Modal Helpers
     window.openModal = function(id) {

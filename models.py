@@ -100,3 +100,28 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
     role = Column(String, nullable=False)  # 'admin' or 'guest'
+
+class InspectionParameter(Base):
+    __tablename__ = "inspection_parameters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    part_no = Column(String, index=True, nullable=False)
+    opn_no = Column(String, index=True, nullable=False)
+    sl_no = Column(Integer, nullable=False, default=1)
+    description = Column(String, nullable=False)
+    nominal_dimension = Column(Float, default=0.0)
+    lo_tol = Column(Float, default=0.0)
+    hi_tol = Column(Float, default=0.0)
+
+class InspectionReport(Base):
+    __tablename__ = "inspection_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    part_no = Column(String, index=True, nullable=False)
+    opn_no = Column(String, index=True, nullable=False)
+    batch_qty = Column(Integer, default=10)
+    machine_name = Column(String, nullable=True)
+    operator_name = Column(String, nullable=True)
+    inspection_date = Column(String, nullable=True)
+    comp_sl_nos = Column(Text, nullable=True)  # Comma-separated component serial numbers, e.g. "1,2,3,4,5,6,7,8,9,10"
+    readings_json = Column(Text, nullable=True) # JSON string mapping param_id -> { col_0: val, col_1: val ... }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GRS ENGINEERING PVT LTD - Production Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=800">
+    <link rel="stylesheet" href="/static/style.css?v=900">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -304,11 +304,12 @@
                                 <tr>
                                     <th>Part No</th>
                                     <th>Total Operations</th>
+                                    <th>Inspection Report</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="partsTableBody">
-                                <tr><td colspan="3" class="text-center">Loading parts...</td></tr>
+                                <tr><td colspan="4" class="text-center">Loading parts...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -602,6 +603,25 @@
         </div>
     </div>
 
+    <!-- Quality Inspection Report Modal -->
+    <div id="partInspectionModal" class="modal">
+        <div class="modal-content" style="max-width: 1100px; width: 95%;">
+            <div class="modal-header">
+                <h3 id="inspectionModalTitle"><i class="fa-solid fa-clipboard-check" style="color: var(--primary);"></i> Quality Inspection Report</h3>
+                <span class="close" onclick="closeModal('partInspectionModal')">&times;</span>
+            </div>
+            
+            <!-- Operation Tabs -->
+            <div id="inspectionOpnTabs" class="role-tabs" style="margin: 15px 0 10px 0; overflow-x: auto; flex-wrap: nowrap;">
+                <!-- Operation tabs rendered by JS (Opn 20, Opn 30, Opn 40...) -->
+            </div>
+
+            <div id="inspectionModalBody">
+                <!-- Inspection Matrix rendered dynamically by JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Login Screen Overlay Modal -->
     <div id="loginOverlay" class="login-overlay-backdrop">
         <div class="login-box shadow-lg">
@@ -637,6 +657,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=800"></script>
+    <script src="/static/app.js?v=900"></script>
 </body>
 </html>
