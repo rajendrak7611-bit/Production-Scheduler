@@ -114,34 +114,45 @@ document.addEventListener("DOMContentLoaded", () => {
     checkUserAuth();
 
     window.switchTab = function(tabName) {
-        navItems.forEach(item => {
+        if (!tabName) tabName = "dashboard";
+        const navs = document.querySelectorAll(".nav-item");
+        const screens = document.querySelectorAll(".tab-screen");
+        const titleEl = document.getElementById("currentTabTitle");
+
+        navs.forEach(item => {
             if (item.dataset.tab === tabName) {
                 item.classList.add("active");
-                tabTitle.innerText = item.innerText.trim();
+                if (titleEl) titleEl.innerText = item.innerText.trim();
             } else {
                 item.classList.remove("active");
             }
         });
 
-        tabScreens.forEach(screen => {
+        screens.forEach(screen => {
             if (screen.id === `screen-${tabName}`) {
                 screen.classList.add("active");
+                screen.style.display = "block";
             } else {
                 screen.classList.remove("active");
+                screen.style.display = "none";
             }
         });
 
         // Trigger data reload for specific tabs
-        if (tabName === "dashboard") loadDashboardStats();
-        if (tabName === "prodlog") loadProdLogPageData();
-        if (tabName === "schedules") loadSchedules();
-        if (tabName === "parts") loadParts();
-        if (tabName === "machines") loadMachines();
-        if (tabName === "operators") loadOperators();
-        if (tabName === "tooling") loadTooling();
+        try {
+            if (tabName === "dashboard" && typeof loadDashboardStats === "function") loadDashboardStats();
+            if (tabName === "prodlog" && typeof loadProdLogPageData === "function") loadProdLogPageData();
+            if (tabName === "schedules" && typeof loadSchedules === "function") loadSchedules();
+            if (tabName === "parts" && typeof loadParts === "function") loadParts();
+            if (tabName === "machines" && typeof loadMachines === "function") loadMachines();
+            if (tabName === "operators" && typeof loadOperators === "function") loadOperators();
+            if (tabName === "tooling" && typeof loadTooling === "function") loadTooling();
+        } catch (e) {
+            console.error("Error switching tab:", e);
+        }
     };
 
-    navItems.forEach(item => {
+    navs.forEach(item => {
         item.addEventListener("click", () => switchTab(item.dataset.tab));
     });
 

@@ -21,25 +21,25 @@
             </div>
             
             <nav class="nav-menu">
-                <button class="nav-item active" data-tab="dashboard">
+                <button class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
                     <i class="fa-solid fa-chart-pie"></i> Dashboard
                 </button>
-                <button class="nav-item" data-tab="prodlog">
+                <button class="nav-item" data-tab="prodlog" onclick="switchTab('prodlog')">
                     <i class="fa-solid fa-clipboard-list"></i> Production Logger
                 </button>
-                <button class="nav-item" data-tab="schedules">
+                <button class="nav-item" data-tab="schedules" onclick="switchTab('schedules')">
                     <i class="fa-solid fa-calendar-check"></i> Work Schedules
                 </button>
-                <button class="nav-item" data-tab="parts">
+                <button class="nav-item" data-tab="parts" onclick="switchTab('parts')">
                     <i class="fa-solid fa-cubes"></i> Part Master
                 </button>
-                <button class="nav-item" data-tab="machines">
+                <button class="nav-item" data-tab="machines" onclick="switchTab('machines')">
                     <i class="fa-solid fa-gears"></i> Machines
                 </button>
-                <button class="nav-item" data-tab="operators">
+                <button class="nav-item" data-tab="operators" onclick="switchTab('operators')">
                     <i class="fa-solid fa-users-gear"></i> Operators
                 </button>
-                <button class="nav-item" data-tab="tooling">
+                <button class="nav-item" data-tab="tooling" onclick="switchTab('tooling')">
                     <i class="fa-solid fa-wrench"></i> Tooling & Taps
                 </button>
             </nav>
@@ -784,6 +784,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=2200"></script>
+    <script src="/static/app.js?v=2300"></script>
 </body>
 </html>
