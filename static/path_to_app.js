@@ -2129,38 +2129,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 tbody.innerHTML = '';
                 if (filteredSchedules.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:1rem;">No schedules found.</td></tr>';
-                    return;
+                } else {
+                    // Sort by newest first assuming higher ID means newer
+                    filteredSchedules.sort((a, b) => b.id - a.id);
+                    filteredSchedules.forEach((s, idx) => {
+                        const partKey = (s.partno || '').trim().toUpperCase();
+                        const partObj = (allPartMasters || []).find(p => (p.partno || '').trim().toUpperCase() === partKey);
+                        
+                        const rateNum = parseFloat(s.rate || (partObj ? (partObj.va || partObj.rate) : 0)) || 0;
+                        const qtyNum = parseInt(s.qty) || 0;
+                        const valNum = rateNum * qtyNum;
+
+                        const rateStr = rateNum > 0 ? rateNum.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0';
+                        const valStr = valNum > 0 ? valNum.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0';
+
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${idx + 1}</td>
+                            <td><strong>${s.department || ''}</strong></td>
+                            <td>${s.partno}</td>
+                            <td>${s.target_date}</td>
+                            <td>${qtyNum}</td>
+                            <td>${rateStr}</td>
+                            <td><strong>${valStr}</strong></td>
+                            <td><span style="padding: 2px 8px; background-color: rgba(59, 130, 246, 0.1); color: var(--primary); border-radius: 12px; font-size: 0.85em;">${s.status || 'Pending'}</span></td>
+                            <td>
+                                <button onclick="editSchedule(${s.id})" style="background: none; border: none; color: var(--primary); cursor: pointer; margin-right: 8px;">Edit</button>
+                                <button onclick="deleteSchedule(${s.id})" style="background: none; border: none; color: #ef4444; cursor: pointer;">Delete</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
                 }
-                // Sort by newest first assuming higher ID means newer
-                filteredSchedules.sort((a, b) => b.id - a.id);
-                filteredSchedules.forEach((s, idx) => {
-                    const partKey = (s.partno || '').trim().toUpperCase();
-                    const partObj = (allPartMasters || []).find(p => (p.partno || '').trim().toUpperCase() === partKey);
-                    
-                    const rateNum = parseFloat(s.rate || (partObj ? (partObj.va || partObj.rate) : 0)) || 0;
-                    const qtyNum = parseInt(s.qty) || 0;
-                    const valNum = rateNum * qtyNum;
-
-                    const rateStr = rateNum > 0 ? rateNum.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0';
-                    const valStr = valNum > 0 ? valNum.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0';
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${idx + 1}</td>
-                        <td><strong>${s.department || ''}</strong></td>
-                        <td>${s.partno}</td>
-                        <td>${s.target_date}</td>
-                        <td>${qtyNum}</td>
-                        <td>${rateStr}</td>
-                        <td><strong>${valStr}</strong></td>
-                        <td><span style="padding: 2px 8px; background-color: rgba(59, 130, 246, 0.1); color: var(--primary); border-radius: 12px; font-size: 0.85em;">${s.status || 'Pending'}</span></td>
-                        <td>
-                            <button onclick="editSchedule(${s.id})" style="background: none; border: none; color: var(--primary); cursor: pointer; margin-right: 8px;">Edit</button>
-                            <button onclick="deleteSchedule(${s.id})" style="background: none; border: none; color: #ef4444; cursor: pointer;">Delete</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
             }
 
             renderScheduleSummaryReport(filteredSchedules);
