@@ -33,6 +33,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 const user = await res.json();
                 localStorage.setItem("currentUser", JSON.stringify(user));
                 window.currentUser = user;
+                const overlay = document.getElementById("loginOverlay");
+                if (overlay) overlay.style.display = "none";
                 applyUserRoleAccess();
             } else {
                 const data = await res.json().catch(() => ({}));
