@@ -120,7 +120,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const titleEl = document.getElementById("currentTabTitle");
 
         navs.forEach(item => {
-            if (item.dataset.tab === tabName) {
+            const targetTab = item.dataset.tab || item.getAttribute("data-tab");
+            if (targetTab === tabName) {
                 item.classList.add("active");
                 if (titleEl) titleEl.innerText = item.innerText.trim();
             } else {
@@ -140,20 +141,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Trigger data reload for specific tabs
         try {
-            if (tabName === "dashboard" && typeof loadDashboardStats === "function") loadDashboardStats();
-            if (tabName === "prodlog" && typeof loadProdLogPageData === "function") loadProdLogPageData();
-            if (tabName === "schedules" && typeof loadSchedules === "function") loadSchedules();
-            if (tabName === "parts" && typeof loadParts === "function") loadParts();
-            if (tabName === "machines" && typeof loadMachines === "function") loadMachines();
-            if (tabName === "operators" && typeof loadOperators === "function") loadOperators();
-            if (tabName === "tooling" && typeof loadTooling === "function") loadTooling();
+            if (tabName === "dashboard" && typeof window.loadDashboardStats === "function") window.loadDashboardStats();
+            if (tabName === "prodlog" && typeof window.loadProdLogPageData === "function") window.loadProdLogPageData();
+            if (tabName === "schedules" && typeof window.loadSchedules === "function") window.loadSchedules();
+            if (tabName === "parts" && typeof window.loadParts === "function") window.loadParts();
+            if (tabName === "machines" && typeof window.loadMachines === "function") window.loadMachines();
+            if (tabName === "operators" && typeof window.loadOperators === "function") window.loadOperators();
+            if (tabName === "tooling" && typeof window.loadTooling === "function") window.loadTooling();
         } catch (e) {
             console.error("Error switching tab:", e);
         }
     };
 
     navs.forEach(item => {
-        item.addEventListener("click", () => switchTab(item.dataset.tab));
+        item.addEventListener("click", (e) => {
+            e.preventDefault();
+            const tabName = item.dataset.tab || item.getAttribute("data-tab");
+            window.switchTab(tabName);
+        });
     });
 
     // Check auth and load initial data
@@ -2308,6 +2313,15 @@ document.addEventListener("DOMContentLoaded", () => {
     window.exportInspectionLogsExcel = function() {
         window.location.href = "/api/export/inspection-reports/excel";
     };
+
+    // Bind Data Loaders to window
+    window.loadDashboardStats = loadDashboardStats;
+    window.loadProdLogPageData = loadProdLogPageData;
+    window.loadSchedules = loadSchedules;
+    window.loadParts = loadParts;
+    window.loadMachines = loadMachines;
+    window.loadOperators = loadOperators;
+    window.loadTooling = loadTooling;
 
     // Modal Helpers
     window.openModal = function(id) {
