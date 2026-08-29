@@ -189,8 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (loginError) loginError.style.display = 'none';
             const usernameInput = document.getElementById('loginUsername');
             const passwordInput = document.getElementById('loginPassword');
-            const username = usernameInput ? usernameInput.value : '';
-            const password = passwordInput ? passwordInput.value : '';
+            const username = usernameInput ? usernameInput.value.trim() : '';
+            const password = passwordInput ? passwordInput.value.trim() : '';
             
             try {
                 const res = await fetch('/api/login', {
@@ -203,11 +203,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem('grs_user', JSON.stringify(data));
                     window.location.reload();
                 } else {
-                    if (loginError) loginError.style.display = 'block';
+                    const errData = await res.json().catch(() => ({}));
+                    if (loginError) {
+                        loginError.innerText = errData.detail || "Invalid credentials";
+                        loginError.style.display = 'block';
+                    }
                 }
             } catch (err) {
                 console.error(err);
-                if (loginError) loginError.style.display = 'block';
+                if (loginError) {
+                    loginError.innerText = "Network error while logging in";
+                    loginError.style.display = 'block';
+                }
             }
         });
     }

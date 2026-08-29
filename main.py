@@ -79,13 +79,17 @@ class UserLogin(BaseModel):
 def seed_default_users():
     db = next(get_db())
     try:
-        admin_user = db.query(models.User).filter(models.User.username == "admin").first()
+        admin_user = db.query(models.User).filter(func.lower(models.User.username) == "admin").first()
         if not admin_user:
             db.add(models.User(username="admin", password="admin123", role="admin"))
+        else:
+            admin_user.password = "admin123"
         
-        guest_user = db.query(models.User).filter(models.User.username == "guest").first()
+        guest_user = db.query(models.User).filter(func.lower(models.User.username) == "guest").first()
         if not guest_user:
             db.add(models.User(username="guest", password="guest123", role="guest"))
+        else:
+            guest_user.password = "guest123"
         
         db.commit()
     except Exception as e:
@@ -94,11 +98,12 @@ def seed_default_users():
     finally:
         db.close()
 
+@app.post("/api/login")
 @app.post("/api/auth/login")
 def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
-    u = login_data.username.strip()
+    u = login_data.username.strip().lower()
     p = login_data.password.strip()
-    user = db.query(models.User).filter(models.User.username == u).first()
+    user = db.query(models.User).filter(func.lower(models.User.username) == u).first()
     if not user or user.password != p:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     return {
