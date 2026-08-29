@@ -101,56 +101,45 @@ document.addEventListener('DOMContentLoaded', () => {
             document.head.appendChild(deleteStyle);
         }
         
-        // Access Control Logic
+        // Access Control & Screen Redirection Logic
         const isAdminUser = !userObj || !userObj.role || (userObj.role || '').toLowerCase() === 'admin' || (userObj.username || '').toLowerCase() === 'admin';
-        const allTabs = document.querySelectorAll('[data-screen]');
-        let firstAvailableTab = null;
-        let accessibleScreens = [];
-        try {
-            accessibleScreens = JSON.parse(userObj.accessible_screens || '[]');
-        } catch(e) {}
         
-        allTabs.forEach(tab => {
+        // Restrict Delete Access across all screens to Admin only
+        if (!isAdminUser) {
+            const deleteStyle = document.createElement('style');
+            deleteStyle.id = 'admin-only-delete-style';
+            deleteStyle.innerHTML = `
+                .delete-btn, .delete-part-btn, .delete-machine-btn, .delete-operator-btn, .delete-dept-btn,
+                .delete-shift-btn, .delete-vendor-btn, .delete-setter-btn, .delete-supplier-btn, .delete-rm-btn,
+                .delete-ht-btn, .delete-insert-btn, .delete-drill-btn, .delete-receipt-btn, .delete-issue-btn,
+                .delete-prodlog-btn, .delete-debur-btn, .delete-inspection-btn, .delete-bdslip-btn, .delete-user-btn,
+                .delete-insp-log-btn, .delete-service-btn,
+                #deleteAllPartMasterBtn, #deleteAllOperatorsBtn, #bulkDeleteLogsBtn, #deleteAllSchedulesBtn,
+                button[class*="delete"], button[id*="delete"], button[onclick*="delete"] {
+                    display: none !important;
+                }
+            `;
+            document.head.appendChild(deleteStyle);
+        }
+
+        // Production Management tabs are visible for ALL logged-in users (Admin & Guest)
+        document.querySelectorAll('.main-tab[data-group]').forEach(tab => {
+            tab.style.display = 'inline-block';
+        });
+
+        document.querySelectorAll('[data-screen]').forEach(tab => {
             const screen = tab.getAttribute('data-screen');
-            const isAllowed = isAdminUser || (!accessibleScreens || accessibleScreens.length === 0) || accessibleScreens.includes(screen) || ((screen === 'rfq' || screen === 'quote') && (accessibleScreens.includes('sales') || accessibleScreens.includes('mfe') || accessibleScreens.includes('rfq') || accessibleScreens.includes('quote'))) || ((screen === 'rawmaterial' || screen === 'ht' || screen === 'pc') && (accessibleScreens.includes('inventory') || accessibleScreens.includes('rawmaterial'))) || (screen === 'attendance' && accessibleScreens.includes('hr')) || ((screen === 'bdslip' || screen === 'servicedetails') && (accessibleScreens.includes('maintenance') || accessibleScreens.includes('bdslip') || accessibleScreens.includes('servicedetails'))) || ((screen === 'insertmaster' || screen === 'drillmaster' || screen === 'tapmaster' || screen === 'insertreceipt' || screen === 'tapreceipt' || screen === 'insertissue' || screen === 'tapissue' || screen === 'insertcpc' || screen === 'insertstock') && (accessibleScreens.includes('products') || accessibleScreens.includes('toolcrib'))) || ((screen === 'rm_requirement' || screen === 'mc_util' || screen === 'oper_eff' || screen === 'reports') && accessibleScreens.includes('reports'));
-            if (isAllowed) {
-                tab.style.display = 'inline-block';
-                if (!firstAvailableTab) firstAvailableTab = tab;
+            if (screen === 'users') {
+                tab.style.display = isAdminUser ? 'inline-block' : 'none';
             } else {
-                tab.style.display = 'none';
+                tab.style.display = 'inline-block';
             }
         });
 
-        // Main tabs access control
-        document.querySelectorAll('.main-tab[data-group]').forEach(tab => {
-            const group = tab.getAttribute('data-group');
-            if (isAdminUser) {
-                tab.style.display = 'inline-block';
-            } else {
-                const groupScreens = {
-                    'master': ['partmaster', 'machines', 'operators', 'dept', 'shift', 'vendors', 'setters', 'suppliers', 'db_backup'],
-                    'sales': ['rfq', 'quote', 'mfe', 'sales'],
-                    'mfe': ['rfq', 'quote', 'mfe', 'sales'],
-                    'inventory': ['inventory', 'rawmaterial', 'ht', 'pc'],
-                    'production': ['schedule', 'status', 'prodlog', 'debur'],
-                    'toolcrib': ['insertmaster', 'drillmaster', 'products', 'insertreceipt', 'insertissue', 'insertcpc', 'insertstock'],
-                    'reports': ['reports', 'rm_requirement', 'mc_util', 'oper_eff', 'bc_prod', 'att_vs_login'],
-                    'maintenance': ['maintenance', 'bdslip', 'servicedetails'],
-                    'hr': ['hr', 'attendance']
-                };
-                const allowed = (!accessibleScreens || accessibleScreens.length === 0) || (groupScreens[group] ? groupScreens[group].some(s => accessibleScreens.includes(s) || accessibleScreens.includes(group)) : false);
-                tab.style.display = allowed ? 'inline-block' : 'none';
-            }
-        });
-        
         // Special case for Users tab
         const sidebarUsers = document.getElementById('sidebarUsers');
         if (sidebarUsers) {
-            if (isAdminUser) {
-                sidebarUsers.style.display = 'inline-block';
-            } else {
-                sidebarUsers.style.display = 'none';
-            }
+            sidebarUsers.style.display = isAdminUser ? 'inline-block' : 'none';
         }
 
         // Add logout button to header actions div
@@ -159,6 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const logoutBtn = document.createElement('button');
             logoutBtn.id = 'logoutBtn';
             logoutBtn.className = 'btn btn-secondary';
+            logoutBtn.style.padding = '4px 10px';
+            logoutBtn.style.fontSize = '0.85rem';
             logoutBtn.textContent = `Logout (${userObj.username})`;
             logoutBtn.onclick = () => {
                 localStorage.removeItem('grs_user');
@@ -167,20 +158,13 @@ document.addEventListener('DOMContentLoaded', () => {
             actionDiv.appendChild(logoutBtn);
         }
 
-        // Auto-click target initial tab on login (prioritize Insert Issue for shopfloor/toolcrib users)
-        let targetInitialTab = null;
-        if (accessibleScreens.includes('insertissue') || accessibleScreens.includes('toolcrib')) {
-            targetInitialTab = document.getElementById('sidebarInsertIssue');
-        }
-        if (!targetInitialTab) {
-            targetInitialTab = firstAvailableTab;
-        }
-
-        if (targetInitialTab && (userObj.role !== 'admin' || accessibleScreens.includes('insertissue'))) {
-            setTimeout(() => {
-                targetInitialTab.click();
-            }, 100);
-        }
+        // ALWAYS open directly to Production Management (Prod Log / Production) on login
+        setTimeout(() => {
+            const prodTab = document.getElementById('sidebarProduction') || document.getElementById('sidebarMaster');
+            if (prodTab) prodTab.click();
+            const prodLogSubTab = document.getElementById('sidebarProdLog') || document.getElementById('sidebarPartMaster');
+            if (prodLogSubTab) prodLogSubTab.click();
+        }, 100);
     }
 
     if (loginForm) {
