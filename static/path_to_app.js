@@ -3141,6 +3141,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initResourceReqd() {
         await populateResourceDeptDropdown();
 
+        const fromDateInput = document.getElementById('resourceFromDate');
+        if (fromDateInput) {
+            if (!fromDateInput.value) {
+                const now = new Date();
+                const firstDayOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+                fromDateInput.value = firstDayOfMonth;
+            }
+            if (!fromDateInput.dataset.hasListener) {
+                fromDateInput.dataset.hasListener = 'true';
+                fromDateInput.addEventListener('change', () => {
+                    fetchResourceReqd();
+                });
+            }
+        }
+
         const deptSelect = document.getElementById('resourceDeptSelect');
         if (deptSelect && !deptSelect.dataset.hasListener) {
             deptSelect.dataset.hasListener = 'true';
@@ -3206,7 +3221,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 return s.includes(currentYearMonth);
             };
 
-            const currentMonthLogs = (allLogs || []).filter(l => isLogCurrentMonth(l.date));
+            const fromDateInput = document.getElementById('resourceFromDate');
+            const fromDateVal = fromDateInput ? (fromDateInput.value || '').trim() : '';
+
+            const parseDateToIso = (dStr) => {
+                if (!dStr) return null;
+                let s = dStr.toString().split('T')[0].split(' ')[0].trim();
+                if (!s) return null;
+                let parts = s.split(/[\/\-]/);
+                if (parts.length === 3) {
+                    let y, m, d;
+                    if (parts[0].length === 4) {
+                        y = parseInt(parts[0], 10);
+                        m = parseInt(parts[1], 10) - 1;
+                        d = parseInt(parts[2], 10);
+                    } else if (parts[2].length === 4) {
+                        d = parseInt(parts[0], 10);
+                        m = parseInt(parts[1], 10) - 1;
+                        y = parseInt(parts[2], 10);
+                    } else {
+                        return null;
+                    }
+                    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                }
+                return s;
+            };
+
+            const currentMonthLogs = (allLogs || []).filter(l => {
+                if (!l.date) return false;
+                if (fromDateVal) {
+                    const isoDate = parseDateToIso(l.date);
+                    if (isoDate) return isoDate >= fromDateVal;
+                }
+                return isLogCurrentMonth(l.date);
+            });
 
             // Filter active schedules for chosen department
             const deptSchedules = (schedules || []).filter(s => 
