@@ -1,3 +1,43 @@
+// Global Tab Switcher
+window.switchTab = function(tabName) {
+    if (!tabName) tabName = "dashboard";
+    const navs = document.querySelectorAll(".nav-item");
+    const screens = document.querySelectorAll(".tab-screen");
+    const titleEl = document.getElementById("currentTabTitle");
+
+    navs.forEach(item => {
+        const targetTab = item.dataset.tab || item.getAttribute("data-tab");
+        if (targetTab === tabName) {
+            item.classList.add("active");
+            if (titleEl) titleEl.innerText = item.innerText.trim();
+        } else {
+            item.classList.remove("active");
+        }
+    });
+
+    screens.forEach(screen => {
+        if (screen.id === `screen-${tabName}`) {
+            screen.classList.add("active");
+            screen.style.setProperty("display", "block", "important");
+        } else {
+            screen.classList.remove("active");
+            screen.style.setProperty("display", "none", "important");
+        }
+    });
+
+    try {
+        if (tabName === "dashboard" && typeof window.loadDashboardStats === "function") window.loadDashboardStats();
+        if (tabName === "prodlog" && typeof window.loadProdLogPageData === "function") window.loadProdLogPageData();
+        if (tabName === "schedules" && typeof window.loadSchedules === "function") window.loadSchedules();
+        if (tabName === "parts" && typeof window.loadParts === "function") window.loadParts();
+        if (tabName === "machines" && typeof window.loadMachines === "function") window.loadMachines();
+        if (tabName === "operators" && typeof window.loadOperators === "function") window.loadOperators();
+        if (tabName === "tooling" && typeof window.loadTooling === "function") window.loadTooling();
+    } catch (e) {
+        console.error("Error switching tab:", e);
+    }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
     // Current date display
     const today = new Date().toISOString().split("T")[0];
@@ -113,47 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     checkUserAuth();
 
-    window.switchTab = function(tabName) {
-        if (!tabName) tabName = "dashboard";
-        const navs = document.querySelectorAll(".nav-item");
-        const screens = document.querySelectorAll(".tab-screen");
-        const titleEl = document.getElementById("currentTabTitle");
-
-        navs.forEach(item => {
-            const targetTab = item.dataset.tab || item.getAttribute("data-tab");
-            if (targetTab === tabName) {
-                item.classList.add("active");
-                if (titleEl) titleEl.innerText = item.innerText.trim();
-            } else {
-                item.classList.remove("active");
-            }
-        });
-
-        screens.forEach(screen => {
-            if (screen.id === `screen-${tabName}`) {
-                screen.classList.add("active");
-                screen.style.display = "block";
-            } else {
-                screen.classList.remove("active");
-                screen.style.display = "none";
-            }
-        });
-
-        // Trigger data reload for specific tabs
-        try {
-            if (tabName === "dashboard" && typeof window.loadDashboardStats === "function") window.loadDashboardStats();
-            if (tabName === "prodlog" && typeof window.loadProdLogPageData === "function") window.loadProdLogPageData();
-            if (tabName === "schedules" && typeof window.loadSchedules === "function") window.loadSchedules();
-            if (tabName === "parts" && typeof window.loadParts === "function") window.loadParts();
-            if (tabName === "machines" && typeof window.loadMachines === "function") window.loadMachines();
-            if (tabName === "operators" && typeof window.loadOperators === "function") window.loadOperators();
-            if (tabName === "tooling" && typeof window.loadTooling === "function") window.loadTooling();
-        } catch (e) {
-            console.error("Error switching tab:", e);
-        }
-    };
-
-    navs.forEach(item => {
+    navItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             const tabName = item.dataset.tab || item.getAttribute("data-tab");

@@ -175,11 +175,11 @@ body {
 
 /* Tab Screens */
 .tab-screen {
-    display: none;
+    display: none !important;
 }
 
 .tab-screen.active {
-    display: block;
+    display: block !important;
 }
 
 /* KPI Cards */
