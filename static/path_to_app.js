@@ -5206,6 +5206,71 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { console.error(e); }
     }
 
+    const bulkDeleteProdLogsBtn = document.getElementById('bulkDeleteProdLogsBtn');
+    if (bulkDeleteProdLogsBtn) {
+        bulkDeleteProdLogsBtn.addEventListener('click', () => {
+            const userObj = window.currentUser || JSON.parse(localStorage.getItem('currentUser') || 'null');
+            const isAdmin = userObj && (userObj.role === 'admin' || (userObj.username || '').toLowerCase() === 'admin');
+            if (!isAdmin) {
+                alert('Access Denied: Only Admin users are authorized to bulk delete production logs.');
+                return;
+            }
+
+            const fromInput = document.getElementById('bulkDeleteFromDate');
+            const toInput = document.getElementById('bulkDeleteToDate');
+            const today = new Date().toISOString().split('T')[0];
+            if (fromInput && !fromInput.value) fromInput.value = today;
+            if (toInput && !toInput.value) toInput.value = today;
+
+            openModal('bulkDeleteProdLogsModal');
+        });
+    }
+
+    const bulkDeleteProdLogsForm = document.getElementById('bulkDeleteProdLogsForm');
+    if (bulkDeleteProdLogsForm) {
+        bulkDeleteProdLogsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fromDate = document.getElementById('bulkDeleteFromDate').value;
+            const toDate = document.getElementById('bulkDeleteToDate').value;
+            const dept = document.getElementById('bulkDeleteDept').value;
+
+            if (!fromDate || !toDate) {
+                alert('Please select both From Date and To Date.');
+                return;
+            }
+
+            const deptText = dept ? `Department: ${dept}` : 'All Departments';
+            if (!confirm(`Are you sure you want to PERMANENTLY DELETE production logs from ${fromDate} to ${toDate} for ${deptText}?`)) {
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    from_date: fromDate,
+                    to_date: toDate,
+                    dept: dept
+                });
+
+                const res = await fetch(`/api/prodlog/bulk-delete?${params.toString()}`, {
+                    method: 'DELETE'
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(data.message || 'Production logs deleted successfully!');
+                    closeModal('bulkDeleteProdLogsModal');
+                    fetchProdLogs();
+                } else {
+                    const errData = await res.json();
+                    alert('Failed to delete logs: ' + (errData.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Error deleting production logs:', err);
+                alert('Error deleting production logs: ' + err.message);
+            }
+        });
+    }
+
     const prodLogMachineIdle = document.getElementById('prodLogMachineIdle');
     const prodLogProdFields = document.getElementById('prodLogProdFields');
 

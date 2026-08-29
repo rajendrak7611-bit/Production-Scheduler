@@ -897,6 +897,55 @@ def create_production_log(log: ProductionLogCreate, db: Session = Depends(get_db
     db.refresh(db_log)
     return db_log
 
+@app.delete("/api/prodlog/bulk-delete")
+@app.delete("/api/production-logs/bulk-delete")
+def bulk_delete_production_logs(
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    dept: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    try:
+        logs = db.query(models.ProductionLog)
+        
+        if dept and dept.strip() and dept.strip().upper() not in ["ALL", "ALL DEPTS", ""]:
+            clean_dept = dept.strip().upper()
+            dept_parts = [
+                p.part_no for p in db.query(models.Part).all()
+                if (getattr(p, 'dept', '') or '').strip().upper() == clean_dept
+            ]
+            dept_parts_upper = [p.upper() for p in dept_parts if p]
+            
+            logs = logs.filter(
+                (func.upper(models.ProductionLog.part_no).in_(dept_parts_upper)) |
+                (func.upper(getattr(models.ProductionLog, 'dept', '')) == clean_dept)
+            )
+            
+        if from_date and from_date.strip():
+            f_date = from_date.strip()
+            logs = logs.filter(models.ProductionLog.log_date >= f_date)
+            
+        if to_date and to_date.strip():
+            t_date = to_date.strip()
+            logs = logs.filter(models.ProductionLog.log_date <= t_date + " 23:59:59")
+            
+        logs_to_delete = logs.all()
+        deleted_count = len(logs_to_delete)
+        
+        for log in logs_to_delete:
+            db.delete(log)
+            
+        db.commit()
+        return {
+            "status": "success",
+            "message": f"Successfully deleted {deleted_count} production log(s).",
+            "deleted_count": deleted_count
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error bulk deleting production logs: {str(e)}")
+
+@app.delete("/api/prodlog/{log_id}")
 @app.delete("/api/production-logs/{log_id}")
 def delete_production_log(log_id: int, db: Session = Depends(get_db)):
     db_log = db.query(models.ProductionLog).filter(models.ProductionLog.id == log_id).first()

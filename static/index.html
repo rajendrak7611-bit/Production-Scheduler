@@ -1706,6 +1706,9 @@
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                                     Export Excel
                                 </button>
+                                <button id="bulkDeleteProdLogsBtn" class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; border-color: #ef4444; color: #ef4444; display: flex; align-items: center; gap: 4px;" title="Delete production logs by date range and department">
+                                    <i class="fa-solid fa-trash-can"></i> Delete Logs
+                                </button>
                             </div>
                         </div>
                         <div style="max-height: 800px; overflow-y: auto;">
@@ -3927,6 +3930,52 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=324"></script>
+    <!-- Modal: Bulk Delete Production Logs -->
+    <div id="bulkDeleteProdLogsModal" class="modal">
+        <div class="modal-content" style="max-width: 480px; border-radius: 12px; padding: 20px; background-color: var(--card-bg); color: var(--text-main);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="margin: 0; color: #ef4444; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-trash-can"></i> Delete Production Logs (Bulk)
+                </h3>
+                <span class="close" onclick="closeModal('bulkDeleteProdLogsModal')" style="cursor: pointer; font-size: 1.5rem;">&times;</span>
+            </div>
+            <form id="bulkDeleteProdLogsForm" style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label for="bulkDeleteFromDate" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">From Date</label>
+                        <input type="date" id="bulkDeleteFromDate" required style="width: 100%; padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.9rem; background-color: var(--card-bg); color: var(--text-main);">
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="bulkDeleteToDate" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">To Date</label>
+                        <input type="date" id="bulkDeleteToDate" required style="width: 100%; padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.9rem; background-color: var(--card-bg); color: var(--text-main);">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="bulkDeleteDept" style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Department</label>
+                    <select id="bulkDeleteDept" style="width: 100%; padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.9rem; background-color: var(--card-bg); color: var(--text-main);">
+                        <option value="">-- All Departments --</option>
+                        <option value="WIPRO">WIPRO</option>
+                        <option value="BC">BC</option>
+                        <option value="GEAR">GEAR</option>
+                        <option value="SPIDER">SPIDER</option>
+                    </select>
+                </div>
+
+                <div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; padding: 10px 12px; border-radius: 6px; font-size: 0.82rem; margin-top: 4px;">
+                    ⚠️ <strong>Warning:</strong> All production logs in the selected date range and department will be <strong>permanently deleted</strong>. This action cannot be undone.
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('bulkDeleteProdLogsModal')">Cancel</button>
+                    <button type="submit" class="btn btn-danger" style="background-color: #ef4444; border-color: #ef4444; color: white;">
+                        <i class="fa-solid fa-trash-can"></i> Confirm & Delete Logs
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=325"></script>
 </body>
 </html>
