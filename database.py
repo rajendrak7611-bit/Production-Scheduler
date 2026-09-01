@@ -14,8 +14,11 @@ if db_url:
         else:
             db_url += "?sslmode=require"
 
+def is_data_writable():
+    return os.path.exists("/data") and os.access("/data", os.W_OK)
+
 if not db_url:
-    if os.path.exists("/data"):
+    if is_data_writable():
         db_url = "sqlite:////data/production.db"
     else:
         db_url = "sqlite:///./production.db"
@@ -28,7 +31,7 @@ try:
         pass
 except Exception as e:
     print(f"Failed to connect to primary DATABASE_URL ({db_url}), falling back to SQLite: {e}")
-    if os.path.exists("/data"):
+    if is_data_writable():
         db_url = "sqlite:////data/production.db"
     else:
         db_url = "sqlite:///./production.db"
@@ -55,7 +58,7 @@ def get_db():
         db.execute(text("SELECT 1"))
     except Exception as e:
         print(f"Primary SessionLocal error: {e}, using SQLite fallback session.")
-        fallback_path = "/data/production.db" if os.path.exists("/data") else "./production.db"
+        fallback_path = "/data/production.db" if is_data_writable() else "./production.db"
         fallback_engine = create_engine(f"sqlite:///{fallback_path}", connect_args={"check_same_thread": False})
         FallbackSession = sessionmaker(autocommit=False, autoflush=False, bind=fallback_engine)
         db = FallbackSession()
