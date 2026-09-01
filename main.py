@@ -11,7 +11,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 import re
 
-from database import engine, get_db, Base
+from database import engine, get_db, Base, SessionLocal
 import models
 
 def parse_excel_bytes(file_bytes: bytes):
