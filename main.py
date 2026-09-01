@@ -329,11 +329,12 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 @app.get("/api/machines")
 def get_machines(db: Session = Depends(get_db)):
     try:
-        machines = db.query(models.Machine).all()
-        return [{"id": m.id, "name": m.name, "dept": m.dept or "General", "status": m.status or "Active"} for m in machines]
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT * FROM machines")).mappings().all()
+            return [{"id": r.get("id"), "name": r.get("name") or r.get("machine_name") or "", "dept": r.get("dept") or r.get("department") or "General", "status": r.get("status") or "Active"} for r in rows]
     except Exception as e:
         print("get_machines error:", e)
-        db.rollback()
         return []
 
 @app.post("/api/machines", response_model=MachineResponse)
@@ -419,11 +420,12 @@ def delete_machine(machine_id: int, db: Session = Depends(get_db)):
 @app.get("/api/operators")
 def get_operators(db: Session = Depends(get_db)):
     try:
-        operators = db.query(models.Operator).all()
-        return [{"id": o.id, "name": o.name, "dept": o.dept or "General", "designation": o.designation or "Operator"} for o in operators]
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT * FROM operators")).mappings().all()
+            return [{"id": r.get("id"), "name": r.get("name") or r.get("operator_name") or "", "dept": r.get("dept") or r.get("department") or "General", "designation": r.get("designation") or "Operator"} for r in rows]
     except Exception as e:
         print("get_operators error:", e)
-        db.rollback()
         return []
 
 @app.post("/api/operators", response_model=OperatorResponse)
