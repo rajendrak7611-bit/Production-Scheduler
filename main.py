@@ -1,4 +1,3 @@
-# Build v325: Resource Requirement From Date Filter
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -79,17 +78,13 @@ class UserLogin(BaseModel):
 def seed_default_users():
     db = next(get_db())
     try:
-        admin_user = db.query(models.User).filter(func.lower(models.User.username) == "admin").first()
+        admin_user = db.query(models.User).filter(models.User.username == "admin").first()
         if not admin_user:
             db.add(models.User(username="admin", password="admin123", role="admin"))
-        else:
-            admin_user.password = "admin123"
         
-        guest_user = db.query(models.User).filter(func.lower(models.User.username) == "guest").first()
+        guest_user = db.query(models.User).filter(models.User.username == "guest").first()
         if not guest_user:
             db.add(models.User(username="guest", password="guest123", role="guest"))
-        else:
-            guest_user.password = "guest123"
         
         db.commit()
     except Exception as e:
@@ -98,12 +93,11 @@ def seed_default_users():
     finally:
         db.close()
 
-@app.post("/api/login")
 @app.post("/api/auth/login")
 def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
-    u = login_data.username.strip().lower()
+    u = login_data.username.strip()
     p = login_data.password.strip()
-    user = db.query(models.User).filter(func.lower(models.User.username) == u).first()
+    user = db.query(models.User).filter(models.User.username == u).first()
     if not user or user.password != p:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     return {
@@ -902,55 +896,6 @@ def create_production_log(log: ProductionLogCreate, db: Session = Depends(get_db
     db.refresh(db_log)
     return db_log
 
-@app.delete("/api/prodlog/bulk-delete")
-@app.delete("/api/production-logs/bulk-delete")
-def bulk_delete_production_logs(
-    from_date: Optional[str] = Query(None),
-    to_date: Optional[str] = Query(None),
-    dept: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    try:
-        logs = db.query(models.ProductionLog)
-        
-        if dept and dept.strip() and dept.strip().upper() not in ["ALL", "ALL DEPTS", ""]:
-            clean_dept = dept.strip().upper()
-            dept_parts = [
-                p.part_no for p in db.query(models.Part).all()
-                if (getattr(p, 'dept', '') or '').strip().upper() == clean_dept
-            ]
-            dept_parts_upper = [p.upper() for p in dept_parts if p]
-            
-            logs = logs.filter(
-                (func.upper(models.ProductionLog.part_no).in_(dept_parts_upper)) |
-                (func.upper(getattr(models.ProductionLog, 'dept', '')) == clean_dept)
-            )
-            
-        if from_date and from_date.strip():
-            f_date = from_date.strip()
-            logs = logs.filter(models.ProductionLog.log_date >= f_date)
-            
-        if to_date and to_date.strip():
-            t_date = to_date.strip()
-            logs = logs.filter(models.ProductionLog.log_date <= t_date + " 23:59:59")
-            
-        logs_to_delete = logs.all()
-        deleted_count = len(logs_to_delete)
-        
-        for log in logs_to_delete:
-            db.delete(log)
-            
-        db.commit()
-        return {
-            "status": "success",
-            "message": f"Successfully deleted {deleted_count} production log(s).",
-            "deleted_count": deleted_count
-        }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error bulk deleting production logs: {str(e)}")
-
-@app.delete("/api/prodlog/{log_id}")
 @app.delete("/api/production-logs/{log_id}")
 def delete_production_log(log_id: int, db: Session = Depends(get_db)):
     db_log = db.query(models.ProductionLog).filter(models.ProductionLog.id == log_id).first()
