@@ -82,6 +82,16 @@ def seed_default_users():
     except Exception as ex:
         print("Auto backup restore notice:", ex)
 
+@app.post("/api/restore-from-backup")
+@app.get("/api/restore-from-backup")
+def trigger_restore_backup():
+    try:
+        import import_all_tables
+        import_all_tables.import_all_backup_tables()
+        return {"message": "All 32 tables restored successfully from backup JSON & Excel!"}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.post("/api/login")
 @app.post("/api/auth/login")
 def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
