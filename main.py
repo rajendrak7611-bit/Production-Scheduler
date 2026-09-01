@@ -685,58 +685,53 @@ def delete_part(part_id: int, db: Session = Depends(get_db)):
 def get_schedules(db: Session = Depends(get_db)):
     try:
         schedules = db.query(models.ProductionSchedule).all()
-    except Exception as e:
-        print("Error in get_schedules:", e)
-        db.rollback()
-        try:
-            models.Base.metadata.create_all(bind=engine)
-            schedules = db.query(models.ProductionSchedule).all()
-        except Exception:
-            return []
-    parts = db.query(models.Part).all()
-    part_map = {p.part_no.strip().upper(): p for p in parts if p.part_no}
+        parts = db.query(models.Part).all()
+        part_map = {p.part_no.strip().upper(): p for p in parts if p.part_no}
 
-    # Calculate actual produced quantity from production logs for each (part_no, opn_no)
-    logs = db.query(models.ProductionLog).all()
-    prod_map = {}
-    for log in logs:
-        if log.part_no and log.opn_no:
-            key = (log.part_no.strip().upper(), str(log.opn_no).strip())
-            prod_map[key] = prod_map.get(key, 0) + (log.qty_produced or 0)
+        logs = db.query(models.ProductionLog).all()
+        prod_map = {}
+        for log in logs:
+            if log.part_no and log.opn_no:
+                key = (log.part_no.strip().upper(), str(log.opn_no).strip())
+                prod_map[key] = prod_map.get(key, 0) + (log.qty_produced or 0)
 
-    results = []
-    for sch in schedules:
-        p_key = sch.part_no.strip().upper() if sch.part_no else ""
-        part = part_map.get(p_key)
+        results = []
+        for sch in schedules:
+            p_key = sch.part_no.strip().upper() if sch.part_no else ""
+            part = part_map.get(p_key)
 
-        if part and part.operations and len(part.operations) > 0:
-            for opn in part.operations:
-                opn_str = str(opn.opn_no).strip()
-                qty_prod = prod_map.get((p_key, opn_str), 0)
+            if part and part.operations and len(part.operations) > 0:
+                for opn in part.operations:
+                    opn_str = str(opn.opn_no).strip()
+                    qty_prod = prod_map.get((p_key, opn_str), 0)
+                    bal = max(0, (sch.total_sch_qty or 0) - qty_prod)
+                    results.append({
+                        "id": sch.id,
+                        "part_no": sch.part_no,
+                        "sch_qty": sch.total_sch_qty or 0,
+                        "opn_no": opn.opn_no,
+                        "desc": opn.description or "",
+                        "qty_prod": qty_prod,
+                        "balance": bal
+                    })
+            else:
+                qty_prod = prod_map.get((p_key, "10"), 0)
                 bal = max(0, (sch.total_sch_qty or 0) - qty_prod)
                 results.append({
                     "id": sch.id,
                     "part_no": sch.part_no,
                     "sch_qty": sch.total_sch_qty or 0,
-                    "opn_no": opn.opn_no,
-                    "desc": opn.description or "",
+                    "opn_no": "10",
+                    "desc": "General",
                     "qty_prod": qty_prod,
                     "balance": bal
                 })
-        else:
-            qty_prod = prod_map.get((p_key, "10"), 0)
-            bal = max(0, (sch.total_sch_qty or 0) - qty_prod)
-            results.append({
-                "id": sch.id,
-                "part_no": sch.part_no,
-                "sch_qty": sch.total_sch_qty or 0,
-                "opn_no": "10",
-                "desc": "General",
-                "qty_prod": qty_prod,
-                "balance": bal
-            })
 
-    return results
+        return results
+    except Exception as e:
+        print("Error in get_schedules:", e)
+        db.rollback()
+        return []
 
 @app.delete("/api/schedules/clear-all")
 def clear_all_schedules(db: Session = Depends(get_db)):
