@@ -1,13 +1,15 @@
 import json
-import sqlite3
 import os
 import glob
+from sqlalchemy import text
+from database import engine
 
 def import_all_backup_tables():
-    # Find latest backup JSON file
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     search_paths = [
-        "C:/Users/win10/Downloads/GRS_Factory_Database_Full_Backup_*.json",
-        "./GRS_Factory_Database_Full_Backup_*.json"
+        os.path.join(base_dir, "full_backup.json"),
+        "C:/Users/win10/Downloads/GRS_Factory_Database_Full_Backup_2026-09-01.json",
+        os.path.join(base_dir, "GRS_Factory_Database_Full_Backup_*.json")
     ]
     
     backup_path = None
@@ -17,7 +19,7 @@ def import_all_backup_tables():
             files.sort(reverse=True)
             backup_path = files[0]
             break
-            
+
     if not backup_path or not os.path.exists(backup_path):
         print("No JSON backup file found!")
         return
@@ -27,41 +29,64 @@ def import_all_backup_tables():
         data = json.load(f)
 
     tables = data.get("tables", {})
-    conn = sqlite3.connect("production.db")
-    cursor = conn.cursor()
+    if not tables:
+        return
 
-    total_inserted = 0
-    for table_name, rows in tables.items():
-        if not rows:
-            continue
-        
-        first_row = rows[0]
-        cols = list(first_row.keys())
-        col_defs = []
-        for col in cols:
-            if col.lower() == "id":
-                col_defs.append(f"{col} INTEGER PRIMARY KEY")
-            else:
-                col_defs.append(f"{col} TEXT")
+    is_postgres = "postgresql" in str(engine.url)
+
+    with engine.connect() as conn:
+        trans = conn.begin()
+        total_inserted = 0
+        try:
+            for table_name, rows in tables.items():
+                if not rows:
+                    continue
                 
-        cursor.execute(f"DROP TABLE IF EXISTS {table_name};")
-        create_sql = f"CREATE TABLE {table_name} ({', '.join(col_defs)});"
-        cursor.execute(create_sql)
+                first_row = rows[0]
+                cols = list(first_row.keys())
+                col_defs = []
+                for col in cols:
+                    if col.lower() == "id":
+                        col_defs.append(f"{col} SERIAL PRIMARY KEY" if is_postgres else f"{col} INTEGER PRIMARY KEY")
+                    else:
+                        col_defs.append(f"{col} TEXT" if is_postgres else f"{col} TEXT")
+                
+                if not is_postgres:
+                    try:
+                        conn.execute(text(f"DROP TABLE IF EXISTS {table_name};"))
+                    except Exception:
+                        pass
+                
+                try:
+                    conn.execute(text(f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(col_defs)});"))
+                except Exception:
+                    pass
+                
+                try:
+                    conn.execute(text(f"DELETE FROM {table_name};"))
+                except Exception:
+                    pass
 
-        placeholders = ", ".join(["?"] * len(cols))
-        insert_sql = f"INSERT INTO {table_name} ({', '.join(cols)}) VALUES ({placeholders});"
+                placeholders = ", ".join([f":{c}" for c in cols])
+                col_str = ", ".join(cols)
+                insert_sql = text(f"INSERT INTO {table_name} ({col_str}) VALUES ({placeholders});")
 
-        row_data = []
-        for r in rows:
-            row_data.append(tuple(r.get(c) for c in cols))
+                inserted = 0
+                for row in rows:
+                    try:
+                        conn.execute(insert_sql, row)
+                        inserted += 1
+                    except Exception as ie:
+                        pass
 
-        cursor.executemany(insert_sql, row_data)
-        print(f"Restored table '{table_name}': {len(row_data)} records.")
-        total_inserted += len(row_data)
+                print(f"Restored table '{table_name}': {inserted} records.")
+                total_inserted += inserted
 
-    conn.commit()
-    conn.close()
-    print(f"All {len(tables)} tables fully restored into production.db! (Total records: {total_inserted})")
+            trans.commit()
+            print(f"All {len(tables)} tables restored into database! (Total records: {total_inserted})")
+        except Exception as e:
+            trans.rollback()
+            print(f"Backup restoration error: {e}")
 
 if __name__ == "__main__":
     import_all_backup_tables()
