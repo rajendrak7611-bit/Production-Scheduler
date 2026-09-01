@@ -76,6 +76,11 @@ class UserLogin(BaseModel):
 
 @app.on_event("startup")
 def seed_default_users():
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception as ex:
+        print("Error creating tables on startup:", ex)
+
     db = SessionLocal()
     try:
         admin_user = db.query(models.User).filter(func.lower(models.User.username) == "admin").first()
@@ -97,6 +102,10 @@ def seed_default_users():
 @app.post("/api/auth/login")
 def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
     try:
+        try:
+            models.Base.metadata.create_all(bind=engine)
+        except Exception:
+            pass
         u = (login_data.username or "").strip()
         p = (login_data.password or "").strip()
         
