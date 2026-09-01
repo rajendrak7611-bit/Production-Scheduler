@@ -50,19 +50,24 @@ def parse_excel_bytes(file_bytes: bytes):
         print("Error reading excel bytes:", e)
     return rows
 
-# Ensure tables are created
-Base.metadata.create_all(bind=engine)
+# Ensure all models and tables are created first
+try:
+    models.Base.metadata.create_all(bind=engine)
+except Exception as _ex:
+    print("Error creating tables:", _ex)
 
 # Auto migrate inspection_reports columns if missing
 try:
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         from sqlalchemy import text
         try:
             conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN report_code VARCHAR;"))
+            conn.commit()
         except Exception:
             pass
         try:
             conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN prod_log_id INTEGER;"))
+            conn.commit()
         except Exception:
             pass
 except Exception as _ex:
