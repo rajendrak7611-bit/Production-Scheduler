@@ -833,8 +833,90 @@ body {
     #loggerMatrixTable, #inspectionMatrixTable {
         width: 100% !important;
         min-width: 100% !important;
-        table-layout: fixed !important;
-    }
+/* --- HORIZONTAL MAIN & SUB MENU STYLING --- */
+.menu-container {
+    padding: 8px 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    margin-bottom: 12px;
+}
+
+.main-menu-horizontal {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: #f8fafc;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 8px;
+}
+
+.main-tab {
+    padding: 6px 14px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #475569;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease-in-out;
+    display: inline-block;
+}
+
+.main-tab:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.main-tab.active {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3) !important;
+}
+
+.sub-menu-horizontal {
+    padding: 4px 6px;
+    background: #ffffff;
+    border-radius: 6px;
+}
+
+.sub-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.sub-tab {
+    padding: 5px 12px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: #64748b;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    display: inline-block;
+}
+
+.sub-tab:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: #94a3b8;
+}
+
+.sub-tab.active {
+    background: #1e40af !important;
+    color: #ffffff !important;
+    border-color: #1e40af !important;
+    font-weight: 600 !important;
+    box-shadow: 0 1px 3px rgba(30, 64, 175, 0.25) !important;
 }
 
 
