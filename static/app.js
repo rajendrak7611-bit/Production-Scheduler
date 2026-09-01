@@ -339,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.main-tab').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.sub-tab').forEach(btn => btn.classList.remove('active'));
         importBtn.style.display = 'none';
-        addBtn.style.display = 'inline-flex';
+        if (addBtn) addBtn.style.display = 'none';
     }
 
     function hideAllSubmenus() {
