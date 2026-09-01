@@ -63,11 +63,10 @@ def import_all_backup_tables():
                     else:
                         col_defs.append(f"{col} TEXT")
                 
-                if not is_postgres:
-                    try:
-                        conn.execute(text(f"DROP TABLE IF EXISTS {table_name};"))
-                    except Exception:
-                        pass
+                try:
+                    conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE;" if is_postgres else f"DROP TABLE IF EXISTS {table_name};"))
+                except Exception:
+                    pass
                 
                 try:
                     conn.execute(text(f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(col_defs)});"))
