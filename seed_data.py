@@ -10,10 +10,15 @@ def read_xlsx_rows(filepath):
     """
     Parses sheet1 of an xlsx file into a list of row value arrays using standard library zipfile/xml.
     """
-    if not os.path.exists(filepath):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    target_path = os.path.join(base_dir, filepath) if not os.path.isabs(filepath) else filepath
+    if not os.path.exists(target_path):
+        target_path = filepath
+    if not os.path.exists(target_path):
+        print(f"File not found: {target_path}")
         return []
     try:
-        with zipfile.ZipFile(filepath) as z:
+        with zipfile.ZipFile(target_path) as z:
             strings = []
             if 'xl/sharedStrings.xml' in z.namelist():
                 tree = ET.fromstring(z.read('xl/sharedStrings.xml'))
