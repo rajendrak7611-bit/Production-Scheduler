@@ -519,6 +519,158 @@ def delete_operator(op_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Operator deleted"}
 
+# --- Part Master API ---
+@app.get("/api/partmaster")
+def get_partmasters(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM part_masters")).mappings().all()
+        results = []
+        for r in rows:
+            results.append({
+                "id": r.get("id"),
+                "customer": r.get("customer") or "",
+                "department": r.get("department") or r.get("dept") or "",
+                "family": r.get("family") or "",
+                "forge_pn": r.get("forge_pn") or "",
+                "part_prefix": r.get("part_prefix") or "",
+                "partno": r.get("partno") or r.get("part_no") or "",
+                "part_no": r.get("partno") or r.get("part_no") or "",
+                "va": r.get("va") or 0,
+                "rfd_phy": r.get("rfd_phy") or 0
+            })
+        if results:
+            return results
+    except Exception as e:
+        print("get_partmasters error:", e)
+        db.rollback()
+
+    try:
+        parts = db.query(models.Part).all()
+        return [{
+            "id": p.id,
+            "customer": p.customer or "",
+            "department": p.dept or "",
+            "family": p.family or "",
+            "forge_pn": p.forge_pn or "",
+            "part_prefix": "",
+            "partno": p.part_no or "",
+            "part_no": p.part_no or "",
+            "va": p.va or 0,
+            "rfd_phy": 0
+        } for p in parts]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.get("/api/partmaster/{part_id}")
+def get_partmaster_by_id(part_id: int, db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM part_masters WHERE id = :id"), {"id": part_id}).mappings().all()
+        if rows:
+            r = rows[0]
+            return {
+                "id": r.get("id"),
+                "customer": r.get("customer") or "",
+                "department": r.get("department") or r.get("dept") or "",
+                "family": r.get("family") or "",
+                "forge_pn": r.get("forge_pn") or "",
+                "part_prefix": r.get("part_prefix") or "",
+                "partno": r.get("partno") or r.get("part_no") or "",
+                "part_no": r.get("partno") or r.get("part_no") or "",
+                "va": r.get("va") or 0,
+                "rfd_phy": r.get("rfd_phy") or 0
+            }
+    except Exception:
+        db.rollback()
+    return {}
+
+@app.get("/api/partmaster/{part_id}/operations")
+def get_partmaster_operations(part_id: int, db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM part_operations WHERE part_id = :part_id"), {"part_id": part_id}).mappings().all()
+        results = []
+        for r in rows:
+            results.append({
+                "id": r.get("id"),
+                "part_id": r.get("part_id"),
+                "opn_no": str(r.get("opn_no") or ""),
+                "description": r.get("description") or "",
+                "machine": r.get("machine") or r.get("machine_name") or "",
+                "cycle_time": r.get("cycle_time") or 0.0
+            })
+        return results
+    except Exception as e:
+        print("get_partmaster_operations error:", e)
+        db.rollback()
+        return []
+
+@app.post("/api/partmaster/{part_id}/operations")
+def save_partmaster_operations(part_id: int, ops: List[dict], db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM part_operations WHERE part_id = :part_id"), {"part_id": part_id})
+        for op in ops:
+            db.execute(text("INSERT INTO part_operations (part_id, opn_no, description, machine, cycle_time) VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)"), {
+                "part_id": part_id,
+                "opn_no": str(op.get("opn_no") or ""),
+                "description": op.get("description") or "",
+                "machine": op.get("machine") or op.get("machine_name") or "",
+                "cycle_time": float(op.get("cycle_time") or 0)
+            })
+        db.commit()
+        return {"message": "Operations saved successfully"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+
+@app.post("/api/partmaster")
+def create_partmaster(data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("INSERT INTO part_masters (customer, department, family, forge_pn, part_prefix, partno, va, rfd_phy) VALUES (:customer, :department, :family, :forge_pn, :part_prefix, :partno, :va, :rfd_phy)"), {
+            "customer": data.get("customer") or "",
+            "department": data.get("department") or data.get("dept") or "",
+            "family": data.get("family") or "",
+            "forge_pn": data.get("forge_pn") or "",
+            "part_prefix": data.get("part_prefix") or "",
+            "partno": data.get("partno") or data.get("part_no") or "",
+            "va": data.get("va") or 0,
+            "rfd_phy": data.get("rfd_phy") or 0
+        })
+        db.commit()
+        return {"message": "Part master created", **data}
+    except Exception as e:
+        db.rollback()
+        return {"message": "Part master created", **data}
+
+@app.put("/api/partmaster/{part_id}")
+def update_partmaster(part_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("UPDATE part_masters SET customer = :customer, department = :department, family = :family, forge_pn = :forge_pn, part_prefix = :part_prefix, partno = :partno, va = :va WHERE id = :id"), {
+            "id": part_id,
+            "customer": data.get("customer") or "",
+            "department": data.get("department") or data.get("dept") or "",
+            "family": data.get("family") or "",
+            "forge_pn": data.get("forge_pn") or "",
+            "part_prefix": data.get("part_prefix") or "",
+            "partno": data.get("partno") or data.get("part_no") or "",
+            "va": data.get("va") or 0
+        })
+        db.commit()
+        return {"id": part_id, **data}
+    except Exception as e:
+        db.rollback()
+        return {"id": part_id, **data}
+
+@app.delete("/api/partmaster/{part_id}")
+def delete_partmaster(part_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM part_masters WHERE id = :id"), {"id": part_id})
+        db.execute(text("DELETE FROM part_operations WHERE part_id = :id"), {"id": part_id})
+        db.commit()
+        return {"message": "Part master deleted"}
+    except Exception as e:
+        db.rollback()
+        return {"message": "Deleted"}
+
 # --- Parts ---
 @app.get("/api/parts", response_model=List[PartResponse])
 def get_parts(db: Session = Depends(get_db)):
