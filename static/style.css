@@ -44,6 +44,36 @@ body {
     min-height: 100vh;
 }
 
+header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 12px 24px !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    width: 100% !important;
+}
+
+header .logo {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+header .logo h1 {
+    font-size: 1.4rem !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+}
+
+#headerActions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin-left: auto !important;
+}
+
 /* Sidebar */
 .sidebar {
     width: 260px;
