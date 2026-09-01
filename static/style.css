@@ -833,6 +833,9 @@ body {
     #loggerMatrixTable, #inspectionMatrixTable {
         width: 100% !important;
         min-width: 100% !important;
+    }
+}
+
 /* --- HORIZONTAL MAIN & SUB MENU STYLING --- */
 .menu-container {
     padding: 8px 16px;
