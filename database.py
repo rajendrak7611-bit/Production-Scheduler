@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Support Render environment variable or persistent disk /data/production.db
@@ -50,8 +50,19 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def get_db():
-    db = SessionLocal()
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+    except Exception as e:
+        print(f"Primary SessionLocal error: {e}, using SQLite fallback session.")
+        fallback_path = "/data/production.db" if os.path.exists("/data") else "./production.db"
+        fallback_engine = create_engine(f"sqlite:///{fallback_path}", connect_args={"check_same_thread": False})
+        FallbackSession = sessionmaker(autocommit=False, autoflush=False, bind=fallback_engine)
+        db = FallbackSession()
     try:
         yield db
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass
