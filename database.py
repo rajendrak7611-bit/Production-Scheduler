@@ -5,8 +5,14 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # Support Render environment variable or persistent disk /data/production.db
 db_url = os.getenv("DATABASE_URL")
 
-if db_url and db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+if db_url:
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    if "postgresql" in db_url and "sslmode" not in db_url:
+        if "?" in db_url:
+            db_url += "&sslmode=require"
+        else:
+            db_url += "?sslmode=require"
 
 if not db_url:
     if os.path.exists("/data"):
