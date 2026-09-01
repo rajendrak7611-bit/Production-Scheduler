@@ -4,26 +4,40 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Support Render environment variable or persistent disk /data/production.db
 db_url = os.getenv("DATABASE_URL")
+
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 if not db_url:
     if os.path.exists("/data"):
         db_url = "sqlite:////data/production.db"
     else:
         db_url = "sqlite:///./production.db"
 
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
 
-connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
+try:
+    engine = create_engine(db_url, connect_args=connect_args)
+    with engine.connect() as conn:
+        pass
+except Exception as e:
+    print(f"Failed to connect to primary DATABASE_URL ({db_url}), falling back to SQLite: {e}")
+    if os.path.exists("/data"):
+        db_url = "sqlite:////data/production.db"
+    else:
+        db_url = "sqlite:///./production.db"
+    engine = create_engine(db_url, connect_args={"check_same_thread": False})
 
-engine = create_engine(db_url, connect_args=connect_args)
-
-if db_url.startswith("sqlite"):
+if "sqlite" in str(engine.url):
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.close()
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.close()
+        except Exception:
+            pass
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
