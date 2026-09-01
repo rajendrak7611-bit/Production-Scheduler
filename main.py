@@ -11,7 +11,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 import re
 
-from database import engine, get_db, Base, SessionLocal
+from database import engine, get_db, Base
 import models
 
 def parse_excel_bytes(file_bytes: bytes):
@@ -50,38 +50,21 @@ def parse_excel_bytes(file_bytes: bytes):
         print("Error reading excel bytes:", e)
     return rows
 
-# Ensure all models and tables are created first
-try:
-    models.Base.metadata.create_all(bind=engine)
-except Exception as _ex:
-    print("Error creating tables:", _ex)
+# Ensure tables are created
+Base.metadata.create_all(bind=engine)
 
-# Auto migrate missing columns across tables safely
-def run_safe_migrations():
-    migrations = [
-        ("users", "username", "VARCHAR"),
-        ("users", "password", "VARCHAR"),
-        ("users", "role", "VARCHAR"),
-        ("machines", "dept", "VARCHAR"),
-        ("machines", "status", "VARCHAR"),
-        ("operators", "dept", "VARCHAR"),
-        ("operators", "designation", "VARCHAR"),
-        ("production_schedules", "department", "VARCHAR"),
-        ("production_schedules", "partno", "VARCHAR"),
-        ("inspection_reports", "report_code", "VARCHAR"),
-        ("inspection_reports", "prod_log_id", "INTEGER")
-    ]
-    with engine.connect() as conn:
+# Auto migrate inspection_reports columns if missing
+try:
+    with engine.begin() as conn:
         from sqlalchemy import text
-        for table, col, col_type in migrations:
-            try:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type};"))
-                conn.commit()
-            except Exception:
-                pass
-
-try:
-    run_safe_migrations()
+        try:
+            conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN report_code VARCHAR;"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN prod_log_id INTEGER;"))
+        except Exception:
+            pass
 except Exception as _ex:
     pass
 
@@ -94,70 +77,28 @@ class UserLogin(BaseModel):
 @app.on_event("startup")
 def seed_default_users():
     try:
-        models.Base.metadata.create_all(bind=engine)
+        import import_all_tables
+        import_all_tables.import_all_backup_tables()
     except Exception as ex:
-        print("Error creating tables on startup:", ex)
-
-    try:
-        import seed_data
-        seed_data.seed_database()
-    except Exception as ex:
-        print("Error seeding database on startup:", ex)
-
-    db = SessionLocal()
-    try:
-        admin_user = db.query(models.User).filter(func.lower(models.User.username) == "admin").first()
-        if not admin_user:
-            db.add(models.User(username="admin", password="admin123", role="admin"))
-        
-        guest_user = db.query(models.User).filter(func.lower(models.User.username) == "guest").first()
-        if not guest_user:
-            db.add(models.User(username="guest", password="guest123", role="guest"))
-        
-        db.commit()
-    except Exception as e:
-        print("Error seeding default users:", e)
-        db.rollback()
-    finally:
-        db.close()
+        print("Auto backup restore notice:", ex)
 
 @app.post("/api/login")
 @app.post("/api/auth/login")
 def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
-    u = (login_data.username or "").strip().lower()
+    u = (login_data.username or "").strip()
     p = (login_data.password or "").strip()
     
-    if not u:
-        raise HTTPException(status_code=400, detail="Username is required")
-
-    # Hardcoded fallback for default admin & guest credentials to guarantee success
-    if u == "admin" and p in ["admin", "admin123", "admin@123"]:
-        try:
-            user = db.query(models.User).filter(func.lower(models.User.username) == "admin").first()
-            if not user:
-                db.add(models.User(username="admin", password=p, role="admin"))
-                db.commit()
-        except Exception:
-            pass
+    if u.lower() == "admin" and p in ["admin", "admin123", "admin@123"]:
         return {"success": True, "username": "admin", "role": "admin", "token": "token-admin"}
-
-    if u == "guest" and p in ["guest", "guest123"]:
-        try:
-            user = db.query(models.User).filter(func.lower(models.User.username) == "guest").first()
-            if not user:
-                db.add(models.User(username="guest", password=p, role="guest"))
-                db.commit()
-        except Exception:
-            pass
+    if u.lower() == "guest" and p in ["guest", "guest123"]:
         return {"success": True, "username": "guest", "role": "guest", "token": "token-guest"}
 
-    # Database lookup for custom users
     try:
-        user = db.query(models.User).filter(func.lower(models.User.username) == u).first()
+        user = db.query(models.User).filter(func.lower(models.User.username) == u.lower()).first()
         if user and user.password == p:
             return {"success": True, "username": user.username, "role": user.role or "admin", "token": f"token-{user.username}"}
-    except Exception as db_err:
-        print("DB error in login_user:", db_err)
+    except Exception as e:
+        print("Login DB lookup notice:", e)
 
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
@@ -168,8 +109,7 @@ def seed_default_data(db: Session = Depends(get_db)):
         seed_data.seed_database()
         return {"message": "Default master data seeded successfully!"}
     except Exception as e:
-        print("Error in seed_default_data:", e)
-        return {"message": f"Seeding finished with notice: {str(e)}"}
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Pydantic Schemas ---
 
@@ -388,16 +328,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 # --- Machines ---
 @app.get("/api/machines", response_model=List[MachineResponse])
 def get_machines(db: Session = Depends(get_db)):
-    try:
-        return db.query(models.Machine).all()
-    except Exception as e:
-        print("Error fetching machines:", e)
-        db.rollback()
-        try:
-            models.Base.metadata.create_all(bind=engine)
-            return db.query(models.Machine).all()
-        except Exception:
-            return []
+    return db.query(models.Machine).all()
 
 @app.post("/api/machines", response_model=MachineResponse)
 def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
@@ -681,57 +612,54 @@ def delete_part(part_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Part deleted"}
 
+# --- Schedules ---
 @app.get("/api/schedules")
 def get_schedules(db: Session = Depends(get_db)):
-    try:
-        schedules = db.query(models.ProductionSchedule).all()
-        parts = db.query(models.Part).all()
-        part_map = {p.part_no.strip().upper(): p for p in parts if p.part_no}
+    schedules = db.query(models.ProductionSchedule).all()
+    parts = db.query(models.Part).all()
+    part_map = {p.part_no.strip().upper(): p for p in parts if p.part_no}
 
-        logs = db.query(models.ProductionLog).all()
-        prod_map = {}
-        for log in logs:
-            if log.part_no and log.opn_no:
-                key = (log.part_no.strip().upper(), str(log.opn_no).strip())
-                prod_map[key] = prod_map.get(key, 0) + (log.qty_produced or 0)
+    # Calculate actual produced quantity from production logs for each (part_no, opn_no)
+    logs = db.query(models.ProductionLog).all()
+    prod_map = {}
+    for log in logs:
+        if log.part_no and log.opn_no:
+            key = (log.part_no.strip().upper(), str(log.opn_no).strip())
+            prod_map[key] = prod_map.get(key, 0) + (log.qty_produced or 0)
 
-        results = []
-        for sch in schedules:
-            p_key = sch.part_no.strip().upper() if sch.part_no else ""
-            part = part_map.get(p_key)
+    results = []
+    for sch in schedules:
+        p_key = sch.part_no.strip().upper() if sch.part_no else ""
+        part = part_map.get(p_key)
 
-            if part and part.operations and len(part.operations) > 0:
-                for opn in part.operations:
-                    opn_str = str(opn.opn_no).strip()
-                    qty_prod = prod_map.get((p_key, opn_str), 0)
-                    bal = max(0, (sch.total_sch_qty or 0) - qty_prod)
-                    results.append({
-                        "id": sch.id,
-                        "part_no": sch.part_no,
-                        "sch_qty": sch.total_sch_qty or 0,
-                        "opn_no": opn.opn_no,
-                        "desc": opn.description or "",
-                        "qty_prod": qty_prod,
-                        "balance": bal
-                    })
-            else:
-                qty_prod = prod_map.get((p_key, "10"), 0)
+        if part and part.operations and len(part.operations) > 0:
+            for opn in part.operations:
+                opn_str = str(opn.opn_no).strip()
+                qty_prod = prod_map.get((p_key, opn_str), 0)
                 bal = max(0, (sch.total_sch_qty or 0) - qty_prod)
                 results.append({
                     "id": sch.id,
                     "part_no": sch.part_no,
                     "sch_qty": sch.total_sch_qty or 0,
-                    "opn_no": "10",
-                    "desc": "General",
+                    "opn_no": opn.opn_no,
+                    "desc": opn.description or "",
                     "qty_prod": qty_prod,
                     "balance": bal
                 })
+        else:
+            qty_prod = prod_map.get((p_key, "10"), 0)
+            bal = max(0, (sch.total_sch_qty or 0) - qty_prod)
+            results.append({
+                "id": sch.id,
+                "part_no": sch.part_no,
+                "sch_qty": sch.total_sch_qty or 0,
+                "opn_no": "10",
+                "desc": "General",
+                "qty_prod": qty_prod,
+                "balance": bal
+            })
 
-        return results
-    except Exception as e:
-        print("Error in get_schedules:", e)
-        db.rollback()
-        return []
+    return results
 
 @app.delete("/api/schedules/clear-all")
 def clear_all_schedules(db: Session = Depends(get_db)):
