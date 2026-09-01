@@ -98,6 +98,12 @@ def seed_default_users():
     except Exception as ex:
         print("Error creating tables on startup:", ex)
 
+    try:
+        import seed_data
+        seed_data.seed_database()
+    except Exception as ex:
+        print("Error seeding database on startup:", ex)
+
     db = SessionLocal()
     try:
         admin_user = db.query(models.User).filter(func.lower(models.User.username) == "admin").first()
