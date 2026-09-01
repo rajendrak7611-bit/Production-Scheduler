@@ -2599,6 +2599,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const statusFromDate = document.getElementById('statusFromDate');
+    if (statusFromDate) {
+        statusFromDate.addEventListener('change', () => {
+            fetchScheduleStatus();
+        });
+    }
+
     const statusPartSearch = document.getElementById('statusPartSearch');
     if (statusPartSearch) {
         statusPartSearch.addEventListener('input', () => {
@@ -2736,6 +2743,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function initScheduleStatus() {
         try {
+            const fromDateInput = document.getElementById('statusFromDate');
+            if (fromDateInput && !fromDateInput.value) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                fromDateInput.value = `${year}-${month}-01`;
+            }
+
             if (statusAllParts.length === 0) {
                 const partsRes = await fetch('/api/partmaster');
                 statusAllParts = await partsRes.json();
@@ -2777,6 +2792,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const dept = document.getElementById('statusDeptSelect').value;
         const custFilter = (document.getElementById('statusCustomerSelect')?.value || '').trim().toUpperCase();
+        const statusFromDateVal = (document.getElementById('statusFromDate')?.value || '').trim();
         const partSearchFilter = (document.getElementById('statusPartSearch')?.value || '').trim().toUpperCase();
         const tbody = document.getElementById('statusBody');
 
@@ -2989,7 +3005,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ncProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'nc').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
                 const rejectionProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'rejection').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
                 const rfdProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'rfd').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
-                const despProd = allRmLogs.filter(l => (l.finish_part_no || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && l.type === 'despatch').reduce((sum, l) => sum + (l.qty || 0), 0);
+                const despProd = allRmLogs.filter(l => {
+                    const isMatchPart = (l.finish_part_no || '').trim().toUpperCase() === (partno || '').trim().toUpperCase();
+                    const isDespatch = l.type === 'despatch';
+                    if (!isMatchPart || !isDespatch) return false;
+
+                    if (statusFromDateVal) {
+                        const logDateRaw = l.date || l.log_date || l.created_at || '';
+                        const isoDate = parseLocalDateStr(logDateRaw);
+                        if (isoDate) return isoDate >= statusFromDateVal;
+                    }
+                    return true;
+                }).reduce((sum, l) => sum + (l.qty || 0), 0);
 
                 let lastOpProd = 0;
                 if (operations.length > 0) {

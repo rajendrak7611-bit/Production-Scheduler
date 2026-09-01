@@ -1203,8 +1203,11 @@
                         <select id="statusCustomerSelect" style="padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--card-bg); color: var(--text-main); font-family: 'Inter', sans-serif;">
                             <option value="">-- All Customers --</option>
                         </select>
-                        <input type="month" id="statusMonthSelect" title="Select Month for Despatch & Status values" style="padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--card-bg); color: var(--text-main); font-family: 'Inter', sans-serif;">
                         <input type="text" id="statusPartSearch" placeholder="🔍 Filter Part No..." style="padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--card-bg); color: var(--text-main); font-family: 'Inter', sans-serif; width: 160px;">
+                        <div style="display: flex; align-items: center; gap: 5px;" title="Select starting date for Despatch Quantity calculation">
+                            <label for="statusFromDate" style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin: 0; white-space: nowrap;">Date:</label>
+                            <input type="date" id="statusFromDate" style="padding: 0.45rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--card-bg); color: var(--text-main); font-family: 'Inter', sans-serif; font-size: 0.85rem;">
+                        </div>
                         <button id="generateStatusReportBtn" class="btn btn-primary" style="padding: 0.5rem 0.9rem; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; white-space: nowrap;">
                             <i class="fas fa-sync-alt"></i> Generate Report
                         </button>
@@ -3928,6 +3931,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=4000"></script>
+    <script src="/static/app.js?v=4001"></script>
 </body>
 </html>

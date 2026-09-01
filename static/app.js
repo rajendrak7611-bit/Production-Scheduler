@@ -2599,9 +2599,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const statusMonthSelect = document.getElementById('statusMonthSelect');
-    if (statusMonthSelect) {
-        statusMonthSelect.addEventListener('change', () => {
+    const statusFromDate = document.getElementById('statusFromDate');
+    if (statusFromDate) {
+        statusFromDate.addEventListener('change', () => {
             fetchScheduleStatus();
         });
     }
@@ -2743,12 +2743,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function initScheduleStatus() {
         try {
-            const monthSelect = document.getElementById('statusMonthSelect');
-            if (monthSelect && !monthSelect.value) {
+            const fromDateInput = document.getElementById('statusFromDate');
+            if (fromDateInput && !fromDateInput.value) {
                 const now = new Date();
                 const year = now.getFullYear();
                 const month = String(now.getMonth() + 1).padStart(2, '0');
-                monthSelect.value = `${year}-${month}`;
+                fromDateInput.value = `${year}-${month}-01`;
             }
 
             if (statusAllParts.length === 0) {
@@ -2792,7 +2792,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const dept = document.getElementById('statusDeptSelect').value;
         const custFilter = (document.getElementById('statusCustomerSelect')?.value || '').trim().toUpperCase();
-        const selectedMonth = (document.getElementById('statusMonthSelect')?.value || '').trim();
+        const statusFromDateVal = (document.getElementById('statusFromDate')?.value || '').trim();
         const partSearchFilter = (document.getElementById('statusPartSearch')?.value || '').trim().toUpperCase();
         const tbody = document.getElementById('statusBody');
 
@@ -3008,10 +3008,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const despProd = allRmLogs.filter(l => {
                     const isMatchPart = (l.finish_part_no || '').trim().toUpperCase() === (partno || '').trim().toUpperCase();
                     const isDespatch = l.type === 'despatch';
-                    const logDate = l.date || l.log_date || l.created_at || '';
-                    const logMonth = logDate.slice(0, 7);
-                    const isMatchMonth = !selectedMonth || logMonth === selectedMonth;
-                    return isMatchPart && isDespatch && isMatchMonth;
+                    if (!isMatchPart || !isDespatch) return false;
+
+                    if (statusFromDateVal) {
+                        const logDateRaw = l.date || l.log_date || l.created_at || '';
+                        const isoDate = parseLocalDateStr(logDateRaw);
+                        if (isoDate) return isoDate >= statusFromDateVal;
+                    }
+                    return true;
                 }).reduce((sum, l) => sum + (l.qty || 0), 0);
 
                 let lastOpProd = 0;
