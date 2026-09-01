@@ -681,10 +681,18 @@ def delete_part(part_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Part deleted"}
 
-# --- Schedules ---
 @app.get("/api/schedules")
 def get_schedules(db: Session = Depends(get_db)):
-    schedules = db.query(models.ProductionSchedule).all()
+    try:
+        schedules = db.query(models.ProductionSchedule).all()
+    except Exception as e:
+        print("Error in get_schedules:", e)
+        db.rollback()
+        try:
+            models.Base.metadata.create_all(bind=engine)
+            schedules = db.query(models.ProductionSchedule).all()
+        except Exception:
+            return []
     parts = db.query(models.Part).all()
     part_map = {p.part_no.strip().upper(): p for p in parts if p.part_no}
 
