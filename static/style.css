@@ -425,7 +425,7 @@ body {
     align-items: center;
 }
 
-.modal.active, .modal-backdrop.active {
+.modal.active, .modal.show, .modal-backdrop.active, .modal-backdrop.show {
     display: flex !important;
 }
 

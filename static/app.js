@@ -1348,6 +1348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const opTableContainer = document.getElementById('operationsTable')?.closest('.table-container, .modal-table-container');
             if (opTableContainer) opTableContainer.style.display = 'block';
 
+            operationsModal.classList.add('active');
             operationsModal.classList.add('show');
         } catch(e) {
             console.error('Error opening operations modal:', e);
@@ -1355,7 +1356,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     function closeOperationsModal() {
-        if (operationsModal) operationsModal.classList.remove('show');
+        if (operationsModal) {
+            operationsModal.classList.remove('active');
+            operationsModal.classList.remove('show');
+        }
     }
     closeOperationsModalBtn?.addEventListener('click', closeOperationsModal);
     cancelOperationsBtn?.addEventListener('click', closeOperationsModal);
