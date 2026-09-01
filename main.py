@@ -76,11 +76,8 @@ class UserLogin(BaseModel):
 
 @app.on_event("startup")
 def seed_default_users():
-    try:
-        import import_all_tables
-        import_all_tables.import_all_backup_tables()
-    except Exception as ex:
-        print("Auto backup restore notice:", ex)
+    # Keep database state persistent and do not overwrite user deletions on restart
+    pass
 
 @app.post("/api/restore-from-backup")
 @app.get("/api/restore-from-backup")
@@ -571,32 +568,9 @@ def get_partmasters(db: Session = Depends(get_db)):
                     "va": r.get("va") or 0,
                     "rfd_phy": r.get("rfd_phy") or 0
                 })
-        if results:
-            return results
+        return results
     except Exception as e:
         print("get_partmasters error:", e)
-        db.rollback()
-
-    try:
-        rows = db.execute(text("SELECT * FROM parts ORDER BY CASE WHEN customer IS NOT NULL AND customer != '' THEN 0 ELSE 1 END, id ASC")).mappings().all()
-        results = []
-        for r in rows:
-            p_no = r.get("part_no") or r.get("partno") or ""
-            if p_no:
-                results.append({
-                    "id": r.get("id"),
-                    "customer": r.get("customer") or "",
-                    "department": r.get("dept") or r.get("department") or "",
-                    "family": r.get("family") or "",
-                    "forge_pn": r.get("forge_pn") or "",
-                    "part_prefix": "",
-                    "partno": p_no,
-                    "part_no": p_no,
-                    "va": r.get("va") or 0,
-                    "rfd_phy": 0
-                })
-        return results
-    except Exception:
         db.rollback()
         return []
 
