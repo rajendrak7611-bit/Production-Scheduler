@@ -11,8 +11,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentUser) userObj = JSON.parse(currentUser);
     } catch(e) {}
 
+    function isUserAdmin() {
+        let u = userObj;
+        if (!u) {
+            try {
+                const raw = localStorage.getItem('grs_user');
+                if (raw) u = JSON.parse(raw);
+            } catch(e){}
+        }
+        return !u || !u.role || (u.role || '').toLowerCase() === 'admin' || (u.username || '').toLowerCase() === 'admin';
+    }
+    window.isUserAdmin = isUserAdmin;
+
     function checkAdminAccess() {
-        if (!userObj || userObj.role !== 'admin') {
+        if (!isUserAdmin()) {
             alert('Access Denied: Only Admin users are authorized to delete records.');
             return false;
         }
@@ -454,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
             importBtn.style.display = 'inline-block';
             addBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Part';
             const clearBtn = document.getElementById('clearAllPartsTab');
-            if (clearBtn) clearBtn.style.display = isAdminUser ? 'inline-block' : 'none';
+            if (clearBtn) clearBtn.style.display = isUserAdmin() ? 'inline-block' : 'none';
             fetchPartMasters(); 
         }},
         'sidebarMachines': { tab: 'machines', action: () => { 
