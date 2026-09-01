@@ -526,18 +526,20 @@ def get_partmasters(db: Session = Depends(get_db)):
         rows = db.execute(text("SELECT * FROM part_masters")).mappings().all()
         results = []
         for r in rows:
-            results.append({
-                "id": r.get("id"),
-                "customer": r.get("customer") or "",
-                "department": r.get("department") or r.get("dept") or "",
-                "family": r.get("family") or "",
-                "forge_pn": r.get("forge_pn") or "",
-                "part_prefix": r.get("part_prefix") or "",
-                "partno": r.get("partno") or r.get("part_no") or "",
-                "part_no": r.get("partno") or r.get("part_no") or "",
-                "va": r.get("va") or 0,
-                "rfd_phy": r.get("rfd_phy") or 0
-            })
+            p_no = r.get("partno") or r.get("part_no") or r.get("part_number") or ""
+            if p_no:
+                results.append({
+                    "id": r.get("id"),
+                    "customer": r.get("customer") or r.get("customer_name") or "",
+                    "department": r.get("department") or r.get("dept") or "",
+                    "family": r.get("family") or "",
+                    "forge_pn": r.get("forge_pn") or r.get("forge_part_no") or "",
+                    "part_prefix": r.get("part_prefix") or "",
+                    "partno": p_no,
+                    "part_no": p_no,
+                    "va": r.get("va") or 0,
+                    "rfd_phy": r.get("rfd_phy") or 0
+                })
         if results:
             return results
     except Exception as e:
@@ -545,19 +547,24 @@ def get_partmasters(db: Session = Depends(get_db)):
         db.rollback()
 
     try:
-        parts = db.query(models.Part).all()
-        return [{
-            "id": p.id,
-            "customer": p.customer or "",
-            "department": p.dept or "",
-            "family": p.family or "",
-            "forge_pn": p.forge_pn or "",
-            "part_prefix": "",
-            "partno": p.part_no or "",
-            "part_no": p.part_no or "",
-            "va": p.va or 0,
-            "rfd_phy": 0
-        } for p in parts]
+        rows = db.execute(text("SELECT * FROM parts")).mappings().all()
+        results = []
+        for r in rows:
+            p_no = r.get("part_no") or r.get("partno") or ""
+            if p_no:
+                results.append({
+                    "id": r.get("id"),
+                    "customer": r.get("customer") or "",
+                    "department": r.get("dept") or r.get("department") or "",
+                    "family": r.get("family") or "",
+                    "forge_pn": r.get("forge_pn") or "",
+                    "part_prefix": "",
+                    "partno": p_no,
+                    "part_no": p_no,
+                    "va": r.get("va") or 0,
+                    "rfd_phy": 0
+                })
+        return results
     except Exception:
         db.rollback()
         return []
