@@ -2,10 +2,12 @@ import os
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Support Render environment variable or persistent disk /data/production.db
+def is_data_writable():
+    return os.path.exists("/data") and os.access("/data", os.W_OK)
+
 db_url = os.getenv("DATABASE_URL")
 if not db_url:
-    if os.path.exists("/data"):
+    if is_data_writable():
         db_url = "sqlite:////data/production.db"
     else:
         db_url = "sqlite:///./production.db"
