@@ -326,9 +326,18 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     }
 
 # --- Machines ---
-@app.get("/api/machines", response_model=List[MachineResponse])
+@app.get("/api/machines")
 def get_machines(db: Session = Depends(get_db)):
-    return db.query(models.Machine).all()
+    try:
+        return db.query(models.Machine).all()
+    except Exception as e:
+        print("get_machines error:", e)
+        db.rollback()
+        try:
+            models.Base.metadata.create_all(bind=engine)
+            return db.query(models.Machine).all()
+        except Exception:
+            return []
 
 @app.post("/api/machines", response_model=MachineResponse)
 def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
@@ -410,9 +419,18 @@ def delete_machine(machine_id: int, db: Session = Depends(get_db)):
     return {"message": "Machine deleted"}
 
 # --- Operators ---
-@app.get("/api/operators", response_model=List[OperatorResponse])
+@app.get("/api/operators")
 def get_operators(db: Session = Depends(get_db)):
-    return db.query(models.Operator).all()
+    try:
+        return db.query(models.Operator).all()
+    except Exception as e:
+        print("get_operators error:", e)
+        db.rollback()
+        try:
+            models.Base.metadata.create_all(bind=engine)
+            return db.query(models.Operator).all()
+        except Exception:
+            return []
 
 @app.post("/api/operators", response_model=OperatorResponse)
 def create_operator(op: OperatorCreate, db: Session = Depends(get_db)):
