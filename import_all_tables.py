@@ -3,6 +3,13 @@ import os
 import glob
 from sqlalchemy import text
 from database import engine
+import models
+
+def safe_float(val, default=0.0):
+    try:
+        return float(val) if val is not None and str(val).strip() not in ["", "-"] else default
+    except (ValueError, TypeError):
+        return default
 
 def import_all_backup_tables():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +41,11 @@ def import_all_backup_tables():
 
     is_postgres = "postgresql" in str(engine.url)
 
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception:
+        pass
+
     with engine.connect() as conn:
         trans = conn.begin()
         total_inserted = 0
@@ -49,7 +61,7 @@ def import_all_backup_tables():
                     if col.lower() == "id":
                         col_defs.append(f"{col} SERIAL PRIMARY KEY" if is_postgres else f"{col} INTEGER PRIMARY KEY")
                     else:
-                        col_defs.append(f"{col} TEXT" if is_postgres else f"{col} TEXT")
+                        col_defs.append(f"{col} TEXT")
                 
                 if not is_postgres:
                     try:
@@ -76,14 +88,105 @@ def import_all_backup_tables():
                     try:
                         conn.execute(insert_sql, row)
                         inserted += 1
-                    except Exception as ie:
+                    except Exception:
                         pass
 
                 print(f"Restored table '{table_name}': {inserted} records.")
                 total_inserted += inserted
 
             trans.commit()
-            print(f"All {len(tables)} tables restored into database! (Total records: {total_inserted})")
+            print(f"All {len(tables)} backup tables restored into database!")
+
+            # Sync model tables (machines, operators, parts, production_schedules)
+            with engine.connect() as conn2:
+                t2 = conn2.begin()
+                try:
+                    # Machines
+                    machines_data = tables.get("machines", [])
+                    if machines_data:
+                        try:
+                            conn2.execute(text("DELETE FROM machines;"))
+                        except Exception:
+                            pass
+                        for m in machines_data:
+                            name = m.get("name") or m.get("machine_name") or m.get("machine")
+                            dept = m.get("dept") or m.get("department") or "General"
+                            status = m.get("status") or "Active"
+                            if name:
+                                try:
+                                    conn2.execute(text("INSERT INTO machines (name, dept, status) VALUES (:name, :dept, :status);"), {"name": name, "dept": dept, "status": status})
+                                except Exception:
+                                    pass
+
+                    # Operators
+                    operators_data = tables.get("operators", [])
+                    if operators_data:
+                        try:
+                            conn2.execute(text("DELETE FROM operators;"))
+                        except Exception:
+                            pass
+                        for o in operators_data:
+                            name = o.get("name") or o.get("operator_name") or o.get("operator")
+                            dept = o.get("dept") or o.get("department") or "General"
+                            desig = o.get("designation") or o.get("role") or "Operator"
+                            if name:
+                                try:
+                                    conn2.execute(text("INSERT INTO operators (name, dept, designation) VALUES (:name, :dept, :desig);"), {"name": name, "dept": dept, "desig": desig})
+                                except Exception:
+                                    pass
+
+                    # Parts
+                    part_masters = tables.get("part_masters", [])
+                    if part_masters:
+                        try:
+                            conn2.execute(text("DELETE FROM parts;"))
+                        except Exception:
+                            pass
+                        for p in part_masters:
+                            part_no = p.get("part_no") or p.get("partno") or p.get("part_number")
+                            cust = p.get("customer") or p.get("customer_name") or ""
+                            dept = p.get("dept") or p.get("department") or ""
+                            fam = p.get("family") or ""
+                            forge = p.get("forge_pn") or p.get("forge_part_no") or ""
+                            desc = p.get("description") or ""
+                            cyc = safe_float(p.get("cycle_time"), 0.0)
+                            va = safe_float(p.get("va"), 0.0)
+                            if part_no:
+                                try:
+                                    conn2.execute(text("INSERT INTO parts (part_no, customer, dept, family, forge_pn, description, cycle_time, va) VALUES (:part_no, :cust, :dept, :fam, :forge, :desc, :cyc, :va);"), {"part_no": part_no, "cust": cust, "dept": dept, "fam": fam, "forge": forge, "desc": desc, "cyc": cyc, "va": va})
+                                except Exception:
+                                    pass
+
+                    # Schedules
+                    schedules_data = tables.get("schedules", [])
+                    if schedules_data:
+                        try:
+                            conn2.execute(text("DELETE FROM production_schedules;"))
+                        except Exception:
+                            pass
+                        for s in schedules_data:
+                            sl_no = str(s.get("sl_no") or "")
+                            item = str(s.get("item") or "")
+                            grs_no = str(s.get("grs_no") or "")
+                            part_no = s.get("part_no") or s.get("partno") or ""
+                            total_sch_qty = int(safe_float(s.get("total_sch_qty") or s.get("sch_qty") or s.get("quantity"), 0))
+                            rate = safe_float(s.get("rate_per_pc") or s.get("rate"), 0.0)
+                            amount = safe_float(s.get("amount"), 0.0)
+                            qty_disp = int(safe_float(s.get("qty_disp") or s.get("dispatched"), 0))
+                            val_rs = safe_float(s.get("value_rs") or s.get("value"), 0.0)
+                            bal = int(safe_float(s.get("balance_to_produce") or s.get("balance"), (total_sch_qty - qty_disp)))
+                            remarks = str(s.get("remarks") or "")
+                            if part_no:
+                                try:
+                                    conn2.execute(text("INSERT INTO production_schedules (sl_no, item, grs_no, part_no, total_sch_qty, rate_per_pc, amount, qty_disp, value_rs, balance_to_produce, remarks) VALUES (:sl_no, :item, :grs_no, :part_no, :total_sch_qty, :rate, :amount, :qty_disp, :val_rs, :bal, :remarks);"), {"sl_no": sl_no, "item": item, "grs_no": grs_no, "part_no": part_no, "total_sch_qty": total_sch_qty, "rate": rate, "amount": amount, "qty_disp": qty_disp, "val_rs": val_rs, "bal": bal, "remarks": remarks})
+                                except Exception:
+                                    pass
+
+                    t2.commit()
+                    print("Synced model tables successfully!")
+                except Exception as ex2:
+                    t2.rollback()
+                    print(f"Model tables sync notice: {ex2}")
         except Exception as e:
             trans.rollback()
             print(f"Backup restoration error: {e}")
