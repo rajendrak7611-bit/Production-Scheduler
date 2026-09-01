@@ -153,27 +153,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Special case for Clear All Parts tab (Admin only)
+        // Special case for Clear All Parts tab (Admin only, visible in Part Master sub menu)
         const clearAllPartsTab = document.getElementById('clearAllPartsTab');
         if (clearAllPartsTab) {
-            if (isAdminUser) {
-                clearAllPartsTab.style.display = 'inline-block';
-                clearAllPartsTab.onclick = async () => {
-                    if (!confirm("⚠️ Are you sure you want to CLEAR ALL PARTS and Part Master records?\n\nThis action cannot be undone.")) {
-                        return;
-                    }
-                    try {
-                        const res = await fetch('/api/partmaster/clear-all', { method: 'DELETE' });
-                        const data = await res.json();
-                        alert(data.message || "All parts cleared successfully!");
-                        window.location.reload();
-                    } catch(err) {
-                        alert("Error clearing parts: " + err);
-                    }
-                };
-            } else {
-                clearAllPartsTab.style.display = 'none';
-            }
+            clearAllPartsTab.onclick = async () => {
+                if (!confirm("⚠️ Are you sure you want to CLEAR ALL PARTS and Part Master records?\n\nThis action cannot be undone.")) {
+                    return;
+                }
+                try {
+                    const res = await fetch('/api/partmaster/clear-all', { method: 'DELETE' });
+                    const data = await res.json();
+                    alert(data.message || "All parts cleared successfully!");
+                    fetchPartMasters();
+                } catch(err) {
+                    alert("Error clearing parts: " + err);
+                }
+            };
+            clearAllPartsTab.style.display = 'none';
         }
 
         // Add logout button to header actions div
@@ -1135,11 +1131,11 @@ document.addEventListener('DOMContentLoaded', () => {
             parts.forEach(p => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${p.id}</td><td>${p.customer || ''}</td><td>${p.department || ''}</td><td>${p.family}</td><td>${p.forge_pn}</td><td>${p.part_prefix || ''}</td><td>${p.partno}</td><td>${p.va || ''}</td>
-                    <td class="actions">
-                        <button class="btn btn-outline" style="margin-right: 5px;" onclick="openOperations(${p.id})">Operations</button>
-                        <button class="btn btn-edit" onclick="editPartMaster(${p.id})">Edit</button>
-                        <button class="btn btn-danger" onclick="deletePartMaster(${p.id})">Delete</button>
+                    <td>${p.id}</td><td>${escapeHtml(p.customer || '')}</td><td>${escapeHtml(p.department || '')}</td><td>${escapeHtml(p.family || '')}</td><td>${escapeHtml(p.forge_pn || '')}</td><td>${escapeHtml(p.part_prefix || '')}</td><td>${escapeHtml(p.partno || '')}</td><td>${p.va !== undefined && p.va !== null ? p.va : ''}</td>
+                    <td class="actions" style="white-space: nowrap;">
+                        <button class="btn btn-outline" style="margin-right: 4px; padding: 4px 8px; font-size: 0.8rem;" onclick="openOperations(${p.id})">Operations</button>
+                        <button class="btn btn-edit" style="margin-right: 4px; padding: 4px 8px; font-size: 0.8rem; background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; cursor: pointer;" onclick="editPartMaster(${p.id})">Edit</button>
+                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem; background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; cursor: pointer;" onclick="deletePartMaster(${p.id})">Delete</button>
                     </td>`;
                 partMasterBody.appendChild(tr);
             });
@@ -1222,13 +1218,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function openPartModal(isEdit) {
-        partModal.classList.add('show');
-        partModalTitle.textContent = isEdit ? 'Edit Part' : 'Add Part';
+        if (partModal) {
+            partModal.classList.add('active');
+            partModal.classList.add('show');
+        }
+        if (partModalTitle) partModalTitle.textContent = isEdit ? 'Edit Part' : 'Add Part';
     }
     function closePartModal() {
-        partModal.classList.remove('show');
-        partForm.reset();
-        document.getElementById('partId').value = '';
+        if (partModal) {
+            partModal.classList.remove('active');
+            partModal.classList.remove('show');
+        }
+        if (partForm) partForm.reset();
+        const partIdInput = document.getElementById('partId');
+        if (partIdInput) partIdInput.value = '';
         const prefixEl = document.getElementById('partPrefix');
         if (prefixEl) prefixEl.value = '';
     }
@@ -1268,10 +1271,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.deletePartMaster = async (id) => {
-        if (!checkAdminAccess()) return;
-        if (confirm('Delete this part master?')) {
-            await fetch(`/api/partmaster/${id}`, { method: 'DELETE' });
-            fetchPartMasters();
+        if (!confirm('Are you sure you want to delete this part master row?')) return;
+        try {
+            const res = await fetch(`/api/partmaster/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                fetchPartMasters();
+            } else {
+                alert('Failed to delete part.');
+            }
+        } catch(e) {
+            alert('Error deleting part: ' + e);
         }
     };
     window.editPartMaster = async (id) => {
