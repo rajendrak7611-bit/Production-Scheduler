@@ -329,10 +329,17 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 @app.get("/api/machines")
 def get_machines(db: Session = Depends(get_db)):
     try:
+        machines = db.query(models.Machine).all()
+        if machines:
+            return machines
+    except Exception:
+        db.rollback()
+    
+    try:
+        from sqlalchemy import text
         rows = db.execute(text("SELECT * FROM machines")).mappings().all()
         return [{"id": r.get("id"), "name": r.get("name") or r.get("machine_name") or "", "dept": r.get("dept") or r.get("department") or "General", "status": r.get("status") or "Active"} for r in rows]
-    except Exception as e:
-        print("get_machines error:", e)
+    except Exception:
         db.rollback()
         return []
 
@@ -419,10 +426,17 @@ def delete_machine(machine_id: int, db: Session = Depends(get_db)):
 @app.get("/api/operators")
 def get_operators(db: Session = Depends(get_db)):
     try:
+        operators = db.query(models.Operator).all()
+        if operators:
+            return operators
+    except Exception:
+        db.rollback()
+    
+    try:
+        from sqlalchemy import text
         rows = db.execute(text("SELECT * FROM operators")).mappings().all()
         return [{"id": r.get("id"), "name": r.get("name") or r.get("operator_name") or "", "dept": r.get("dept") or r.get("department") or "General", "designation": r.get("designation") or "Operator"} for r in rows]
-    except Exception as e:
-        print("get_operators error:", e)
+    except Exception:
         db.rollback()
         return []
 
@@ -465,17 +479,30 @@ async def import_operators_excel(file: UploadFile = File(...), db: Session = Dep
     for row in rows[1:]:
         if name_idx < len(row) and row[name_idx]:
             name = row[name_idx].strip()
+            if not name or name.upper() in ["OPERATOR", "OPERATOR NAME", "EMP NAME"]:
+                continue
             dept = row[dept_idx].strip() if dept_idx != -1 and dept_idx < len(row) and row[dept_idx] else "General"
             desig = row[desig_idx].strip() if desig_idx != -1 and desig_idx < len(row) and row[desig_idx] else "Operator"
             
             if name.upper() not in existing_op_names:
-                op = models.Operator(name=name, dept=dept, designation=desig)
-                db.add(op)
+                op_obj = models.Operator(name=name, dept=dept, designation=desig)
+                db.add(op_obj)
                 existing_op_names.add(name.upper())
                 imported_count += 1
                 
     db.commit()
     return {"imported_count": imported_count, "message": f"Successfully imported {imported_count} new operators!"}
+
+@app.put("/api/operators/{op_id}", response_model=OperatorResponse)
+def update_operator(op_id: int, op: OperatorCreate, db: Session = Depends(get_db)):
+    db_op = db.query(models.Operator).filter(models.Operator.id == op_id).first()
+    if not db_op:
+        raise HTTPException(status_code=404, detail="Operator not found")
+    for k, v in op.model_dump().items():
+        setattr(db_op, k, v)
+    db.commit()
+    db.refresh(db_op)
+    return db_op
 
 @app.delete("/api/operators/clear-all")
 def clear_all_operators(db: Session = Depends(get_db)):
@@ -483,23 +510,29 @@ def clear_all_operators(db: Session = Depends(get_db)):
     db.commit()
     return {"message": "All operators cleared successfully!"}
 
-@app.delete("/api/operators/{operator_id}")
-def delete_operator(operator_id: int, db: Session = Depends(get_db)):
-    db_op = db.query(models.Operator).filter(models.Operator.id == operator_id).first()
+@app.delete("/api/operators/{op_id}")
+def delete_operator(op_id: int, db: Session = Depends(get_db)):
+    db_op = db.query(models.Operator).filter(models.Operator.id == op_id).first()
     if not db_op:
         raise HTTPException(status_code=404, detail="Operator not found")
     db.delete(db_op)
     db.commit()
     return {"message": "Operator deleted"}
 
-# --- Parts & Operations ---
+# --- Parts ---
 @app.get("/api/parts", response_model=List[PartResponse])
 def get_parts(db: Session = Depends(get_db)):
     return db.query(models.Part).all()
 
 @app.post("/api/parts", response_model=PartResponse)
 def create_part(part: PartCreate, db: Session = Depends(get_db)):
-    db_part = models.Part(**part.model_dump())
+    ops_data = part.operations
+    part_dict = part.model_dump(exclude={"operations"})
+    db_part = models.Part(**part_dict)
+    
+    for op in ops_data:
+        db_part.operations.append(models.Operation(**op.model_dump()))
+
     db.add(db_part)
     db.commit()
     db.refresh(db_part)
@@ -514,32 +547,168 @@ async def import_parts_excel(file: UploadFile = File(...), db: Session = Depends
     
     headers = [h.lower().strip() for h in rows[0]]
     
-    part_idx = -1
-    opn_idx = -1
-    desc_idx = -1
-    cyc_idx = -1
-    mach_idx = -1
+    part_no_idx = -1
     cust_idx = -1
     dept_idx = -1
     fam_idx = -1
     forge_idx = -1
+    desc_idx = -1
+    cycle_idx = -1
+    va_idx = -1
 
     for i, h in enumerate(headers):
-        if "part" in h or "item" in h: part_idx = i
-        elif "opn" in h or "operation" in h: opn_idx = i
-        elif "desc" in h or "description" in h: desc_idx = i
-        elif "cycle" in h or "ct" in h: cyc_idx = i
-        elif "machine" in h or "mach" in h: mach_idx = i
-        elif "cust" in h or "customer" in h: cust_idx = i
+        if "part" in h or "drawing" in h: part_no_idx = i
+        elif "cust" in h: cust_idx = i
         elif "dept" in h: dept_idx = i
-        elif "family" in h or "fam" in h: fam_idx = i
+        elif "family" in h: fam_idx = i
         elif "forge" in h: forge_idx = i
+        elif "desc" in h: desc_idx = i
+        elif "cycle" in h: cycle_idx = i
+        elif "va" in h: va_idx = i
 
-    if part_idx == -1:
-        part_idx = 0
+    if part_no_idx == -1: part_no_idx = 0
 
     existing_parts = {p.part_no.strip().upper(): p for p in db.query(models.Part).all()}
-    imported_parts_count = 0
+    imported_count = 0
+
+    def safe_float(val, default=0.0):
+        try:
+            return float(val) if val else default
+        except (ValueError, TypeError):
+            return default
+
+    for row in rows[1:]:
+        if part_no_idx < len(row) and row[part_no_idx]:
+            p_no = row[part_no_idx].strip()
+            if not p_no or p_no.upper() in ["PART NO", "PART NUMBER", "DRAWING NO"]:
+                continue
+            
+            cust = row[cust_idx].strip() if cust_idx != -1 and cust_idx < len(row) and row[cust_idx] else ""
+            dept = row[dept_idx].strip() if dept_idx != -1 and dept_idx < len(row) and row[dept_idx] else ""
+            fam = row[fam_idx].strip() if fam_idx != -1 and fam_idx < len(row) and row[fam_idx] else ""
+            forge = row[forge_idx].strip() if forge_idx != -1 and forge_idx < len(row) and row[forge_idx] else ""
+            desc = row[desc_idx].strip() if desc_idx != -1 and desc_idx < len(row) and row[desc_idx] else ""
+            cycle = safe_float(row[cycle_idx]) if cycle_idx != -1 and cycle_idx < len(row) else 0.0
+            va = safe_float(row[va_idx]) if va_idx != -1 and va_idx < len(row) else 0.0
+
+            if p_no.upper() not in existing_parts:
+                new_p = models.Part(
+                    part_no=p_no, customer=cust, dept=dept, family=fam,
+                    forge_pn=forge, description=desc, cycle_time=cycle, va=va
+                )
+                db.add(new_p)
+                existing_parts[p_no.upper()] = new_p
+                imported_count += 1
+            else:
+                existing_p = existing_parts[p_no.upper()]
+                if cust: existing_p.customer = cust
+                if dept: existing_p.dept = dept
+                if fam: existing_p.family = fam
+                if forge: existing_p.forge_pn = forge
+                if desc: existing_p.description = desc
+                if cycle > 0: existing_p.cycle_time = cycle
+                if va > 0: existing_p.va = va
+
+    db.commit()
+    return {"imported_count": imported_count, "message": f"Successfully imported/updated parts master!"}
+
+@app.put("/api/parts/{part_id}", response_model=PartResponse)
+def update_part(part_id: int, part: PartCreate, db: Session = Depends(get_db)):
+    db_part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not db_part:
+        raise HTTPException(status_code=404, detail="Part not found")
+    
+    db_part.part_no = part.part_no
+    db_part.customer = part.customer
+    db_part.dept = part.dept
+    db_part.family = part.family
+    db_part.forge_pn = part.forge_pn
+    db_part.description = part.description
+    db_part.cycle_time = part.cycle_time
+    db_part.va = part.va
+
+    db.query(models.Operation).filter(models.Operation.part_id == part_id).delete()
+    for op in part.operations:
+        db_part.operations.append(models.Operation(**op.model_dump()))
+
+    db.commit()
+    db.refresh(db_part)
+    return db_part
+
+@app.delete("/api/parts/clear-all")
+def clear_all_parts(db: Session = Depends(get_db)):
+    db.query(models.Part).delete()
+    db.commit()
+    return {"message": "All parts cleared successfully!"}
+
+@app.delete("/api/parts/{part_id}")
+def delete_part(part_id: int, db: Session = Depends(get_db)):
+    db_part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not db_part:
+        raise HTTPException(status_code=404, detail="Part not found")
+    db.delete(db_part)
+    db.commit()
+    return {"message": "Part deleted"}
+
+# --- Schedules ---
+@app.get("/api/schedules")
+def get_schedules(db: Session = Depends(get_db)):
+    try:
+        schedules = db.query(models.ProductionSchedule).all()
+        if schedules:
+            parts = db.query(models.Part).all()
+            part_map = {p.part_no.strip().upper(): p for p in parts if p.part_no}
+
+            logs = db.query(models.ProductionLog).all()
+            prod_map = {}
+            for log in logs:
+                if log.part_no and log.opn_no:
+                    key = (log.part_no.strip().upper(), str(log.opn_no).strip())
+                    prod_map[key] = prod_map.get(key, 0) + (log.qty_produced or 0)
+
+            results = []
+            for sch in schedules:
+                p_key = sch.part_no.strip().upper() if sch.part_no else ""
+                part = part_map.get(p_key)
+
+                if part and part.operations and len(part.operations) > 0:
+                    for opn in part.operations:
+                        opn_str = str(opn.opn_no).strip()
+                        qty_prod = prod_map.get((p_key, opn_str), 0)
+                        bal = max(0, (sch.total_sch_qty or 0) - qty_prod)
+                        results.append({
+                            "id": sch.id,
+                            "part_no": sch.part_no,
+                            "sch_qty": sch.total_sch_qty or 0,
+                            "opn_no": opn.opn_no,
+                            "desc": opn.description or "",
+                            "qty_prod": qty_prod,
+                            "balance": bal
+                        })
+                else:
+                    qty_prod = prod_map.get((p_key, "10"), 0)
+                    bal = max(0, (sch.total_sch_qty or 0) - qty_prod)
+                    results.append({
+                        "id": sch.id,
+                        "part_no": sch.part_no,
+                        "sch_qty": sch.total_sch_qty or 0,
+                        "opn_no": "10",
+                        "desc": "General",
+                        "qty_prod": qty_prod,
+                        "balance": bal
+                    })
+
+            return results
+    except Exception:
+        db.rollback()
+
+    try:
+        from sqlalchemy import text
+        rows = db.execute(text("SELECT * FROM schedules")).mappings().all()
+        return [dict(r) for r in rows]
+    except Exception:
+        db.rollback()
+        return []
     imported_opns_count = 0
 
     def safe_num(val):
