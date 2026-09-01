@@ -143,9 +143,9 @@ def import_all_backup_tables():
                         except Exception:
                             pass
                         for p in part_masters:
-                            part_no = p.get("part_no") or p.get("partno") or p.get("part_number")
+                            part_no = p.get("partno") or p.get("part_no") or p.get("part_number")
                             cust = p.get("customer") or p.get("customer_name") or ""
-                            dept = p.get("dept") or p.get("department") or ""
+                            dept = p.get("department") or p.get("dept") or ""
                             fam = p.get("family") or ""
                             forge = p.get("forge_pn") or p.get("forge_part_no") or ""
                             desc = p.get("description") or ""

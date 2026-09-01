@@ -533,7 +533,7 @@ def delete_operator(op_id: int, db: Session = Depends(get_db)):
 @app.get("/api/partmaster")
 def get_partmasters(db: Session = Depends(get_db)):
     try:
-        rows = db.execute(text("SELECT * FROM part_masters")).mappings().all()
+        rows = db.execute(text("SELECT * FROM part_masters ORDER BY CASE WHEN customer IS NOT NULL AND customer != '' THEN 0 ELSE 1 END, id ASC")).mappings().all()
         results = []
         for r in rows:
             p_no = r.get("partno") or r.get("part_no") or r.get("part_number") or ""
@@ -557,7 +557,7 @@ def get_partmasters(db: Session = Depends(get_db)):
         db.rollback()
 
     try:
-        rows = db.execute(text("SELECT * FROM parts")).mappings().all()
+        rows = db.execute(text("SELECT * FROM parts ORDER BY CASE WHEN customer IS NOT NULL AND customer != '' THEN 0 ELSE 1 END, id ASC")).mappings().all()
         results = []
         for r in rows:
             p_no = r.get("part_no") or r.get("partno") or ""
