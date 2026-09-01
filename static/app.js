@@ -153,6 +153,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Special case for Clear All Parts tab (Admin only)
+        const clearAllPartsTab = document.getElementById('clearAllPartsTab');
+        if (clearAllPartsTab) {
+            if (isAdminUser) {
+                clearAllPartsTab.style.display = 'inline-block';
+                clearAllPartsTab.onclick = async () => {
+                    if (!confirm("⚠️ Are you sure you want to CLEAR ALL PARTS and Part Master records?\n\nThis action cannot be undone.")) {
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/partmaster/clear-all', { method: 'DELETE' });
+                        const data = await res.json();
+                        alert(data.message || "All parts cleared successfully!");
+                        window.location.reload();
+                    } catch(err) {
+                        alert("Error clearing parts: " + err);
+                    }
+                };
+            } else {
+                clearAllPartsTab.style.display = 'none';
+            }
+        }
+
         // Add logout button to header actions div
         const actionDiv = document.getElementById('headerActions');
         if (actionDiv && !document.getElementById('logoutBtn')) {

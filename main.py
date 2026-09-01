@@ -530,6 +530,27 @@ def delete_operator(op_id: int, db: Session = Depends(get_db)):
     return {"message": "Operator deleted"}
 
 # --- Part Master API ---
+@app.delete("/api/partmaster/clear-all")
+@app.post("/api/partmaster/clear-all")
+def clear_all_parts(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM part_masters;"))
+    except Exception:
+        pass
+    try:
+        db.execute(text("DELETE FROM parts;"))
+    except Exception:
+        pass
+    try:
+        db.execute(text("DELETE FROM part_operations;"))
+    except Exception:
+        pass
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"success": True, "message": "All parts cleared successfully!"}
+
 @app.get("/api/partmaster")
 def get_partmasters(db: Session = Depends(get_db)):
     try:
