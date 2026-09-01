@@ -598,36 +598,95 @@ def get_partmaster_by_id(part_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/partmaster/{part_id}/operations")
 def get_partmaster_operations(part_id: int, db: Session = Depends(get_db)):
+    # 1. Search part_operations by part_id
     try:
-        rows = db.execute(text("SELECT * FROM part_operations WHERE part_id = :part_id"), {"part_id": part_id}).mappings().all()
-        results = []
-        for r in rows:
-            results.append({
-                "id": r.get("id"),
-                "part_id": r.get("part_id"),
-                "opn_no": str(r.get("opn_no") or ""),
-                "description": r.get("description") or "",
-                "machine": r.get("machine") or r.get("machine_name") or "",
-                "cycle_time": r.get("cycle_time") or 0.0
-            })
-        return results
+        rows = db.execute(text("SELECT * FROM part_operations WHERE CAST(part_id AS TEXT) = :part_id_str ORDER BY id ASC"), {"part_id_str": str(part_id)}).mappings().all()
+        if rows:
+            results = []
+            for r in rows:
+                results.append({
+                    "id": r.get("id"),
+                    "part_id": part_id,
+                    "opn_no": str(r.get("opn_no") or ""),
+                    "description": r.get("description") or "",
+                    "machine": r.get("machine") or r.get("machine_name") or "",
+                    "cycle_time": float(r.get("cycle_time") or 0.0)
+                })
+            return results
     except Exception as e:
-        print("get_partmaster_operations error:", e)
         db.rollback()
-        return []
+
+    # 2. Search operations by part_id
+    try:
+        rows = db.execute(text("SELECT * FROM operations WHERE CAST(part_id AS TEXT) = :part_id_str ORDER BY id ASC"), {"part_id_str": str(part_id)}).mappings().all()
+        if rows:
+            results = []
+            for r in rows:
+                results.append({
+                    "id": r.get("id"),
+                    "part_id": part_id,
+                    "opn_no": str(r.get("opn_no") or ""),
+                    "description": r.get("description") or "",
+                    "machine": r.get("machine_name") or r.get("machine") or "",
+                    "cycle_time": float(r.get("cycle_time") or 0.0)
+                })
+            return results
+    except Exception as e:
+        db.rollback()
+
+    # 3. Fallback by matching partno
+    try:
+        pm_rows = db.execute(text("SELECT * FROM part_masters WHERE id = :id"), {"id": part_id}).mappings().all()
+        if pm_rows:
+            p_no = pm_rows[0].get("partno") or pm_rows[0].get("part_no") or ""
+            if p_no:
+                part_rows = db.execute(text("SELECT id FROM parts WHERE part_no = :p_no"), {"p_no": p_no}).mappings().all()
+                if part_rows:
+                    real_pid = part_rows[0].get("id")
+                    rows = db.execute(text("SELECT * FROM operations WHERE part_id = :pid ORDER BY id ASC"), {"pid": real_pid}).mappings().all()
+                    if rows:
+                        results = []
+                        for r in rows:
+                            results.append({
+                                "id": r.get("id"),
+                                "part_id": part_id,
+                                "opn_no": str(r.get("opn_no") or ""),
+                                "description": r.get("description") or "",
+                                "machine": r.get("machine_name") or r.get("machine") or "",
+                                "cycle_time": float(r.get("cycle_time") or 0.0)
+                            })
+                        return results
+    except Exception:
+        db.rollback()
+
+    return []
 
 @app.post("/api/partmaster/{part_id}/operations")
 def save_partmaster_operations(part_id: int, ops: List[dict], db: Session = Depends(get_db)):
     try:
-        db.execute(text("DELETE FROM part_operations WHERE part_id = :part_id"), {"part_id": part_id})
+        db.execute(text("DELETE FROM part_operations WHERE CAST(part_id AS TEXT) = :part_id_str"), {"part_id_str": str(part_id)})
+        try:
+            db.execute(text("DELETE FROM operations WHERE CAST(part_id AS TEXT) = :part_id_str"), {"part_id_str": str(part_id)})
+        except Exception:
+            pass
         for op in ops:
             db.execute(text("INSERT INTO part_operations (part_id, opn_no, description, machine, cycle_time) VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)"), {
-                "part_id": part_id,
+                "part_id": str(part_id),
                 "opn_no": str(op.get("opn_no") or ""),
                 "description": op.get("description") or "",
                 "machine": op.get("machine") or op.get("machine_name") or "",
                 "cycle_time": float(op.get("cycle_time") or 0)
             })
+            try:
+                db.execute(text("INSERT INTO operations (part_id, opn_no, description, machine_name, cycle_time) VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)"), {
+                    "part_id": part_id,
+                    "opn_no": str(op.get("opn_no") or ""),
+                    "description": op.get("description") or "",
+                    "machine": op.get("machine") or op.get("machine_name") or "",
+                    "cycle_time": float(op.get("cycle_time") or 0)
+                })
+            except Exception:
+                pass
         db.commit()
         return {"message": "Operations saved successfully"}
     except Exception as e:

@@ -142,6 +142,7 @@ def import_all_backup_tables():
                         except Exception:
                             pass
                         for p in part_masters:
+                            pid = int(safe_float(p.get("id"), 0))
                             part_no = p.get("partno") or p.get("part_no") or p.get("part_number")
                             cust = p.get("customer") or p.get("customer_name") or ""
                             dept = p.get("department") or p.get("dept") or ""
@@ -152,7 +153,35 @@ def import_all_backup_tables():
                             va = safe_float(p.get("va"), 0.0)
                             if part_no:
                                 try:
-                                    conn2.execute(text("INSERT INTO parts (part_no, customer, dept, family, forge_pn, description, cycle_time, va) VALUES (:part_no, :cust, :dept, :fam, :forge, :desc, :cyc, :va);"), {"part_no": part_no, "cust": cust, "dept": dept, "fam": fam, "forge": forge, "desc": desc, "cyc": cyc, "va": va})
+                                    if pid:
+                                        conn2.execute(text("INSERT INTO parts (id, part_no, customer, dept, family, forge_pn, description, cycle_time, va) VALUES (:id, :part_no, :cust, :dept, :fam, :forge, :desc, :cyc, :va);"), {"id": pid, "part_no": part_no, "cust": cust, "dept": dept, "fam": fam, "forge": forge, "desc": desc, "cyc": cyc, "va": va})
+                                    else:
+                                        conn2.execute(text("INSERT INTO parts (part_no, customer, dept, family, forge_pn, description, cycle_time, va) VALUES (:part_no, :cust, :dept, :fam, :forge, :desc, :cyc, :va);"), {"part_no": part_no, "cust": cust, "dept": dept, "fam": fam, "forge": forge, "desc": desc, "cyc": cyc, "va": va})
+                                except Exception:
+                                    pass
+
+                    # Operations
+                    part_operations_data = tables.get("part_operations", [])
+                    if part_operations_data:
+                        try:
+                            conn2.execute(text("DELETE FROM operations;"))
+                        except Exception:
+                            pass
+                        for op in part_operations_data:
+                            pid = int(safe_float(op.get("part_id"), 0))
+                            opn = str(op.get("opn_no") or "")
+                            desc = op.get("description") or ""
+                            mc = op.get("machine") or op.get("machine_name") or ""
+                            cyc = safe_float(op.get("cycle_time"), 0.0)
+                            if pid and opn:
+                                try:
+                                    conn2.execute(text("INSERT INTO operations (part_id, opn_no, description, machine_name, cycle_time) VALUES (:part_id, :opn_no, :description, :machine_name, :cycle_time);"), {
+                                        "part_id": pid,
+                                        "opn_no": opn,
+                                        "description": desc,
+                                        "machine_name": mc,
+                                        "cycle_time": cyc
+                                    })
                                 except Exception:
                                     pass
 
