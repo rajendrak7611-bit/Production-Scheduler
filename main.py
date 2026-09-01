@@ -329,15 +329,12 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 @app.get("/api/machines")
 def get_machines(db: Session = Depends(get_db)):
     try:
-        return db.query(models.Machine).all()
+        machines = db.query(models.Machine).all()
+        return [{"id": m.id, "name": m.name, "dept": m.dept or "General", "status": m.status or "Active"} for m in machines]
     except Exception as e:
         print("get_machines error:", e)
         db.rollback()
-        try:
-            models.Base.metadata.create_all(bind=engine)
-            return db.query(models.Machine).all()
-        except Exception:
-            return []
+        return []
 
 @app.post("/api/machines", response_model=MachineResponse)
 def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
@@ -422,15 +419,12 @@ def delete_machine(machine_id: int, db: Session = Depends(get_db)):
 @app.get("/api/operators")
 def get_operators(db: Session = Depends(get_db)):
     try:
-        return db.query(models.Operator).all()
+        operators = db.query(models.Operator).all()
+        return [{"id": o.id, "name": o.name, "dept": o.dept or "General", "designation": o.designation or "Operator"} for o in operators]
     except Exception as e:
         print("get_operators error:", e)
         db.rollback()
-        try:
-            models.Base.metadata.create_all(bind=engine)
-            return db.query(models.Operator).all()
-        except Exception:
-            return []
+        return []
 
 @app.post("/api/operators", response_model=OperatorResponse)
 def create_operator(op: OperatorCreate, db: Session = Depends(get_db)):
