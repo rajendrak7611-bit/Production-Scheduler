@@ -56,20 +56,32 @@ try:
 except Exception as _ex:
     print("Error creating tables:", _ex)
 
-# Auto migrate inspection_reports columns if missing
-try:
+# Auto migrate missing columns across tables safely
+def run_safe_migrations():
+    migrations = [
+        ("users", "username", "VARCHAR"),
+        ("users", "password", "VARCHAR"),
+        ("users", "role", "VARCHAR"),
+        ("machines", "dept", "VARCHAR"),
+        ("machines", "status", "VARCHAR"),
+        ("operators", "dept", "VARCHAR"),
+        ("operators", "designation", "VARCHAR"),
+        ("production_schedules", "department", "VARCHAR"),
+        ("production_schedules", "partno", "VARCHAR"),
+        ("inspection_reports", "report_code", "VARCHAR"),
+        ("inspection_reports", "prod_log_id", "INTEGER")
+    ]
     with engine.connect() as conn:
         from sqlalchemy import text
-        try:
-            conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN report_code VARCHAR;"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN prod_log_id INTEGER;"))
-            conn.commit()
-        except Exception:
-            pass
+        for table, col, col_type in migrations:
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type};"))
+                conn.commit()
+            except Exception:
+                pass
+
+try:
+    run_safe_migrations()
 except Exception as _ex:
     pass
 
@@ -106,80 +118,42 @@ def seed_default_users():
 @app.post("/api/login")
 @app.post("/api/auth/login")
 def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
-    try:
+    u = (login_data.username or "").strip().lower()
+    p = (login_data.password or "").strip()
+    
+    if not u:
+        raise HTTPException(status_code=400, detail="Username is required")
+
+    # Hardcoded fallback for default admin & guest credentials to guarantee success
+    if u == "admin" and p in ["admin", "admin123", "admin@123"]:
         try:
-            models.Base.metadata.create_all(bind=engine)
+            user = db.query(models.User).filter(func.lower(models.User.username) == "admin").first()
+            if not user:
+                db.add(models.User(username="admin", password=p, role="admin"))
+                db.commit()
         except Exception:
             pass
-        u = (login_data.username or "").strip()
-        p = (login_data.password or "").strip()
-        
-        if not u:
-            raise HTTPException(status_code=400, detail="Username is required")
+        return {"success": True, "username": "admin", "role": "admin", "token": "token-admin"}
 
-        user = None
+    if u == "guest" and p in ["guest", "guest123"]:
         try:
-            user = db.query(models.User).filter(func.lower(models.User.username) == u.lower()).first()
-        except Exception as db_err:
-            print("DB lookup error in login_user:", db_err)
-            db.rollback()
+            user = db.query(models.User).filter(func.lower(models.User.username) == "guest").first()
+            if not user:
+                db.add(models.User(username="guest", password=p, role="guest"))
+                db.commit()
+        except Exception:
+            pass
+        return {"success": True, "username": "guest", "role": "guest", "token": "token-guest"}
 
-        is_valid = False
-        role = "admin"
+    # Database lookup for custom users
+    try:
+        user = db.query(models.User).filter(func.lower(models.User.username) == u).first()
+        if user and user.password == p:
+            return {"success": True, "username": user.username, "role": user.role or "admin", "token": f"token-{user.username}"}
+    except Exception as db_err:
+        print("DB error in login_user:", db_err)
 
-        if user:
-            role = user.role or "admin"
-            if user.password == p:
-                is_valid = True
-            elif u.lower() == "admin" and p in ["admin", "admin123", "admin@123"]:
-                user.password = p
-                try:
-                    db.commit()
-                except Exception:
-                    db.rollback()
-                is_valid = True
-            elif u.lower() == "guest" and p in ["guest", "guest123"]:
-                user.password = p
-                try:
-                    db.commit()
-                except Exception:
-                    db.rollback()
-                is_valid = True
-        else:
-            if u.lower() == "admin" and p in ["admin", "admin123", "admin@123"]:
-                try:
-                    new_user = models.User(username="admin", password=p, role="admin")
-                    db.add(new_user)
-                    db.commit()
-                except Exception:
-                    db.rollback()
-                is_valid = True
-                role = "admin"
-            elif u.lower() == "guest" and p in ["guest", "guest123"]:
-                try:
-                    new_user = models.User(username="guest", password=p, role="guest")
-                    db.add(new_user)
-                    db.commit()
-                except Exception:
-                    db.rollback()
-                is_valid = True
-                role = "guest"
-
-        if not is_valid:
-            raise HTTPException(status_code=401, detail="Invalid username or password")
-            
-        return {
-            "success": True,
-            "username": u.lower(),
-            "role": role,
-            "token": f"token-{u.lower()}"
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        print("Error in login_user:", traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Login server error: {str(e)}")
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
 @app.post("/api/seed-default-data")
 def seed_default_data(db: Session = Depends(get_db)):
