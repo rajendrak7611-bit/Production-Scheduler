@@ -919,11 +919,11 @@ header .logo h1 {
 }
 
 .sub-group {
-    display: flex !important;
-    gap: 6px !important;
-    flex-wrap: wrap !important;
-    align-items: center !important;
-    width: 100% !important;
+    display: none;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
 }
 
 .danger-tab {

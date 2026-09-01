@@ -207,10 +207,17 @@ document.addEventListener('DOMContentLoaded', () => {
             targetInitialTab = firstAvailableTab;
         }
 
-        if (targetInitialTab && (userObj.role !== 'admin' || accessibleScreens.includes('insertissue'))) {
+        if (targetInitialTab) {
             setTimeout(() => {
                 targetInitialTab.click();
             }, 100);
+        } else {
+            const masterTab = document.getElementById('sidebarMaster');
+            if (masterTab) {
+                setTimeout(() => {
+                    masterTab.click();
+                }, 100);
+            }
         }
     }
 
