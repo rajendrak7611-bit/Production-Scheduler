@@ -193,6 +193,52 @@ document.addEventListener('DOMContentLoaded', () => {
             clearAllPartsTab.style.display = 'none';
         }
 
+        // Inventory Submenu Action Tabs
+        const addReceiptTab = document.getElementById('addReceiptTab');
+        if (addReceiptTab) {
+            addReceiptTab.onclick = () => {
+                currentTab = 'rm_receipt';
+                if (addBtn) addBtn.click();
+            };
+            addReceiptTab.style.display = 'none';
+        }
+
+        const addDespatchTab = document.getElementById('addDespatchTab');
+        if (addDespatchTab) {
+            addDespatchTab.onclick = () => {
+                currentTab = 'rm_despatch';
+                if (addBtn) addBtn.click();
+            };
+            addDespatchTab.style.display = 'none';
+        }
+
+        const addRmTab = document.getElementById('addRmTab');
+        if (addRmTab) {
+            addRmTab.onclick = () => {
+                currentTab = 'rawmaterial';
+                if (addBtn) addBtn.click();
+            };
+            addRmTab.style.display = 'none';
+        }
+
+        const sendToHtTab = document.getElementById('sendToHtTab');
+        if (sendToHtTab) {
+            sendToHtTab.onclick = () => {
+                currentTab = 'ht';
+                if (addBtn) addBtn.click();
+            };
+            sendToHtTab.style.display = 'none';
+        }
+
+        const sendToPcTab = document.getElementById('sendToPcTab');
+        if (sendToPcTab) {
+            sendToPcTab.onclick = () => {
+                currentTab = 'pc';
+                if (addBtn) addBtn.click();
+            };
+            sendToPcTab.style.display = 'none';
+        }
+
         // Add logout button to header actions div
         const actionDiv = document.getElementById('headerActions');
         if (actionDiv && !document.getElementById('logoutBtn')) {
@@ -385,12 +431,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.querySelectorAll('.main-tab').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.sub-tab').forEach(btn => btn.classList.remove('active'));
-        importBtn.style.display = 'none';
-        if (addBtn) addBtn.style.display = 'none';
-        const addPartBtnTab = document.getElementById('addPartTab');
-        if (addPartBtnTab) addPartBtnTab.style.display = 'none';
-        const clearBtn = document.getElementById('clearAllPartsTab');
-        if (clearBtn) clearBtn.style.display = 'none';
+        ['addPartTab', 'clearAllPartsTab', 'addReceiptTab', 'addDespatchTab', 'addRmTab', 'sendToHtTab', 'sendToPcTab'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
     }
 
     function hideAllSubmenus() {
@@ -418,8 +462,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (submenu) {
                     submenu.style.display = 'flex';
-                    // Auto-click first visible tab in submenu
-                    const visibleTabs = Array.from(submenu.querySelectorAll('.sub-tab')).filter(t => t.style.display !== 'none');
+                    // Auto-click first visible tab in submenu (ignore action tabs)
+                    const visibleTabs = Array.from(submenu.querySelectorAll('.sub-tab:not(.action-tab)')).filter(t => t.style.display !== 'none');
                     if (visibleTabs.length > 0) {
                         visibleTabs[0].click();
                     }
@@ -549,33 +593,36 @@ document.addEventListener('DOMContentLoaded', () => {
         'sidebarHt': { tab: 'ht', action: () => {
             if (htSection) htSection.style.display = 'block';
             importBtn.style.display = 'none';
-            addBtn.style.display = 'inline-flex';
-            addBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Send to HT';
+            const sendToHtBtnTab = document.getElementById('sendToHtTab');
+            if (sendToHtBtnTab) sendToHtBtnTab.style.display = 'inline-block';
             fetchHtData();
         }},
         'sidebarPc': { tab: 'pc', action: () => {
             const pcSection = document.getElementById('pcSection');
             if (pcSection) pcSection.style.display = 'block';
             importBtn.style.display = 'none';
-            addBtn.style.display = 'inline-flex';
-            addBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Send to PC';
+            const sendToPcBtnTab = document.getElementById('sendToPcTab');
+            if (sendToPcBtnTab) sendToPcBtnTab.style.display = 'inline-block';
             fetchPcData();
         }},
         'sidebarRmReceipt': { tab: 'rm_receipt', action: () => { 
             if (rmReceiptSection) rmReceiptSection.style.display = 'block';
-            addBtn.innerHTML = '<i class="fas fa-plus"></i> Add Receipt';
+            const addReceiptBtnTab = document.getElementById('addReceiptTab');
+            if (addReceiptBtnTab) addReceiptBtnTab.style.display = 'inline-block';
             importBtn.style.display = 'inline-flex';
             fetchRmLogs('receipt');
         }},
         'sidebarRmDespatch': { tab: 'rm_despatch', action: () => { 
             if (rmDespatchSection) rmDespatchSection.style.display = 'block';
-            addBtn.innerHTML = '<i class="fas fa-plus"></i> Add Despatch';
+            const addDespatchBtnTab = document.getElementById('addDespatchTab');
+            if (addDespatchBtnTab) addDespatchBtnTab.style.display = 'inline-block';
             importBtn.style.display = 'inline-flex';
             fetchRmLogs('despatch');
         }},
         'sidebarRmMaster': { tab: 'rawmaterial', action: () => { 
             if (rawMaterialsSection) rawMaterialsSection.style.display = 'block';
-            addBtn.innerHTML = '<i class="fas fa-plus"></i> Add Raw Material';
+            const addRmBtnTab = document.getElementById('addRmTab');
+            if (addRmBtnTab) addRmBtnTab.style.display = 'inline-block';
             importBtn.style.display = 'inline-flex';
             fetchRawMaterials();
         }},
@@ -756,11 +803,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }}
     };
 
-    document.querySelectorAll('.sub-tab').forEach(tab => {
+    document.querySelectorAll('.sub-tab:not(.action-tab)').forEach(tab => {
         tab.addEventListener('click', (e) => {
             e.preventDefault();
             hideAllSections();
-            document.querySelectorAll('.sub-tab').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.sub-tab:not(.action-tab)').forEach(btn => btn.classList.remove('active'));
             tab.classList.add('active');
             
             const config = subTabs[tab.id];
