@@ -5027,27 +5027,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let prodLogAllPartMasters = [];
     let currentPartOperations = [];
 
-    let prodLogPartNoTomSelect = null;
-
-    function initProdLogPartNoTomSelect() {
-        const selectEl = document.getElementById('prodLogPartNo');
-        if (!selectEl) return;
-        if (prodLogPartNoTomSelect) {
-            try { prodLogPartNoTomSelect.destroy(); } catch (e) {}
-            prodLogPartNoTomSelect = null;
-        }
-        if (window.TomSelect) {
-            prodLogPartNoTomSelect = new TomSelect(selectEl, {
-                create: false,
-                maxItems: 1,
-                placeholder: 'Type to search Part No...',
-                allowEmptyOption: true,
-                sortField: { field: 'text', direction: 'asc' },
-                onChange: async (val) => {
-                    await handleProdLogPartChange(val);
-                }
-            });
-        }
+    let prodLogPartNoSelect = null;
+    const prodLogPartNoEl = document.getElementById('prodLogPartNo');
+    if (prodLogPartNoEl && window.TomSelect) {
+        prodLogPartNoSelect = new TomSelect(prodLogPartNoEl, {
+            create: false,
+            sortField: { field: "text", direction: "asc" },
+            placeholder: "Type to search Part No...",
+            allowEmptyOption: true,
+            onChange: async (val) => {
+                await handleProdLogPartChange(val);
+            }
+        });
     }
 
     async function handleProdLogPartChange(partno) {
@@ -5090,9 +5081,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateProdLogPartList(dept = '') {
-        const selectEl = document.getElementById('prodLogPartNo');
-        if (!selectEl) return;
-
         const deptUpper = (dept || '').trim().toUpperCase();
         const partNoSet = new Set();
 
@@ -5107,25 +5095,27 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. Always include ALL Part Master parts as fallback so user can search any part
         prodLogAllPartMasters.forEach(p => p.partno && partNoSet.add(String(p.partno).trim()));
 
-        const sortedParts = Array.from(partNoSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+        const sortedParts = Array.from(partNoSet).filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-        if (prodLogPartNoTomSelect) {
-            prodLogPartNoTomSelect.clear();
-            prodLogPartNoTomSelect.clearOptions();
-            prodLogPartNoTomSelect.addOption({ value: '', text: '-- Select Part No --' });
+        if (prodLogPartNoSelect) {
+            prodLogPartNoSelect.clear();
+            prodLogPartNoSelect.clearOptions();
+            prodLogPartNoSelect.addOption({ value: '', text: '-- Select Part No --' });
             sortedParts.forEach(p => {
-                prodLogPartNoTomSelect.addOption({ value: p, text: p });
+                prodLogPartNoSelect.addOption({ value: p, text: p });
             });
-            prodLogPartNoTomSelect.refreshOptions(false);
+            prodLogPartNoSelect.refreshOptions(false);
         } else {
-            selectEl.innerHTML = '<option value="">-- Select Part No --</option>';
-            sortedParts.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p;
-                opt.textContent = p;
-                selectEl.appendChild(opt);
-            });
-            initProdLogPartNoTomSelect();
+            const selectEl = document.getElementById('prodLogPartNo');
+            if (selectEl) {
+                selectEl.innerHTML = '<option value="">-- Select Part No --</option>';
+                sortedParts.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    opt.textContent = p;
+                    selectEl.appendChild(opt);
+                });
+            }
         }
     }
 
@@ -5183,7 +5173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (prodLogPartNoTomSelect) prodLogPartNoTomSelect.clear();
+        if (prodLogPartNoSelect) prodLogPartNoSelect.clear();
         else if (document.getElementById('prodLogPartNo')) document.getElementById('prodLogPartNo').value = '';
 
         updateProdLogPartList(deptUpper);
@@ -5230,7 +5220,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('prodLogPartNo')?.addEventListener('change', async (e) => {
-        if (!prodLogPartNoTomSelect) {
+        if (!prodLogPartNoSelect) {
             await handleProdLogPartChange(e.target.value);
         }
     });
@@ -5474,7 +5464,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 machine: document.getElementById('prodLogMachine').value,
                 operator: isIdle ? "" : document.getElementById('prodLogOperator').value,
                 multiple_mc: isIdle ? 1 : (parseInt(document.getElementById('prodLogMultipleMc').value) || 1),
-                partno: isIdle ? "MACHINE IDLE" : (prodLogPartNoTomSelect ? prodLogPartNoTomSelect.getValue() : (document.getElementById('prodLogPartNo')?.value || '')),
+                partno: isIdle ? "MACHINE IDLE" : (prodLogPartNoSelect ? prodLogPartNoSelect.getValue() : (document.getElementById('prodLogPartNo')?.value || '')),
                 opn_no: isIdle ? "IDLE" : document.getElementById('prodLogOpnNo').value,
                 description: isIdle ? (document.getElementById('prodLogIdleReason').value || "Machine Idle") : document.getElementById('prodLogDescription').value,
                 cycle_time: isIdle ? 0 : (parseFloat(document.getElementById('prodLogCycleTime').value) || 0),

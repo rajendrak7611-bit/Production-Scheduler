@@ -970,4 +970,53 @@ header .logo h1 {
     box-shadow: 0 1px 3px rgba(30, 64, 175, 0.25) !important;
 }
 
+/* TomSelect Global Styles */
+select.tomselected, .tomselected {
+    display: none !important;
+}
+
+.ts-wrapper {
+    width: 100% !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+.ts-control {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid var(--border-color, #cbd5e1) !important;
+    border-radius: 8px !important;
+    color: var(--text-main, #0f172a) !important;
+    font-family: 'Inter', sans-serif !important;
+    padding: 0.4rem 0.6rem !important;
+    font-size: 0.9rem !important;
+    min-height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.ts-control input {
+    color: var(--text-main, #0f172a) !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.9rem !important;
+}
+
+.ts-dropdown {
+    z-index: 10000 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+    border: 1px solid var(--border-color, #cbd5e1) !important;
+    background: #ffffff !important;
+}
+
+.ts-dropdown .option {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.88rem !important;
+    cursor: pointer !important;
+}
+
+.ts-dropdown .option:hover, .ts-dropdown .active {
+    background-color: #e0e7ff !important;
+    color: #1e40af !important;
+}
+
+
 
