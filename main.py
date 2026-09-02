@@ -2145,18 +2145,30 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Production Logging CRUD ---
+def normalize_date_str(d_str: str) -> str:
+    if not d_str:
+        return datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    d_str = d_str.strip()
+    m = re.match(r"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$", d_str)
+    if m:
+        return f"{int(m.group(1)):04d}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+    m = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$", d_str)
+    if m:
+        return f"{int(m.group(3)):04d}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
+    return d_str
+
 @app.get("/api/prodlog")
 @app.get("/api/production-logs")
 def get_all_prod_logs(db: Session = Depends(get_db)):
     try:
-        rows = db.execute(text("SELECT * FROM production_logs ORDER BY id DESC")).mappings().all()
+        rows = db.execute(text("SELECT * FROM production_logs ORDER BY date DESC, id DESC")).mappings().all()
         if rows:
             results = []
             for r in rows:
                 results.append({
                     "id": r.get("id"),
                     "dept": r.get("dept") or "",
-                    "date": r.get("date") or r.get("log_date") or "",
+                    "date": normalize_date_str(r.get("date") or r.get("log_date") or ""),
                     "shift": r.get("shift") or "",
                     "setter": r.get("setter") or "",
                     "machine": r.get("machine") or r.get("machine_name") or "",
@@ -2183,11 +2195,11 @@ def get_all_prod_logs(db: Session = Depends(get_db)):
         db.rollback()
 
     try:
-        logs = db.query(models.ProductionLog).order_by(models.ProductionLog.id.desc()).all()
+        logs = db.query(models.ProductionLog).order_by(models.ProductionLog.date.desc(), models.ProductionLog.id.desc()).all()
         return [{
             "id": l.id,
             "dept": getattr(l, "dept", "") or "",
-            "date": getattr(l, "date", "") or getattr(l, "log_date", "") or "",
+            "date": normalize_date_str(getattr(l, "date", "") or getattr(l, "log_date", "") or ""),
             "shift": l.shift or "",
             "setter": getattr(l, "setter", "") or "",
             "machine": getattr(l, "machine", "") or getattr(l, "machine_name", "") or "",
@@ -2217,7 +2229,7 @@ def get_all_prod_logs(db: Session = Depends(get_db)):
 @app.post("/api/production-logs")
 def create_prod_log(data: dict, db: Session = Depends(get_db)):
     dept = (data.get("dept") or "").strip()
-    date_val = (data.get("date") or data.get("log_date") or "").strip()
+    date_val = normalize_date_str(data.get("date") or data.get("log_date") or "")
     shift = (data.get("shift") or "").strip()
     setter = (data.get("setter") or "").strip()
     machine = (data.get("machine") or data.get("machine_name") or "").strip()
@@ -2239,17 +2251,19 @@ def create_prod_log(data: dict, db: Session = Depends(get_db)):
     multiple_mc = int(data.get("multiple_mc") or 1)
 
     try:
-        db.execute(text("SELECT setval(pg_get_serial_sequence('production_logs', 'id'), coalesce(max(id),0) + 1, false) FROM production_logs;"))
+        db.execute(text("SELECT setval(pg_get_serial_sequence('production_logs', 'id'), coalesce(max(id),4420) + 1, false) FROM production_logs;"))
         db.commit()
     except Exception:
         db.rollback()
 
     try:
-        max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM production_logs")).mappings().first()
-        next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        max_row = db.execute(text("SELECT COALESCE(MAX(id), 4420) + 1 AS next_id FROM production_logs")).mappings().first()
+        next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 4421
+        if next_id <= 4420:
+            next_id = 4421
     except Exception:
         db.rollback()
-        next_id = 1
+        next_id = 4421
 
     params = {
         "id": next_id,
@@ -2302,7 +2316,7 @@ def update_prod_log(log_id: int, data: dict, db: Session = Depends(get_db)):
     params = {
         "id": log_id,
         "dept": (data.get("dept") or "").strip(),
-        "date": (data.get("date") or data.get("log_date") or "").strip(),
+        "date": normalize_date_str(data.get("date") or data.get("log_date") or ""),
         "shift": (data.get("shift") or "").strip(),
         "setter": (data.get("setter") or "").strip(),
         "machine": (data.get("machine") or data.get("machine_name") or "").strip(),

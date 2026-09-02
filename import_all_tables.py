@@ -455,7 +455,7 @@ def import_all_backup_tables():
                     prod_logs_data = tables.get("production_logs", [])
                     if prod_logs_data:
                         try:
-                            conn2.execute(text("DELETE FROM production_logs WHERE date <= '2026-08-31' OR date IS NULL;"))
+                            conn2.execute(text("DELETE FROM production_logs WHERE id <= 4420;"))
                         except Exception:
                             pass
                         for pl in prod_logs_data:
