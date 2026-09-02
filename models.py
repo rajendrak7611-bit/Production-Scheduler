@@ -194,6 +194,17 @@ class InspectionReport(Base):
     batch_qty = Column(Integer, default=30)
     machine_name = Column(String, nullable=True)
     operator_name = Column(String, nullable=True)
-    inspection_date = Column(String, nullable=True)
     comp_sl_nos = Column(Text, nullable=True)  # Comma-separated component serial numbers, e.g. "10,11,12,13,14"
     readings_json = Column(Text, nullable=True) # JSON string mapping param_id -> { col_0: val, col_1: val ... }
+
+class Attendance(Base):
+    __tablename__ = "attendances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_name = Column(String, index=True, nullable=False)
+    dept = Column(String, nullable=True)
+    designation = Column(String, default="Operator")
+    month_year = Column(String, index=True, nullable=False)  # YYYY-MM
+    day = Column(Integer, nullable=False)                     # 1-31
+    hours = Column(String, default="0")
+    created_at = Column(DateTime, default=get_now_ist)

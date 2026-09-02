@@ -421,6 +421,36 @@ def import_all_backup_tables():
                                     except Exception:
                                         pass
 
+                    # Attendances
+                    att_data = tables.get("attendances", [])
+                    if att_data:
+                        try:
+                            conn2.execute(text("DELETE FROM attendances;"))
+                        except Exception:
+                            pass
+                        for a in att_data:
+                            aid = int(safe_float(a.get("id"), 0))
+                            ename = (a.get("employee_name") or a.get("name") or "").strip()
+                            dept = (a.get("dept") or a.get("department") or "").strip()
+                            desig = (a.get("designation") or "Operator").strip()
+                            my = (a.get("month_year") or "").strip()
+                            day = int(safe_float(a.get("day"), 1))
+                            hrs = str(a.get("hours") or "0")
+                            if ename and my:
+                                try:
+                                    if aid:
+                                        conn2.execute(text("""
+                                            INSERT INTO attendances (id, employee_name, dept, designation, month_year, day, hours)
+                                            VALUES (:id, :employee_name, :dept, :designation, :month_year, :day, :hours);
+                                        """), {"id": aid, "employee_name": ename, "dept": dept, "designation": desig, "month_year": my, "day": day, "hours": hrs})
+                                    else:
+                                        conn2.execute(text("""
+                                            INSERT INTO attendances (employee_name, dept, designation, month_year, day, hours)
+                                            VALUES (:employee_name, :dept, :designation, :month_year, :day, :hours);
+                                        """), {"employee_name": ename, "dept": dept, "designation": desig, "month_year": my, "day": day, "hours": hrs})
+                                except Exception:
+                                    pass
+
                     t2.commit()
                     print("Synced model tables successfully!")
                 except Exception as ex2:

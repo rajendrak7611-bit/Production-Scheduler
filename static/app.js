@@ -1887,32 +1887,46 @@ document.addEventListener('DOMContentLoaded', () => {
         let existingRecords = [];
         try {
             const res = await fetch(`/api/attendance?month_year=${monthVal}`);
-            existingRecords = await res.json();
+            if (res.ok) existingRecords = await res.json();
         } catch (e) { console.error(e); }
 
         // Fetch operators to auto-populate employees if attendance is new
         let allOperators = [];
         try {
             const opRes = await fetch('/api/operators');
-            allOperators = await opRes.json();
+            if (opRes.ok) allOperators = await opRes.json();
         } catch (e) { console.error(e); }
 
         // Group operators in exact sequence from Operator Master and map past hours
         const empMap = {};
-        allOperators.forEach(op => {
-            empMap[op.name] = {
-                name: op.name,
-                dept: op.department || '',
-                designation: op.designation || 'Operator',
-                days: {}
-            };
-        });
+        if (Array.isArray(allOperators)) {
+            allOperators.forEach(op => {
+                if (op && op.name) {
+                    empMap[op.name] = {
+                        name: op.name,
+                        dept: op.dept || op.department || '',
+                        designation: op.designation || op.role || 'Operator',
+                        days: {}
+                    };
+                }
+            });
+        }
 
-        existingRecords.forEach(r => {
-            if (empMap[r.employee_name]) {
-                empMap[r.employee_name].days[r.day] = r.hours;
-            }
-        });
+        if (Array.isArray(existingRecords)) {
+            existingRecords.forEach(r => {
+                const ename = (r.employee_name || '').trim();
+                if (!ename) return;
+                if (!empMap[ename]) {
+                    empMap[ename] = {
+                        name: ename,
+                        dept: r.dept || '',
+                        designation: r.designation || 'Operator',
+                        days: {}
+                    };
+                }
+                empMap[ename].days[r.day] = r.hours;
+            });
+        }
 
         let empList = Object.values(empMap);
 

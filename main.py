@@ -2610,6 +2610,105 @@ def bulk_import_raw_material_logs(items: list, db: Session = Depends(get_db)):
     db.commit()
     return {"message": f"Imported {len(items)} logs successfully"}
 
+# --- HR ATTENDANCE CRUD ---
+@app.get("/api/attendance")
+def get_attendance(month_year: Optional[str] = None, db: Session = Depends(get_db)):
+    try:
+        if month_year:
+            rows = db.execute(text("SELECT * FROM attendances WHERE month_year = :my ORDER BY id ASC;"), {"my": month_year.strip()}).mappings().all()
+        else:
+            rows = db.execute(text("SELECT * FROM attendances ORDER BY id ASC;")).mappings().all()
+        if rows:
+            return [{
+                "id": r.get("id"),
+                "employee_name": r.get("employee_name") or "",
+                "dept": r.get("dept") or "",
+                "designation": r.get("designation") or "Operator",
+                "month_year": r.get("month_year") or "",
+                "day": int(r.get("day") or 1),
+                "hours": str(r.get("hours") or "0"),
+                "created_at": str(r.get("created_at") or "")
+            } for r in rows]
+        return []
+    except Exception:
+        db.rollback()
+        try:
+            q = db.query(models.Attendance)
+            if month_year:
+                q = q.filter(models.Attendance.month_year == month_year.strip())
+            atts = q.order_by(models.Attendance.id.asc()).all()
+            return [{
+                "id": a.id,
+                "employee_name": a.employee_name,
+                "dept": a.dept or "",
+                "designation": a.designation or "Operator",
+                "month_year": a.month_year,
+                "day": a.day,
+                "hours": a.hours or "0",
+                "created_at": str(getattr(a, "created_at", "") or "")
+            } for a in atts]
+        except Exception:
+            db.rollback()
+            return []
+
+@app.post("/api/attendance")
+def save_attendance(data: dict, db: Session = Depends(get_db)):
+    month_val = (data.get("month_year") or "").strip()
+    entries = data.get("entries") or []
+
+    if not month_val:
+        raise HTTPException(status_code=400, detail="month_year is required")
+
+    try:
+        db.execute(text("DELETE FROM attendances WHERE month_year = :my;"), {"my": month_val})
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('attendances', 'id'), coalesce(max(id),0) + 1, false) FROM attendances;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    for entry in entries:
+        ename = (entry.get("employee_name") or "").strip()
+        if not ename:
+            continue
+        dept = (entry.get("dept") or "").strip()
+        desig = (entry.get("designation") or "Operator").strip()
+        day = int(entry.get("day") or 1)
+        hrs = str(entry.get("hours") or "0")
+
+        try:
+            db.execute(text("""
+                INSERT INTO attendances (employee_name, dept, designation, month_year, day, hours)
+                VALUES (:employee_name, :dept, :designation, :month_year, :day, :hours);
+            """), {
+                "employee_name": ename,
+                "dept": dept,
+                "designation": desig,
+                "month_year": month_val,
+                "day": day,
+                "hours": hrs
+            })
+        except Exception:
+            pass
+
+    db.commit()
+    return {"message": f"Attendance for {month_val} saved successfully!"}
+
+@app.delete("/api/attendance/clear-all")
+@app.delete("/api/attendance/all")
+@app.post("/api/attendance/clear-all")
+def clear_all_attendance(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM attendances;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All attendance records cleared successfully"}
+
 # --- Tooling ---
 @app.get("/api/tooling", response_model=List[ToolingResponse])
 def get_tooling(db: Session = Depends(get_db)):
