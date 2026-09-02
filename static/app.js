@@ -10608,7 +10608,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/insert_receipts');
             allReceiptsCache = await res.json();
 
-            const matchingReceipts = allReceiptsCache.filter(r => (r.insert_spec || '').trim().toLowerCase() === spec.trim().toLowerCase() && r.qty >= 0);
+            const matchingReceipts = allReceiptsCache.filter(r => {
+                const isSpecMatch = (r.insert_spec || '').trim().toLowerCase() === spec.trim().toLowerCase();
+                const bNo = (r.batch_no || `ID-${r.id}`).trim();
+                const isSelected = selectedBatch && selectedBatch.trim().toLowerCase() === bNo.toLowerCase();
+                const hasStock = (parseFloat(r.qty) || 0) > 0;
+                return isSpecMatch && (hasStock || isSelected);
+            });
             
             if (matchingReceipts.length === 0) {
                 batchSel.innerHTML = '<option value="">-- No Batches Available --</option>';
