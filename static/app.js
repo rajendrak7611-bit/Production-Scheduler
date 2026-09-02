@@ -5025,6 +5025,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let prodLogAllSetters = [];
     let prodLogSchedules = [];
     let prodLogAllPartMasters = [];
+    let prodLogAllPartsFallback = [];
     let currentPartOperations = [];
 
     let prodLogPartNoSelect = null;
@@ -5050,32 +5051,44 @@ document.addEventListener('DOMContentLoaded', () => {
         recalcProdLog();
         
         if (!partno) return;
+        const cleanPart = String(partno).trim().toLowerCase();
         
-        let part = prodLogAllPartMasters.find(p => String(p.partno).trim().toLowerCase() === String(partno).trim().toLowerCase());
-        if (!part) {
+        // 1. Try from partmaster
+        let pmPart = (prodLogAllPartMasters || []).find(p => String(p.partno || p.part_no || '').trim().toLowerCase() === cleanPart);
+        if (pmPart && pmPart.id) {
             try {
-                const res = await fetch('/api/partmaster');
-                const allParts = await res.json();
-                prodLogAllPartMasters = allParts;
-                part = allParts.find(p => String(p.partno).trim().toLowerCase() === String(partno).trim().toLowerCase());
-            } catch (e) {
-                console.error(e);
-            }
-        }
-        if (part) {
-            try {
-                const opRes = await fetch(`/api/partmaster/${part.id}/operations`);
-                currentPartOperations = await opRes.json();
-                opnSelect.innerHTML = '<option value="">-- Select Operation --</option>';
-                currentPartOperations.forEach(op => {
-                    opnSelect.innerHTML += `<option value="${op.opn_no}">${op.opn_no}</option>`;
-                });
-                if (currentPartOperations.length === 1) {
-                    opnSelect.value = currentPartOperations[0].opn_no;
-                    opnSelect.dispatchEvent(new Event('change'));
+                const opRes = await fetch(`/api/partmaster/${pmPart.id}/operations`);
+                if (opRes.ok) {
+                    const ops = await opRes.json();
+                    if (Array.isArray(ops) && ops.length > 0) {
+                        currentPartOperations = ops;
+                        opnSelect.innerHTML = '<option value="">-- Select Operation --</option>';
+                        currentPartOperations.forEach(op => {
+                            opnSelect.innerHTML += `<option value="${op.opn_no}">${op.opn_no}</option>`;
+                        });
+                        if (currentPartOperations.length === 1) {
+                            opnSelect.value = currentPartOperations[0].opn_no;
+                            opnSelect.dispatchEvent(new Event('change'));
+                        }
+                        return;
+                    }
                 }
             } catch (e) {
-                console.error('Error fetching operations:', e);
+                console.error('Error fetching pm operations:', e);
+            }
+        }
+
+        // 2. Try from parts table fallback
+        let fallbackPart = (prodLogAllPartsFallback || []).find(p => String(p.part_no || p.partno || '').trim().toLowerCase() === cleanPart);
+        if (fallbackPart && Array.isArray(fallbackPart.operations) && fallbackPart.operations.length > 0) {
+            currentPartOperations = fallbackPart.operations;
+            opnSelect.innerHTML = '<option value="">-- Select Operation --</option>';
+            currentPartOperations.forEach(op => {
+                opnSelect.innerHTML += `<option value="${op.opn_no}">${op.opn_no}</option>`;
+            });
+            if (currentPartOperations.length === 1) {
+                opnSelect.value = currentPartOperations[0].opn_no;
+                opnSelect.dispatchEvent(new Event('change'));
             }
         }
     }
@@ -5085,20 +5098,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const partNoSet = new Set();
 
         // 1. Scheduled parts matching dept (or all if no dept)
-        const schedParts = prodLogSchedules.filter(s => !deptUpper || (s.department || '').trim().toUpperCase() === deptUpper);
-        schedParts.forEach(s => s.partno && partNoSet.add(String(s.partno).trim()));
+        if (Array.isArray(prodLogSchedules)) {
+            const schedParts = prodLogSchedules.filter(s => !deptUpper || (s.department || '').trim().toUpperCase() === deptUpper);
+            schedParts.forEach(s => s && s.partno && partNoSet.add(String(s.partno).trim()));
+        }
 
         // 2. Part Master parts matching dept
-        const pmPartsMatching = prodLogAllPartMasters.filter(p => !deptUpper || !p.department || (p.department || '').trim().toUpperCase() === deptUpper);
-        pmPartsMatching.forEach(p => p.partno && partNoSet.add(String(p.partno).trim()));
+        if (Array.isArray(prodLogAllPartMasters)) {
+            const pmPartsMatching = prodLogAllPartMasters.filter(p => !deptUpper || !p.department || (p.department || '').trim().toUpperCase() === deptUpper);
+            pmPartsMatching.forEach(p => p && (p.partno || p.part_no) && partNoSet.add(String(p.partno || p.part_no).trim()));
 
-        // 3. Always include ALL Part Master parts as fallback so user can search any part
-        prodLogAllPartMasters.forEach(p => p.partno && partNoSet.add(String(p.partno).trim()));
+            // 3. Always include ALL Part Master parts as fallback so user can search any part
+            prodLogAllPartMasters.forEach(p => p && (p.partno || p.part_no) && partNoSet.add(String(p.partno || p.part_no).trim()));
+        }
+
+        // 4. Parts table fallback
+        if (Array.isArray(prodLogAllPartsFallback)) {
+            prodLogAllPartsFallback.forEach(p => p && (p.part_no || p.partno) && partNoSet.add(String(p.part_no || p.partno).trim()));
+        }
 
         const sortedParts = Array.from(partNoSet).filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
+        if (!prodLogPartNoSelect && window.TomSelect) {
+            const el = document.getElementById('prodLogPartNo');
+            if (el) {
+                prodLogPartNoSelect = new TomSelect(el, {
+                    create: false,
+                    sortField: { field: "text", direction: "asc" },
+                    placeholder: "Type to search Part No...",
+                    allowEmptyOption: true,
+                    onChange: async (val) => {
+                        await handleProdLogPartChange(val);
+                    }
+                });
+            }
+        }
+
         if (prodLogPartNoSelect) {
-            prodLogPartNoSelect.clear();
+            prodLogPartNoSelect.clear(true);
             prodLogPartNoSelect.clearOptions();
             prodLogPartNoSelect.addOption({ value: '', text: '-- Select Part No --' });
             sortedParts.forEach(p => {
@@ -5128,8 +5165,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (machSelect) {
             const currentMach = machSelect.value;
             machSelect.innerHTML = '<option value="">-- Select Machine --</option>';
-            const machs = prodLogAllMachines.filter(m => !deptUpper || (m.department || m.dept || '').trim().toUpperCase() === deptUpper);
-            const machsToDisplay = machs.length > 0 ? machs : prodLogAllMachines;
+            const machs = (prodLogAllMachines || []).filter(m => !deptUpper || (m.department || m.dept || '').trim().toUpperCase() === deptUpper);
+            const machsToDisplay = machs.length > 0 ? machs : (prodLogAllMachines || []);
             machsToDisplay.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m.name;
@@ -5144,8 +5181,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (opSelect) {
             const currentOp = opSelect.value;
             opSelect.innerHTML = '<option value="">-- Select Operator --</option>';
-            const filteredOperators = prodLogAllOperators.filter(o => !deptUpper || (o.department || o.dept || '').trim().toUpperCase() === deptUpper);
-            const opsToDisplay = filteredOperators.length > 0 ? filteredOperators : prodLogAllOperators;
+            const filteredOperators = (prodLogAllOperators || []).filter(o => !deptUpper || (o.department || o.dept || '').trim().toUpperCase() === deptUpper);
+            const opsToDisplay = filteredOperators.length > 0 ? filteredOperators : (prodLogAllOperators || []);
             opsToDisplay.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(o => {
                 const opt = document.createElement('option');
                 opt.value = o.name;
@@ -5160,8 +5197,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (setterSelect) {
             const currentSetter = setterSelect.value;
             setterSelect.innerHTML = '<option value="">-- Select Setter --</option>';
-            const filteredSetters = prodLogAllSetters.filter(s => !deptUpper || (s.department || s.dept || '').trim().toUpperCase() === deptUpper);
-            const settersToDisplay = filteredSetters.length > 0 ? filteredSetters : prodLogAllSetters;
+            const filteredSetters = (prodLogAllSetters || []).filter(s => !deptUpper || (s.department || s.dept || '').trim().toUpperCase() === deptUpper);
+            const settersToDisplay = filteredSetters.length > 0 ? filteredSetters : (prodLogAllSetters || []);
             settersToDisplay.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s.name;
@@ -5173,7 +5210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (prodLogPartNoSelect) prodLogPartNoSelect.clear();
+        if (prodLogPartNoSelect) prodLogPartNoSelect.clear(true);
         else if (document.getElementById('prodLogPartNo')) document.getElementById('prodLogPartNo').value = '';
 
         updateProdLogPartList(deptUpper);
@@ -5193,21 +5230,42 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('prodLogDate').valueAsDate = new Date();
         }
         
-        // Fetch dependencies
-        const [machRes, opRes, setterRes, schedRes, pmRes] = await Promise.all([
-            fetch('/api/machines'),
-            fetch('/api/operators'),
-            fetch('/api/setters'),
-            fetch('/api/schedule'),
-            fetch('/api/partmaster')
+        // Fetch dependencies independently so one failure never blocks the others
+        const [machData, opData, setterData, schedData, pmData, shiftData, partsData] = await Promise.all([
+            fetch('/api/machines').then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('/api/operators').then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('/api/setters').then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('/api/schedules').then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('/api/partmaster').then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('/api/shifts').then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('/api/parts').then(r => r.ok ? r.json() : []).catch(() => [])
         ]);
 
-        prodLogAllMachines = await machRes.json();
-        prodLogAllOperators = await opRes.json();
-        prodLogAllSetters = await setterRes.json();
-        const schedData = await schedRes.json();
-        prodLogSchedules = schedData.filter(s => s.status === 'Pending' || !s.status);
-        prodLogAllPartMasters = await pmRes.json();
+        prodLogAllMachines = machData || [];
+        prodLogAllOperators = opData || [];
+        prodLogAllSetters = setterData || [];
+        prodLogSchedules = (schedData || []).filter(s => s.status === 'Pending' || !s.status);
+        prodLogAllPartMasters = pmData || [];
+        prodLogAllPartsFallback = partsData || [];
+
+        // Populate Shift dropdown
+        const shiftSelect = document.getElementById('prodLogShift');
+        if (shiftSelect && shiftData && shiftData.length > 0) {
+            const currentShift = shiftSelect.value;
+            shiftSelect.innerHTML = '<option value="">-- Select Shift --</option>';
+            shiftData.forEach(s => {
+                const shiftLabel = `${s.name} (${s.hours} Hrs)`;
+                const opt = document.createElement('option');
+                opt.value = shiftLabel;
+                opt.textContent = shiftLabel;
+                shiftSelect.appendChild(opt);
+            });
+            if (currentShift && shiftData.some(s => `${s.name} (${s.hours} Hrs)` === currentShift || s.name === currentShift)) {
+                shiftSelect.value = currentShift;
+            } else if (shiftSelect.options.length > 1) {
+                shiftSelect.selectedIndex = 1;
+            }
+        }
 
         const currentDept = document.getElementById('prodLogDept')?.value || '';
         populateProdLogDeptFields(currentDept);

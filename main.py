@@ -1721,6 +1721,7 @@ def delete_part(part_id: int, db: Session = Depends(get_db)):
 
 # --- Schedules ---
 @app.get("/api/schedules")
+@app.get("/api/schedule")
 def get_schedules(db: Session = Depends(get_db)):
     try:
         schedules = db.query(models.ProductionSchedule).all()
