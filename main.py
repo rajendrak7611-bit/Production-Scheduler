@@ -499,24 +499,42 @@ def create_department(data: dict, db: Session = Depends(get_db)):
     name = (data.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Department name cannot be empty")
+    
+    # Check if department with this name already exists
     try:
-        db.execute(text("INSERT INTO departments (name) VALUES (:name)"), {"name": name})
+        existing = db.execute(text("SELECT id, name FROM departments WHERE UPPER(name) = :name"), {"name": name.upper()}).mappings().first()
+        if existing:
+            return {"id": existing.get("id"), "name": existing.get("name"), "message": "Department already exists"}
+    except Exception:
+        db.rollback()
+
+    # Sync postgres sequence if needed
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('departments', 'id'), coalesce(max(id),0) + 1, false) FROM departments;"))
         db.commit()
     except Exception:
         db.rollback()
+
+    try:
+        max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM departments")).mappings().first()
+        next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        
         try:
-            d_obj = models.Department(name=name)
-            db.add(d_obj)
+            db.execute(text("INSERT INTO departments (id, name) VALUES (:id, :name)"), {"id": next_id, "name": name})
             db.commit()
-        except Exception as ex:
+        except Exception:
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to create department: {ex}")
+            db.execute(text("INSERT INTO departments (name) VALUES (:name)"), {"name": name})
+            db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create department: {ex}")
     
     try:
-        row = db.execute(text("SELECT id, name FROM departments WHERE name = :name ORDER BY id DESC LIMIT 1"), {"name": name}).mappings().first()
-        return {"id": row.get("id") if row else 1, "name": name, "message": "Department created successfully"}
+        row = db.execute(text("SELECT id, name FROM departments WHERE UPPER(name) = :name ORDER BY id DESC LIMIT 1"), {"name": name.upper()}).mappings().first()
+        return {"id": row.get("id") if row else next_id, "name": name, "message": "Department created successfully"}
     except Exception:
-        return {"name": name, "message": "Department created successfully"}
+        return {"id": next_id, "name": name, "message": "Department created successfully"}
 
 @app.put("/api/departments/{dept_id}")
 def update_department(dept_id: int, data: dict, db: Session = Depends(get_db)):
