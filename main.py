@@ -438,8 +438,34 @@ def delete_machine(machine_id: int, db: Session = Depends(get_db)):
     if not db_m:
         raise HTTPException(status_code=404, detail="Machine not found")
     db.delete(db_m)
+@app.post("/api/machines/bulk_import")
+def bulk_import_machines(data: dict, db: Session = Depends(get_db)):
+    machines = data.get("machines") or []
+    count = 0
+    for m in machines:
+        name = m.get("name") or m.get("machine_name") or ""
+        dept = m.get("department") or m.get("dept") or ""
+        status = m.get("status") or "Active"
+        if name:
+            try:
+                db.execute(text("INSERT INTO machines (name, dept, status) VALUES (:name, :dept, :status)"), {
+                    "name": name,
+                    "dept": dept,
+                    "status": status
+                })
+                count += 1
+            except Exception:
+                try:
+                    db.execute(text("INSERT INTO machines (name, department, status) VALUES (:name, :dept, :status)"), {
+                        "name": name,
+                        "dept": dept,
+                        "status": status
+                    })
+                    count += 1
+                except Exception:
+                    pass
     db.commit()
-    return {"message": "Machine deleted"}
+    return {"message": f"Successfully imported {count} machines!", "imported_count": count}
 
 # --- Operators ---
 @app.get("/api/operators")
@@ -562,25 +588,90 @@ def clear_all_operators(db: Session = Depends(get_db)):
         db.commit()
     except Exception:
         db.rollback()
-    return {"success": True, "message": "All operators cleared successfully!"}
-
-@app.delete("/api/operators/{op_id}")
-def delete_operator(op_id: int, db: Session = Depends(get_db)):
-    try:
-        db.execute(text("DELETE FROM operators WHERE id = :id;"), {"id": op_id})
-        db.commit()
-    except Exception:
-        db.rollback()
-    try:
-        db_op = db.query(models.Operator).filter(models.Operator.id == op_id).first()
-        if db_op:
-            db.delete(db_op)
-            db.commit()
-    except Exception:
-        db.rollback()
-    return {"message": "Operator deleted"}
+@app.post("/api/operators/bulk_import")
+def bulk_import_operators(data: dict, db: Session = Depends(get_db)):
+    operators = data.get("operators") or []
+    count = 0
+    for op in operators:
+        name = op.get("name") or op.get("operator_name") or ""
+        dept = op.get("department") or op.get("dept") or ""
+        desig = op.get("designation") or op.get("role") or "Operator"
+        if name:
+            try:
+                db.execute(text("INSERT INTO operators (name, dept, designation) VALUES (:name, :dept, :designation)"), {
+                    "name": name,
+                    "dept": dept,
+                    "designation": desig
+                })
+                count += 1
+            except Exception:
+                try:
+                    db.execute(text("INSERT INTO operators (name, department, designation) VALUES (:name, :dept, :designation)"), {
+                        "name": name,
+                        "dept": dept,
+                        "designation": desig
+                    })
+                    count += 1
+                except Exception:
+                    pass
+    db.commit()
+    return {"message": f"Successfully imported {count} operators!", "imported_count": count}
 
 # --- Part Master API ---
+@app.post("/api/partmaster/bulk_import")
+def bulk_import_partmasters(data: dict, db: Session = Depends(get_db)):
+    parts = data.get("parts") or []
+    count = 0
+    for p in parts:
+        partno = p.get("partno") or p.get("part_no") or ""
+        family = p.get("family") or ""
+        forge_pn = p.get("forge_pn") or p.get("forgepn") or ""
+        part_prefix = p.get("part_prefix") or p.get("prefix") or ""
+        department = p.get("department") or p.get("dept") or ""
+        customer = p.get("customer") or ""
+        va = str(p.get("va") or 0)
+        operations = p.get("operations") or []
+        if partno:
+            try:
+                db.execute(text("INSERT INTO part_masters (customer, department, family, forge_pn, part_prefix, partno, va, rfd_phy) VALUES (:customer, :department, :family, :forge_pn, :part_prefix, :partno, :va, :rfd_phy)"), {
+                    "customer": customer,
+                    "department": department,
+                    "family": family,
+                    "forge_pn": forge_pn,
+                    "part_prefix": part_prefix,
+                    "partno": partno,
+                    "va": va,
+                    "rfd_phy": 0
+                })
+                count += 1
+            except Exception:
+                pass
+            
+            if operations:
+                try:
+                    row = db.execute(text("SELECT id FROM part_masters WHERE partno = :p ORDER BY id DESC LIMIT 1"), {"p": partno}).mappings().first()
+                    if row:
+                        part_id = row.get("id")
+                        for op in operations:
+                            opn = str(op.get("opn_no") or "")
+                            desc = op.get("description") or ""
+                            mc = op.get("machine") or op.get("machine_name") or ""
+                            cyc = float(op.get("cycle_time") or 0)
+                            if opn or desc:
+                                try:
+                                    db.execute(text("INSERT INTO part_operations (part_id, opn_no, description, machine, cycle_time) VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)"), {
+                                        "part_id": str(part_id),
+                                        "opn_no": opn,
+                                        "description": desc,
+                                        "machine": mc,
+                                        "cycle_time": cyc
+                                    })
+                                except Exception:
+                                    pass
+                except Exception:
+                    pass
+    db.commit()
+    return {"message": f"Successfully imported {count} parts!", "imported_count": count}
 @app.delete("/api/partmaster/clear-all")
 @app.post("/api/partmaster/clear-all")
 def clear_all_parts(db: Session = Depends(get_db)):

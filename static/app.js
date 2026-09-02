@@ -1053,7 +1053,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (response.ok) {
-                    alert('Import successful!');
+                    const resJson = await response.json().catch(() => ({}));
+                    alert(resJson.message || 'Import successful!');
                     if (currentTab === 'partmaster') fetchPartMasters();
                     else if (currentTab === 'machines') fetchMachines();
                     else if (currentTab === 'operators') fetchOperators();
@@ -1061,7 +1062,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (currentTab === 'rm_receipt') fetchRmLogs('receipt');
                     else if (currentTab === 'rm_despatch') fetchRmLogs('despatch');
                 } else {
-                    alert('Import failed. Please check the console.');
+                    const errText = await response.text().catch(() => '');
+                    alert('Import failed: ' + (errText || 'Please check the file format and column headers.'));
                 }
             } catch (err) {
                 console.error('Error importing file:', err);
