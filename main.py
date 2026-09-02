@@ -3701,40 +3701,96 @@ def get_insert_masters(db: Session = Depends(get_db)):
 
 @app.post("/api/insert_masters")
 def create_insert_master(data: dict, db: Session = Depends(get_db)):
-    spec = (data.get("insert_spec") or data.get("name") or "").strip()
-    if not spec:
-        raise HTTPException(status_code=400, detail="Insert spec is required")
-    edges = int(data.get("no_of_edges") or 1)
-    grade = (data.get("grade") or "").strip()
-    make = (data.get("make") or "").strip()
-    stock = float(data.get("stock") or 0.0)
-    price = float(data.get("price") or 0.0)
-    db.execute(text("""
-        INSERT INTO insert_masters (insert_spec, no_of_edges, grade, make, stock, price)
-        VALUES (:spec, :edges, :grade, :make, :stock, :price);
-    """), {"spec": spec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price})
-    db.commit()
-    return {"message": "Created successfully"}
+    try:
+        spec = (data.get("insert_spec") or data.get("name") or "").strip()
+        if not spec:
+            raise HTTPException(status_code=400, detail="Insert spec is required")
+        edges = int(data.get("no_of_edges") or 1)
+        grade = (data.get("grade") or "").strip()
+        make = (data.get("make") or "").strip()
+        stock = float(data.get("stock") or 0.0)
+        price = float(data.get("price") or 0.0)
+
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('insert_masters', 'id'), coalesce(max(id),0) + 1, false) FROM insert_masters;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM insert_masters")).mappings().first()
+            next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        except Exception:
+            db.rollback()
+            next_id = 1
+
+        params = {"id": next_id, "spec": spec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price}
+        try:
+            db.execute(text("""
+                INSERT INTO insert_masters (id, insert_spec, no_of_edges, grade, make, stock, price)
+                VALUES (:id, :spec, :edges, :grade, :make, :stock, :price);
+            """), params)
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO insert_masters (insert_spec, no_of_edges, grade, make, stock, price)
+                VALUES (:spec, :edges, :grade, :make, :stock, :price);
+            """), params)
+            db.commit()
+
+        return {"id": next_id, "message": "Created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/insert_masters/bulk")
 def bulk_create_insert_masters(data: dict, db: Session = Depends(get_db)):
     inserts = data.get("inserts") or []
     count = 0
-    for ins in inserts:
-        spec = (ins.get("insert_spec") or ins.get("name") or "").strip()
-        if spec:
-            edges = int(ins.get("no_of_edges") or 1)
-            grade = (ins.get("grade") or "").strip()
-            make = (ins.get("make") or "").strip()
-            stock = float(ins.get("stock") or 0.0)
-            price = float(ins.get("price") or 0.0)
-            db.execute(text("""
-                INSERT INTO insert_masters (insert_spec, no_of_edges, grade, make, stock, price)
-                VALUES (:spec, :edges, :grade, :make, :stock, :price);
-            """), {"spec": spec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price})
-            count += 1
-    db.commit()
-    return {"message": f"Successfully created {count} insert master records"}
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('insert_masters', 'id'), coalesce(max(id),0) + 1, false) FROM insert_masters;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) AS max_id FROM insert_masters")).mappings().first()
+            curr_id = int(max_row.get("max_id")) if max_row and max_row.get("max_id") else 0
+        except Exception:
+            db.rollback()
+            curr_id = 0
+
+        for ins in inserts:
+            spec = (ins.get("insert_spec") or ins.get("name") or "").strip()
+            if spec:
+                curr_id += 1
+                edges = int(ins.get("no_of_edges") or 1)
+                grade = (ins.get("grade") or "").strip()
+                make = (ins.get("make") or "").strip()
+                stock = float(ins.get("stock") or 0.0)
+                price = float(ins.get("price") or 0.0)
+                params = {"id": curr_id, "spec": spec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price}
+                try:
+                    db.execute(text("""
+                        INSERT INTO insert_masters (id, insert_spec, no_of_edges, grade, make, stock, price)
+                        VALUES (:id, :spec, :edges, :grade, :make, :stock, :price);
+                    """), params)
+                except Exception:
+                    db.rollback()
+                    db.execute(text("""
+                        INSERT INTO insert_masters (insert_spec, no_of_edges, grade, make, stock, price)
+                        VALUES (:spec, :edges, :grade, :make, :stock, :price);
+                    """), params)
+                count += 1
+        db.commit()
+        return {"message": f"Successfully created {count} insert master records"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/insert_masters/{id}")
 def update_insert_master(id: int, data: dict, db: Session = Depends(get_db)):
@@ -3790,38 +3846,92 @@ def get_drill_masters(db: Session = Depends(get_db)):
 
 @app.post("/api/drill_masters")
 def create_drill_master(data: dict, db: Session = Depends(get_db)):
-    size = (data.get("drill_size") or data.get("size_dia") or data.get("name") or "").strip()
-    sl = (data.get("sl_no") or "").strip()
-    rc = int(data.get("resharp_count") or 0)
-    make = (data.get("make") or "").strip()
-    stock = float(data.get("stock") or 0.0)
-    price = float(data.get("price") or 0.0)
-    db.execute(text("""
-        INSERT INTO drill_masters (drill_size, sl_no, resharp_count, make, stock, price)
-        VALUES (:size, :sl, :rc, :make, :stock, :price);
-    """), {"size": size, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price})
-    db.commit()
-    return {"message": "Created successfully"}
+    try:
+        size = (data.get("drill_size") or data.get("size_dia") or data.get("name") or "").strip()
+        sl = (data.get("sl_no") or "").strip()
+        rc = int(data.get("resharp_count") or 0)
+        make = (data.get("make") or "").strip()
+        stock = float(data.get("stock") or 0.0)
+        price = float(data.get("price") or 0.0)
+
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('drill_masters', 'id'), coalesce(max(id),0) + 1, false) FROM drill_masters;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM drill_masters")).mappings().first()
+            next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        except Exception:
+            db.rollback()
+            next_id = 1
+
+        params = {"id": next_id, "size": size, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price}
+        try:
+            db.execute(text("""
+                INSERT INTO drill_masters (id, drill_size, sl_no, resharp_count, make, stock, price)
+                VALUES (:id, :size, :sl, :rc, :make, :stock, :price);
+            """), params)
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO drill_masters (drill_size, sl_no, resharp_count, make, stock, price)
+                VALUES (:size, :sl, :rc, :make, :stock, :price);
+            """), params)
+            db.commit()
+
+        return {"id": next_id, "message": "Created successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/drill_masters/bulk")
 def bulk_create_drill_masters(data: dict, db: Session = Depends(get_db)):
     drills = data.get("drills") or []
     count = 0
-    for dr in drills:
-        size = (dr.get("drill_size") or dr.get("size_dia") or dr.get("name") or "").strip()
-        sl = (dr.get("sl_no") or "").strip()
-        if size or sl:
-            rc = int(dr.get("resharp_count") or 0)
-            make = (dr.get("make") or "").strip()
-            stock = float(dr.get("stock") or 0.0)
-            price = float(dr.get("price") or 0.0)
-            db.execute(text("""
-                INSERT INTO drill_masters (drill_size, sl_no, resharp_count, make, stock, price)
-                VALUES (:size, :sl, :rc, :make, :stock, :price);
-            """), {"size": size, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price})
-            count += 1
-    db.commit()
-    return {"message": f"Successfully created {count} drill records"}
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('drill_masters', 'id'), coalesce(max(id),0) + 1, false) FROM drill_masters;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) AS max_id FROM drill_masters")).mappings().first()
+            curr_id = int(max_row.get("max_id")) if max_row and max_row.get("max_id") else 0
+        except Exception:
+            db.rollback()
+            curr_id = 0
+
+        for dr in drills:
+            size = (dr.get("drill_size") or dr.get("size_dia") or dr.get("name") or "").strip()
+            sl = (dr.get("sl_no") or "").strip()
+            if size or sl:
+                curr_id += 1
+                rc = int(dr.get("resharp_count") or 0)
+                make = (dr.get("make") or "").strip()
+                stock = float(dr.get("stock") or 0.0)
+                price = float(dr.get("price") or 0.0)
+                params = {"id": curr_id, "size": size, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price}
+                try:
+                    db.execute(text("""
+                        INSERT INTO drill_masters (id, drill_size, sl_no, resharp_count, make, stock, price)
+                        VALUES (:id, :size, :sl, :rc, :make, :stock, :price);
+                    """), params)
+                except Exception:
+                    db.rollback()
+                    db.execute(text("""
+                        INSERT INTO drill_masters (drill_size, sl_no, resharp_count, make, stock, price)
+                        VALUES (:size, :sl, :rc, :make, :stock, :price);
+                    """), params)
+                count += 1
+        db.commit()
+        return {"message": f"Successfully created {count} drill records"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/drill_masters/{id}")
 def update_drill_master(id: int, data: dict, db: Session = Depends(get_db)):
@@ -3874,36 +3984,92 @@ def get_tap_masters(db: Session = Depends(get_db)):
 
 @app.post("/api/tap_masters")
 def create_tap_master(data: dict, db: Session = Depends(get_db)):
-    spec = (data.get("tap_spec") or data.get("specification") or data.get("name") or "").strip()
-    if not spec:
-        raise HTTPException(status_code=400, detail="Tap spec is required")
-    make = (data.get("make") or "").strip()
-    stock = float(data.get("stock") or 0.0)
-    price = float(data.get("price") or 0.0)
-    db.execute(text("""
-        INSERT INTO tap_masters (tap_spec, make, stock, price)
-        VALUES (:spec, :make, :stock, :price);
-    """), {"spec": spec, "make": make, "stock": stock, "price": price})
-    db.commit()
-    return {"message": "Created successfully"}
+    try:
+        spec = (data.get("tap_spec") or data.get("specification") or data.get("name") or "").strip()
+        if not spec:
+            raise HTTPException(status_code=400, detail="Tap spec is required")
+        make = (data.get("make") or "").strip()
+        stock = float(data.get("stock") or 0.0)
+        price = float(data.get("price") or 0.0)
+
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('tap_masters', 'id'), coalesce(max(id),0) + 1, false) FROM tap_masters;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM tap_masters")).mappings().first()
+            next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        except Exception:
+            db.rollback()
+            next_id = 1
+
+        params = {"id": next_id, "spec": spec, "make": make, "stock": stock, "price": price}
+        try:
+            db.execute(text("""
+                INSERT INTO tap_masters (id, tap_spec, make, stock, price)
+                VALUES (:id, :spec, :make, :stock, :price);
+            """), params)
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO tap_masters (tap_spec, make, stock, price)
+                VALUES (:spec, :make, :stock, :price);
+            """), params)
+            db.commit()
+
+        return {"id": next_id, "message": "Created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/tap_masters/bulk")
 def bulk_create_tap_masters(data: dict, db: Session = Depends(get_db)):
     taps = data.get("taps") or []
     count = 0
-    for t in taps:
-        spec = (t.get("tap_spec") or t.get("specification") or t.get("name") or "").strip()
-        if spec:
-            make = (t.get("make") or "").strip()
-            stock = float(t.get("stock") or 0.0)
-            price = float(t.get("price") or 0.0)
-            db.execute(text("""
-                INSERT INTO tap_masters (tap_spec, make, stock, price)
-                VALUES (:spec, :make, :stock, :price);
-            """), {"spec": spec, "make": make, "stock": stock, "price": price})
-            count += 1
-    db.commit()
-    return {"message": f"Successfully created {count} tap records"}
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('tap_masters', 'id'), coalesce(max(id),0) + 1, false) FROM tap_masters;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) AS max_id FROM tap_masters")).mappings().first()
+            curr_id = int(max_row.get("max_id")) if max_row and max_row.get("max_id") else 0
+        except Exception:
+            db.rollback()
+            curr_id = 0
+
+        for t in taps:
+            spec = (t.get("tap_spec") or t.get("specification") or t.get("name") or "").strip()
+            if spec:
+                curr_id += 1
+                make = (t.get("make") or "").strip()
+                stock = float(t.get("stock") or 0.0)
+                price = float(t.get("price") or 0.0)
+                params = {"id": curr_id, "spec": spec, "make": make, "stock": stock, "price": price}
+                try:
+                    db.execute(text("""
+                        INSERT INTO tap_masters (id, tap_spec, make, stock, price)
+                        VALUES (:id, :spec, :make, :stock, :price);
+                    """), params)
+                except Exception:
+                    db.rollback()
+                    db.execute(text("""
+                        INSERT INTO tap_masters (tap_spec, make, stock, price)
+                        VALUES (:spec, :make, :stock, :price);
+                    """), params)
+                count += 1
+        db.commit()
+        return {"message": f"Successfully created {count} tap records"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/tap_masters/{id}")
 def update_tap_master(id: int, data: dict, db: Session = Depends(get_db)):
@@ -3955,41 +4121,112 @@ def get_insert_receipts(db: Session = Depends(get_db)):
 
 @app.post("/api/insert_receipts")
 def create_insert_receipt(data: dict, db: Session = Depends(get_db)):
-    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
-    supp = (data.get("supplier") or "").strip()
-    spec = (data.get("insert_spec") or "").strip()
-    batch = (data.get("batch_no") or "").strip()
-    qty = float(data.get("qty") or 0.0)
-    rate = float(data.get("rate") or 0.0)
-    db.execute(text("""
-        INSERT INTO insert_receipts (date, supplier, insert_spec, batch_no, qty, rate)
-        VALUES (:date, :supp, :spec, :batch, :qty, :rate);
-    """), {"date": date_val, "supp": supp, "spec": spec, "batch": batch, "qty": qty, "rate": rate})
-    db.commit()
-    return {"message": "Created successfully"}
+    try:
+        date_val = normalize_date_str(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
+        supp = (data.get("supplier") or "").strip()
+        spec = (data.get("insert_spec") or "").strip()
+        batch = (data.get("batch_no") or "").strip()
+        qty = float(data.get("qty") or 0.0)
+        rate = float(data.get("rate") or 0.0)
+
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('insert_receipts', 'id'), coalesce(max(id),0) + 1, false) FROM insert_receipts;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM insert_receipts")).mappings().first()
+            next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        except Exception:
+            db.rollback()
+            next_id = 1
+
+        params = {
+            "id": next_id,
+            "date": date_val,
+            "supp": supp,
+            "spec": spec,
+            "batch": batch,
+            "qty": qty,
+            "rate": rate
+        }
+
+        try:
+            db.execute(text("""
+                INSERT INTO insert_receipts (id, date, supplier, insert_spec, batch_no, qty, rate)
+                VALUES (:id, :date, :supp, :spec, :batch, :qty, :rate);
+            """), params)
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO insert_receipts (date, supplier, insert_spec, batch_no, qty, rate)
+                VALUES (:date, :supp, :spec, :batch, :qty, :rate);
+            """), params)
+            db.commit()
+
+        return {"id": next_id, "message": "Created successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create insert receipt: {e}")
 
 @app.post("/api/insert_receipts/bulk")
 def bulk_create_insert_receipts(data: dict, db: Session = Depends(get_db)):
     receipts = data.get("receipts") or []
     count = 0
-    for r in receipts:
-        date_val = r.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
-        supp = (r.get("supplier") or "").strip()
-        spec = (r.get("insert_spec") or "").strip()
-        batch = (r.get("batch_no") or "").strip()
-        qty = float(r.get("qty") or 0.0)
-        rate = float(r.get("rate") or 0.0)
-        db.execute(text("""
-            INSERT INTO insert_receipts (date, supplier, insert_spec, batch_no, qty, rate)
-            VALUES (:date, :supp, :spec, :batch, :qty, :rate);
-        """), {"date": date_val, "supp": supp, "spec": spec, "batch": batch, "qty": qty, "rate": rate})
-        count += 1
-    db.commit()
-    return {"message": f"Successfully created {count} insert receipt records"}
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('insert_receipts', 'id'), coalesce(max(id),0) + 1, false) FROM insert_receipts;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) AS max_id FROM insert_receipts")).mappings().first()
+            curr_id = int(max_row.get("max_id")) if max_row and max_row.get("max_id") else 0
+        except Exception:
+            db.rollback()
+            curr_id = 0
+
+        for r in receipts:
+            curr_id += 1
+            date_val = normalize_date_str(r.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
+            supp = (r.get("supplier") or "").strip()
+            spec = (r.get("insert_spec") or "").strip()
+            batch = (r.get("batch_no") or "").strip()
+            qty = float(r.get("qty") or 0.0)
+            rate = float(r.get("rate") or 0.0)
+            params = {
+                "id": curr_id,
+                "date": date_val,
+                "supp": supp,
+                "spec": spec,
+                "batch": batch,
+                "qty": qty,
+                "rate": rate
+            }
+            try:
+                db.execute(text("""
+                    INSERT INTO insert_receipts (id, date, supplier, insert_spec, batch_no, qty, rate)
+                    VALUES (:id, :date, :supp, :spec, :batch, :qty, :rate);
+                """), params)
+            except Exception:
+                db.rollback()
+                db.execute(text("""
+                    INSERT INTO insert_receipts (date, supplier, insert_spec, batch_no, qty, rate)
+                    VALUES (:date, :supp, :spec, :batch, :qty, :rate);
+                """), params)
+            count += 1
+        db.commit()
+        return {"message": f"Successfully created {count} insert receipt records"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/insert_receipts/{id}")
 def update_insert_receipt(id: int, data: dict, db: Session = Depends(get_db)):
-    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    date_val = normalize_date_str(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
     supp = (data.get("supplier") or "").strip()
     spec = (data.get("insert_spec") or "").strip()
     batch = (data.get("batch_no") or "").strip()
@@ -4038,39 +4275,108 @@ def get_tap_receipts(db: Session = Depends(get_db)):
 
 @app.post("/api/tap_receipts")
 def create_tap_receipt(data: dict, db: Session = Depends(get_db)):
-    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
-    supp = (data.get("supplier") or "").strip()
-    spec = (data.get("tap_spec") or "").strip()
-    qty = float(data.get("qty") or 0.0)
-    rate = float(data.get("rate") or 0.0)
-    db.execute(text("""
-        INSERT INTO tap_receipts (date, supplier, tap_spec, qty, rate)
-        VALUES (:date, :supp, :spec, :qty, :rate);
-    """), {"date": date_val, "supp": supp, "spec": spec, "qty": qty, "rate": rate})
-    db.commit()
-    return {"message": "Created successfully"}
+    try:
+        date_val = normalize_date_str(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
+        supp = (data.get("supplier") or "").strip()
+        spec = (data.get("tap_spec") or "").strip()
+        qty = float(data.get("qty") or 0.0)
+        rate = float(data.get("rate") or 0.0)
+
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('tap_receipts', 'id'), coalesce(max(id),0) + 1, false) FROM tap_receipts;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM tap_receipts")).mappings().first()
+            next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        except Exception:
+            db.rollback()
+            next_id = 1
+
+        params = {
+            "id": next_id,
+            "date": date_val,
+            "supp": supp,
+            "spec": spec,
+            "qty": qty,
+            "rate": rate
+        }
+
+        try:
+            db.execute(text("""
+                INSERT INTO tap_receipts (id, date, supplier, tap_spec, qty, rate)
+                VALUES (:id, :date, :supp, :spec, :qty, :rate);
+            """), params)
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO tap_receipts (date, supplier, tap_spec, qty, rate)
+                VALUES (:date, :supp, :spec, :qty, :rate);
+            """), params)
+            db.commit()
+
+        return {"id": next_id, "message": "Created successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create tap receipt: {e}")
 
 @app.post("/api/tap_receipts/bulk")
 def bulk_create_tap_receipts(data: dict, db: Session = Depends(get_db)):
     receipts = data.get("receipts") or []
     count = 0
-    for r in receipts:
-        date_val = r.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
-        supp = (r.get("supplier") or "").strip()
-        spec = (r.get("tap_spec") or "").strip()
-        qty = float(r.get("qty") or 0.0)
-        rate = float(r.get("rate") or 0.0)
-        db.execute(text("""
-            INSERT INTO tap_receipts (date, supplier, tap_spec, qty, rate)
-            VALUES (:date, :supp, :spec, :qty, :rate);
-        """), {"date": date_val, "supp": supp, "spec": spec, "qty": qty, "rate": rate})
-        count += 1
-    db.commit()
-    return {"message": f"Successfully created {count} tap receipt records"}
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('tap_receipts', 'id'), coalesce(max(id),0) + 1, false) FROM tap_receipts;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) AS max_id FROM tap_receipts")).mappings().first()
+            curr_id = int(max_row.get("max_id")) if max_row and max_row.get("max_id") else 0
+        except Exception:
+            db.rollback()
+            curr_id = 0
+
+        for r in receipts:
+            curr_id += 1
+            date_val = normalize_date_str(r.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
+            supp = (r.get("supplier") or "").strip()
+            spec = (r.get("tap_spec") or "").strip()
+            qty = float(r.get("qty") or 0.0)
+            rate = float(r.get("rate") or 0.0)
+            params = {
+                "id": curr_id,
+                "date": date_val,
+                "supp": supp,
+                "spec": spec,
+                "qty": qty,
+                "rate": rate
+            }
+            try:
+                db.execute(text("""
+                    INSERT INTO tap_receipts (id, date, supplier, tap_spec, qty, rate)
+                    VALUES (:id, :date, :supp, :spec, :qty, :rate);
+                """), params)
+            except Exception:
+                db.rollback()
+                db.execute(text("""
+                    INSERT INTO tap_receipts (date, supplier, tap_spec, qty, rate)
+                    VALUES (:date, :supp, :spec, :qty, :rate);
+                """), params)
+            count += 1
+        db.commit()
+        return {"message": f"Successfully created {count} tap receipt records"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/tap_receipts/{id}")
 def update_tap_receipt(id: int, data: dict, db: Session = Depends(get_db)):
-    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    date_val = normalize_date_str(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
     supp = (data.get("supplier") or "").strip()
     spec = (data.get("tap_spec") or "").strip()
     qty = float(data.get("qty") or 0.0)
@@ -4157,57 +4463,122 @@ def get_insert_issue(id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/insert_issues")
 def create_insert_issue(data: dict, db: Session = Depends(get_db)):
-    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
-    shift = (data.get("shift") or "First").strip()
-    dept = (data.get("department") or "WIPRO").strip()
-    spec = (data.get("insert_spec") or "").strip()
-    batch = (data.get("batch_no") or "").strip()
-    qty_iss = float(data.get("qty_issued") or 0.0)
-    qty_rec = float(data.get("qty_received") or 0.0)
-    mach = (data.get("machine") or "").strip()
-    op = (data.get("operator") or "").strip()
-    partno = (data.get("partno") or "").strip()
-    opn = str(data.get("opn_no") or "").strip()
-    usages = str(data.get("usages") or "")
-    rid = int(data.get("receipt_id")) if data.get("receipt_id") else None
-    edge = str(data.get("edge_data") or "")
-    db.execute(text("""
-        INSERT INTO insert_issues (date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
-        VALUES (:date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
-    """), {"date": date_val, "shift": shift, "dept": dept, "spec": spec, "batch": batch, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn, "usages": usages, "rid": rid, "edge": edge})
-    db.commit()
-    return {"message": "Created successfully"}
+    try:
+        date_val = normalize_date_str(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
+        shift = (data.get("shift") or "First").strip()
+        dept = (data.get("department") or "WIPRO").strip()
+        spec = (data.get("insert_spec") or "").strip()
+        batch = (data.get("batch_no") or "").strip()
+        qty_iss = float(data.get("qty_issued") or 0.0)
+        qty_rec = float(data.get("qty_received") or 0.0)
+        mach = (data.get("machine") or "").strip()
+        op = (data.get("operator") or "").strip()
+        partno = (data.get("partno") or "").strip()
+        opn = str(data.get("opn_no") or "").strip()
+        usages = str(data.get("usages") or "")
+        rid = int(data.get("receipt_id")) if data.get("receipt_id") else None
+        edge = str(data.get("edge_data") or "")
+
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('insert_issues', 'id'), coalesce(max(id),0) + 1, false) FROM insert_issues;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM insert_issues")).mappings().first()
+            next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        except Exception:
+            db.rollback()
+            next_id = 1
+
+        params = {
+            "id": next_id,
+            "date": date_val, "shift": shift, "dept": dept, "spec": spec, "batch": batch,
+            "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno,
+            "opn": opn, "usages": usages, "rid": rid, "edge": edge
+        }
+
+        try:
+            db.execute(text("""
+                INSERT INTO insert_issues (id, date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
+                VALUES (:id, :date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
+            """), params)
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO insert_issues (date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
+                VALUES (:date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
+            """), params)
+            db.commit()
+
+        return {"id": next_id, "message": "Created successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create insert issue: {e}")
 
 @app.post("/api/insert_issues/bulk")
 def bulk_create_insert_issues(data: dict, db: Session = Depends(get_db)):
     issues = data.get("issues") or []
     count = 0
-    for iss in issues:
-        date_val = iss.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
-        shift = (iss.get("shift") or "First").strip()
-        dept = (iss.get("department") or "WIPRO").strip()
-        spec = (iss.get("insert_spec") or "").strip()
-        batch = (iss.get("batch_no") or "").strip()
-        qty_iss = float(iss.get("qty_issued") or 0.0)
-        qty_rec = float(iss.get("qty_received") or 0.0)
-        mach = (iss.get("machine") or "").strip()
-        op = (iss.get("operator") or "").strip()
-        partno = (iss.get("partno") or "").strip()
-        opn = str(iss.get("opn_no") or "").strip()
-        usages = str(iss.get("usages") or "")
-        rid = int(iss.get("receipt_id")) if iss.get("receipt_id") else None
-        edge = str(iss.get("edge_data") or "")
-        db.execute(text("""
-            INSERT INTO insert_issues (date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
-            VALUES (:date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
-        """), {"date": date_val, "shift": shift, "dept": dept, "spec": spec, "batch": batch, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn, "usages": usages, "rid": rid, "edge": edge})
-        count += 1
-    db.commit()
-    return {"message": f"Successfully created {count} insert issue records"}
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('insert_issues', 'id'), coalesce(max(id),0) + 1, false) FROM insert_issues;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) AS max_id FROM insert_issues")).mappings().first()
+            curr_id = int(max_row.get("max_id")) if max_row and max_row.get("max_id") else 0
+        except Exception:
+            db.rollback()
+            curr_id = 0
+
+        for iss in issues:
+            curr_id += 1
+            date_val = normalize_date_str(iss.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
+            shift = (iss.get("shift") or "First").strip()
+            dept = (iss.get("department") or "WIPRO").strip()
+            spec = (iss.get("insert_spec") or "").strip()
+            batch = (iss.get("batch_no") or "").strip()
+            qty_iss = float(iss.get("qty_issued") or 0.0)
+            qty_rec = float(iss.get("qty_received") or 0.0)
+            mach = (iss.get("machine") or "").strip()
+            op = (iss.get("operator") or "").strip()
+            partno = (iss.get("partno") or "").strip()
+            opn = str(iss.get("opn_no") or "").strip()
+            usages = str(iss.get("usages") or "")
+            rid = int(iss.get("receipt_id")) if iss.get("receipt_id") else None
+            edge = str(iss.get("edge_data") or "")
+            params = {
+                "id": curr_id,
+                "date": date_val, "shift": shift, "dept": dept, "spec": spec, "batch": batch,
+                "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno,
+                "opn": opn, "usages": usages, "rid": rid, "edge": edge
+            }
+            try:
+                db.execute(text("""
+                    INSERT INTO insert_issues (id, date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
+                    VALUES (:id, :date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
+                """), params)
+            except Exception:
+                db.rollback()
+                db.execute(text("""
+                    INSERT INTO insert_issues (date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
+                    VALUES (:date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
+                """), params)
+            count += 1
+        db.commit()
+        return {"message": f"Successfully created {count} insert issue records"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/insert_issues/{id}")
 def update_insert_issue(id: int, data: dict, db: Session = Depends(get_db)):
-    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    date_val = normalize_date_str(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
     shift = (data.get("shift") or "First").strip()
     dept = (data.get("department") or "WIPRO").strip()
     spec = (data.get("insert_spec") or "").strip()
@@ -4269,45 +4640,108 @@ def get_tap_issues(db: Session = Depends(get_db)):
 
 @app.post("/api/tap_issues")
 def create_tap_issue(data: dict, db: Session = Depends(get_db)):
-    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
-    shift = (data.get("shift") or "First").strip()
-    dept = (data.get("department") or "WIPRO").strip()
-    spec = (data.get("tap_spec") or "").strip()
-    qty_iss = float(data.get("qty_issued") or 0.0)
-    qty_rec = float(data.get("qty_received") or 0.0)
-    mach = (data.get("machine") or "").strip()
-    op = (data.get("operator") or "").strip()
-    partno = (data.get("partno") or "").strip()
-    opn = str(data.get("opn_no") or "").strip()
-    db.execute(text("""
-        INSERT INTO tap_issues (date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
-        VALUES (:date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
-    """), {"date": date_val, "shift": shift, "dept": dept, "spec": spec, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn})
-    db.commit()
-    return {"message": "Created successfully"}
+    try:
+        date_val = normalize_date_str(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
+        shift = (data.get("shift") or "First").strip()
+        dept = (data.get("department") or "WIPRO").strip()
+        spec = (data.get("tap_spec") or "").strip()
+        qty_iss = float(data.get("qty_issued") or 0.0)
+        qty_rec = float(data.get("qty_received") or 0.0)
+        mach = (data.get("machine") or "").strip()
+        op = (data.get("operator") or "").strip()
+        partno = (data.get("partno") or "").strip()
+        opn = str(data.get("opn_no") or "").strip()
+
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('tap_issues', 'id'), coalesce(max(id),0) + 1, false) FROM tap_issues;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM tap_issues")).mappings().first()
+            next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        except Exception:
+            db.rollback()
+            next_id = 1
+
+        params = {
+            "id": next_id,
+            "date": date_val, "shift": shift, "dept": dept, "spec": spec,
+            "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn
+        }
+
+        try:
+            db.execute(text("""
+                INSERT INTO tap_issues (id, date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
+                VALUES (:id, :date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
+            """), params)
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO tap_issues (date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
+                VALUES (:date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
+            """), params)
+            db.commit()
+
+        return {"id": next_id, "message": "Created successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create tap issue: {e}")
 
 @app.post("/api/tap_issues/bulk")
 def bulk_create_tap_issues(data: dict, db: Session = Depends(get_db)):
     issues = data.get("issues") or []
     count = 0
-    for iss in issues:
-        date_val = iss.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
-        shift = (iss.get("shift") or "First").strip()
-        dept = (iss.get("department") or "WIPRO").strip()
-        spec = (iss.get("tap_spec") or "").strip()
-        qty_iss = float(iss.get("qty_issued") or 0.0)
-        qty_rec = float(iss.get("qty_received") or 0.0)
-        mach = (iss.get("machine") or "").strip()
-        op = (iss.get("operator") or "").strip()
-        partno = (iss.get("partno") or "").strip()
-        opn = str(iss.get("opn_no") or "").strip()
-        db.execute(text("""
-            INSERT INTO tap_issues (date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
-            VALUES (:date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
-        """), {"date": date_val, "shift": shift, "dept": dept, "spec": spec, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn})
-        count += 1
-    db.commit()
-    return {"message": f"Successfully created {count} tap issue records"}
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('tap_issues', 'id'), coalesce(max(id),0) + 1, false) FROM tap_issues;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        try:
+            max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) AS max_id FROM tap_issues")).mappings().first()
+            curr_id = int(max_row.get("max_id")) if max_row and max_row.get("max_id") else 0
+        except Exception:
+            db.rollback()
+            curr_id = 0
+
+        for iss in issues:
+            curr_id += 1
+            date_val = normalize_date_str(iss.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d"))
+            shift = (iss.get("shift") or "First").strip()
+            dept = (iss.get("department") or "WIPRO").strip()
+            spec = (iss.get("tap_spec") or "").strip()
+            qty_iss = float(iss.get("qty_issued") or 0.0)
+            qty_rec = float(iss.get("qty_received") or 0.0)
+            mach = (iss.get("machine") or "").strip()
+            op = (iss.get("operator") or "").strip()
+            partno = (iss.get("partno") or "").strip()
+            opn = str(iss.get("opn_no") or "").strip()
+            params = {
+                "id": curr_id,
+                "date": date_val, "shift": shift, "dept": dept, "spec": spec,
+                "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn
+            }
+            try:
+                db.execute(text("""
+                    INSERT INTO tap_issues (id, date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
+                    VALUES (:id, :date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
+                """), params)
+            except Exception:
+                db.rollback()
+                db.execute(text("""
+                    INSERT INTO tap_issues (date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
+                    VALUES (:date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
+                """), params)
+            count += 1
+        db.commit()
+        return {"message": f"Successfully created {count} tap issue records"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/tap_issues/{id}")
 def update_tap_issue(id: int, data: dict, db: Session = Depends(get_db)):
