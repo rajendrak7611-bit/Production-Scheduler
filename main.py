@@ -2862,8 +2862,8 @@ def clear_all_attendance(db: Session = Depends(get_db)):
 @app.get("/api/ht/spider_parts")
 def get_ht_spider_parts(db: Session = Depends(get_db)):
     try:
-        parts_rows = db.execute(text("SELECT id, partno, department FROM part_master WHERE UPPER(department) = 'SPIDER' OR partno IN (SELECT DISTINCT partno FROM ht_logs) ORDER BY partno;")).mappings().all()
-        prod_rows = db.execute(text("SELECT partno, opn_no, prod_qty FROM prod_log;")).mappings().all()
+        parts_rows = db.execute(text("SELECT id, partno, department FROM part_masters WHERE UPPER(department) = 'SPIDER' OR partno IN (SELECT DISTINCT partno FROM ht_logs) ORDER BY partno;")).mappings().all()
+        prod_rows = db.execute(text("SELECT partno, opn_no, prod_qty FROM production_logs;")).mappings().all()
         ht_rows = db.execute(text("SELECT partno, qty FROM ht_logs;")).mappings().all()
 
         prod_map = {}
@@ -2941,8 +2941,8 @@ def get_ht_vendor_pending_parts(db: Session = Depends(get_db)):
 @app.get("/api/pc/available_parts")
 def get_pc_available_parts(db: Session = Depends(get_db)):
     try:
-        parts_rows = db.execute(text("SELECT id, partno, department FROM part_master ORDER BY partno;")).mappings().all()
-        prod_rows = db.execute(text("SELECT partno, opn_no, prod_qty FROM prod_log;")).mappings().all()
+        parts_rows = db.execute(text("SELECT id, partno, department FROM part_masters ORDER BY partno;")).mappings().all()
+        prod_rows = db.execute(text("SELECT partno, opn_no, prod_qty FROM production_logs;")).mappings().all()
         pc_rows = db.execute(text("SELECT partno, qty FROM pc_logs;")).mappings().all()
 
         prod_map = {}
