@@ -88,7 +88,9 @@ def seed_default_users():
 @app.get("/api/restore-from-backup")
 def trigger_restore_backup():
     try:
+        import importlib
         import import_all_tables
+        importlib.reload(import_all_tables)
         import_all_tables.import_all_backup_tables()
         return {"message": "All 32 tables restored successfully from backup JSON & Excel!"}
     except Exception as e:
