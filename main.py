@@ -2314,34 +2314,40 @@ def bulk_import_raw_materials(items: list, db: Session = Depends(get_db)):
 @app.get("/api/rawmateriallogs")
 def get_raw_material_logs(db: Session = Depends(get_db)):
     try:
-        rows = db.execute(text("SELECT id, type, date, dc_type, forge_pn, dc_no, finish_part_no, part_prefix, qty, created_at FROM raw_material_logs ORDER BY id DESC;")).mappings().all()
-        return [{
-            "id": r["id"],
-            "type": r["type"] or "receipt",
-            "date": r["date"] or "",
-            "dc_type": r["dc_type"] or "",
-            "forge_pn": r["forge_pn"] or "",
-            "dc_no": r["dc_no"] or "",
-            "finish_part_no": r["finish_part_no"] or "",
-            "part_prefix": r["part_prefix"] or "",
-            "qty": int(r["qty"] or 0),
-            "created_at": str(r["created_at"] or "")
-        } for r in rows]
+        rows = db.execute(text("SELECT * FROM raw_material_logs ORDER BY id DESC;")).mappings().all()
+        if rows:
+            return [{
+                "id": r.get("id"),
+                "type": r.get("type") or "receipt",
+                "date": r.get("date") or "",
+                "dc_type": r.get("dc_type") or "",
+                "forge_pn": r.get("forge_pn") or "",
+                "dc_no": r.get("dc_no") or "",
+                "finish_part_no": r.get("finish_part_no") or "",
+                "part_prefix": r.get("part_prefix") or "",
+                "qty": int(r.get("qty") or 0),
+                "created_at": str(r.get("created_at") or "")
+            } for r in rows]
+        return []
     except Exception:
         db.rollback()
-        logs = db.query(models.RawMaterialLog).order_by(models.RawMaterialLog.id.desc()).all()
-        return [{
-            "id": l.id,
-            "type": l.type or "receipt",
-            "date": l.date or "",
-            "dc_type": l.dc_type or "",
-            "forge_pn": l.forge_pn or "",
-            "dc_no": l.dc_no or "",
-            "finish_part_no": l.finish_part_no or "",
-            "part_prefix": l.part_prefix or "",
-            "qty": l.qty or 0,
-            "created_at": str(l.created_at or "")
-        } for l in logs]
+        try:
+            logs = db.query(models.RawMaterialLog).order_by(models.RawMaterialLog.id.desc()).all()
+            return [{
+                "id": l.id,
+                "type": l.type or "receipt",
+                "date": l.date or "",
+                "dc_type": l.dc_type or "",
+                "forge_pn": l.forge_pn or "",
+                "dc_no": l.dc_no or "",
+                "finish_part_no": l.finish_part_no or "",
+                "part_prefix": l.part_prefix or "",
+                "qty": l.qty or 0,
+                "created_at": str(getattr(l, "created_at", "") or "")
+            } for l in logs]
+        except Exception:
+            db.rollback()
+            return []
 
 @app.post("/api/rawmateriallogs")
 def create_raw_material_log(data: dict, db: Session = Depends(get_db)):
