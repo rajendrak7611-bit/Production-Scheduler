@@ -105,15 +105,35 @@ class ProductionLog(Base):
     __tablename__ = "production_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    log_date = Column(String, nullable=False)  # YYYY-MM-DD
-    shift = Column(String, default="Shift A")   # Shift A, Shift B, Shift C
-    machine_name = Column(String, index=True, nullable=False)
-    operator_name = Column(String, index=True, nullable=False)
-    part_no = Column(String, index=True, nullable=False)
+    dept = Column(String, nullable=True)
+    date = Column(String, nullable=True)
+    shift = Column(String, nullable=True)
+    setter = Column(String, nullable=True)
+    machine = Column(String, nullable=True)
+    operator = Column(String, nullable=True)
+    partno = Column(String, nullable=True)
     opn_no = Column(String, nullable=True)
+    description = Column(String, nullable=True)
+    runtime = Column(Float, default=0.0)
+    cycle_time = Column(Float, default=0.0)
+    target_qty = Column(Float, default=0.0)
+    prod_qty = Column(Float, default=0.0)
+    efficiency = Column(Float, default=0.0)
+    idle_hours = Column(Float, default=0.0)
+    idle_reason = Column(String, default="None")
+    idle_hours_2 = Column(Float, default=0.0)
+    idle_reason_2 = Column(String, default="None")
+    idle_hours_3 = Column(Float, default=0.0)
+    idle_reason_3 = Column(String, default="None")
+    multiple_mc = Column(Integer, default=1)
+    # backward compatible fields
+    log_date = Column(String, nullable=True)
+    machine_name = Column(String, nullable=True)
+    operator_name = Column(String, nullable=True)
+    part_no = Column(String, nullable=True)
     qty_produced = Column(Integer, default=0)
     scrap_qty = Column(Integer, default=0)
-    completed_sl_nos = Column(Text, nullable=True)  # Stores comma-separated Sl Nos like "1,2,3,4,5"
+    completed_sl_nos = Column(Text, nullable=True)
     remarks = Column(Text, nullable=True)
     created_at = Column(DateTime, default=get_now_ist)
 

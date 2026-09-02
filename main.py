@@ -1976,45 +1976,245 @@ def get_completed_sl_nos(part_no: str, opn_no: Optional[str] = None, db: Session
         print("Error in get_completed_sl_nos:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/production-logs", response_model=ProductionLogResponse)
-def create_production_log(log: ProductionLogCreate, db: Session = Depends(get_db)):
-    data = log.model_dump()
-    
-    # Auto capture exact date and time in Indian Standard Time (IST, UTC+5:30)
-    now_ist = get_now_ist()
-    if not data.get("log_date"):
-        data["log_date"] = now_ist.strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Auto calculate shift based on IST time if not provided
-    if not data.get("shift"):
-        h = now_ist.hour
-        if 7 <= h < 15:
-            data["shift"] = "Shift A (07:00 - 15:00)"
-        elif 15 <= h < 23:
-            data["shift"] = "Shift B (15:00 - 23:00)"
-        else:
-            data["shift"] = "Shift C (23:00 - 07:00)"
+# --- Production Logging CRUD ---
+@app.get("/api/prodlog")
+@app.get("/api/production-logs")
+def get_all_prod_logs(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM production_logs ORDER BY id DESC")).mappings().all()
+        if rows:
+            results = []
+            for r in rows:
+                results.append({
+                    "id": r.get("id"),
+                    "dept": r.get("dept") or "",
+                    "date": r.get("date") or r.get("log_date") or "",
+                    "shift": r.get("shift") or "",
+                    "setter": r.get("setter") or "",
+                    "machine": r.get("machine") or r.get("machine_name") or "",
+                    "operator": r.get("operator") or r.get("operator_name") or "",
+                    "partno": r.get("partno") or r.get("part_no") or "",
+                    "opn_no": r.get("opn_no") or "",
+                    "description": r.get("description") or "",
+                    "runtime": float(r.get("runtime") or 0.0),
+                    "cycle_time": float(r.get("cycle_time") or 0.0),
+                    "target_qty": float(r.get("target_qty") or 0.0),
+                    "prod_qty": float(r.get("prod_qty") if r.get("prod_qty") is not None else (r.get("qty_produced") or 0)),
+                    "efficiency": float(r.get("efficiency") or 0.0),
+                    "idle_hours": float(r.get("idle_hours") or 0.0),
+                    "idle_reason": r.get("idle_reason") or "None",
+                    "idle_hours_2": float(r.get("idle_hours_2") or 0.0),
+                    "idle_reason_2": r.get("idle_reason_2") or "None",
+                    "idle_hours_3": float(r.get("idle_hours_3") or 0.0),
+                    "idle_reason_3": r.get("idle_reason_3") or "None",
+                    "multiple_mc": int(r.get("multiple_mc") or 1),
+                    "created_at": str(r.get("created_at") or "")
+                })
+            return results
+    except Exception:
+        db.rollback()
 
-    db_log = models.ProductionLog(**data)
-    db.add(db_log)
-    
-    # Auto update balance in production schedule matching part_no
-    schedules = db.query(models.ProductionSchedule).filter(models.ProductionSchedule.part_no == log.part_no).all()
-    for sch in schedules:
-        if sch.balance_to_produce > 0:
-            sch.balance_to_produce = max(0, sch.balance_to_produce - log.qty_produced)
-            
-    db.commit()
-    db.refresh(db_log)
-    return db_log
+    try:
+        logs = db.query(models.ProductionLog).order_by(models.ProductionLog.id.desc()).all()
+        return [{
+            "id": l.id,
+            "dept": getattr(l, "dept", "") or "",
+            "date": getattr(l, "date", "") or getattr(l, "log_date", "") or "",
+            "shift": l.shift or "",
+            "setter": getattr(l, "setter", "") or "",
+            "machine": getattr(l, "machine", "") or getattr(l, "machine_name", "") or "",
+            "operator": getattr(l, "operator", "") or getattr(l, "operator_name", "") or "",
+            "partno": getattr(l, "partno", "") or getattr(l, "part_no", "") or "",
+            "opn_no": getattr(l, "opn_no", "") or "",
+            "description": getattr(l, "description", "") or "",
+            "runtime": float(getattr(l, "runtime", 0.0) or 0.0),
+            "cycle_time": float(getattr(l, "cycle_time", 0.0) or 0.0),
+            "target_qty": float(getattr(l, "target_qty", 0.0) or 0.0),
+            "prod_qty": float(getattr(l, "prod_qty", None) if getattr(l, "prod_qty", None) is not None else (getattr(l, "qty_produced", 0) or 0)),
+            "efficiency": float(getattr(l, "efficiency", 0.0) or 0.0),
+            "idle_hours": float(getattr(l, "idle_hours", 0.0) or 0.0),
+            "idle_reason": getattr(l, "idle_reason", "None") or "None",
+            "idle_hours_2": float(getattr(l, "idle_hours_2", 0.0) or 0.0),
+            "idle_reason_2": getattr(l, "idle_reason_2", "None") or "None",
+            "idle_hours_3": float(getattr(l, "idle_hours_3", 0.0) or 0.0),
+            "idle_reason_3": getattr(l, "idle_reason_3", "None") or "None",
+            "multiple_mc": int(getattr(l, "multiple_mc", 1) or 1),
+            "created_at": str(getattr(l, "created_at", "") or "")
+        } for l in logs]
+    except Exception:
+        db.rollback()
+        return []
 
+@app.post("/api/prodlog")
+@app.post("/api/production-logs")
+def create_prod_log(data: dict, db: Session = Depends(get_db)):
+    dept = (data.get("dept") or "").strip()
+    date_val = (data.get("date") or data.get("log_date") or "").strip()
+    shift = (data.get("shift") or "").strip()
+    setter = (data.get("setter") or "").strip()
+    machine = (data.get("machine") or data.get("machine_name") or "").strip()
+    operator = (data.get("operator") or data.get("operator_name") or "").strip()
+    partno = (data.get("partno") or data.get("part_no") or "").strip()
+    opn_no = (data.get("opn_no") or "").strip()
+    description = (data.get("description") or "").strip()
+    runtime = float(data.get("runtime") or 0.0)
+    cycle_time = float(data.get("cycle_time") or 0.0)
+    target_qty = float(data.get("target_qty") or 0.0)
+    prod_qty = float(data.get("prod_qty") if data.get("prod_qty") is not None else (data.get("qty_produced") or 0.0))
+    efficiency = float(data.get("efficiency") or 0.0)
+    idle_hours = float(data.get("idle_hours") or 0.0)
+    idle_reason = (data.get("idle_reason") or "None").strip()
+    idle_hours_2 = float(data.get("idle_hours_2") or 0.0)
+    idle_reason_2 = (data.get("idle_reason_2") or "None").strip()
+    idle_hours_3 = float(data.get("idle_hours_3") or 0.0)
+    idle_reason_3 = (data.get("idle_reason_3") or "None").strip()
+    multiple_mc = int(data.get("multiple_mc") or 1)
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('production_logs', 'id'), coalesce(max(id),0) + 1, false) FROM production_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM production_logs")).mappings().first()
+        next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+    except Exception:
+        db.rollback()
+        next_id = 1
+
+    params = {
+        "id": next_id,
+        "dept": dept,
+        "date": date_val,
+        "shift": shift,
+        "setter": setter,
+        "machine": machine,
+        "operator": operator,
+        "partno": partno,
+        "opn_no": opn_no,
+        "description": description,
+        "runtime": runtime,
+        "cycle_time": cycle_time,
+        "target_qty": target_qty,
+        "prod_qty": prod_qty,
+        "efficiency": efficiency,
+        "idle_hours": idle_hours,
+        "idle_reason": idle_reason,
+        "idle_hours_2": idle_hours_2,
+        "idle_reason_2": idle_reason_2,
+        "idle_hours_3": idle_hours_3,
+        "idle_reason_3": idle_reason_3,
+        "multiple_mc": multiple_mc,
+        "log_date": date_val,
+        "machine_name": machine,
+        "operator_name": operator,
+        "part_no": partno,
+        "qty_produced": int(prod_qty)
+    }
+
+    try:
+        db.execute(text("""
+            INSERT INTO production_logs (id, dept, date, shift, setter, machine, operator, partno, opn_no, description, runtime, cycle_time, target_qty, prod_qty, efficiency, idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc, log_date, machine_name, operator_name, part_no, qty_produced)
+            VALUES (:id, :dept, :date, :shift, :setter, :machine, :operator, :partno, :opn_no, :description, :runtime, :cycle_time, :target_qty, :prod_qty, :efficiency, :idle_hours, :idle_reason, :idle_hours_2, :idle_reason_2, :idle_hours_3, :idle_reason_3, :multiple_mc, :log_date, :machine_name, :operator_name, :part_no, :qty_produced)
+        """), params)
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            db.execute(text("""
+                INSERT INTO production_logs (dept, date, shift, setter, machine, operator, partno, opn_no, description, runtime, cycle_time, target_qty, prod_qty, efficiency, idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc, log_date, machine_name, operator_name, part_no, qty_produced)
+                VALUES (:dept, :date, :shift, :setter, :machine, :operator, :partno, :opn_no, :description, :runtime, :cycle_time, :target_qty, :prod_qty, :efficiency, :idle_hours, :idle_reason, :idle_hours_2, :idle_reason_2, :idle_hours_3, :idle_reason_3, :multiple_mc, :log_date, :machine_name, :operator_name, :part_no, :qty_produced)
+            """), params)
+            db.commit()
+        except Exception as ex:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to save production log: {ex}")
+
+    return {"id": next_id, "message": "Production Log saved successfully"}
+
+@app.put("/api/prodlog/{log_id}")
+@app.put("/api/production-logs/{log_id}")
+def update_prod_log(log_id: int, data: dict, db: Session = Depends(get_db)):
+    params = {
+        "id": log_id,
+        "dept": (data.get("dept") or "").strip(),
+        "date": (data.get("date") or data.get("log_date") or "").strip(),
+        "shift": (data.get("shift") or "").strip(),
+        "setter": (data.get("setter") or "").strip(),
+        "machine": (data.get("machine") or data.get("machine_name") or "").strip(),
+        "operator": (data.get("operator") or data.get("operator_name") or "").strip(),
+        "partno": (data.get("partno") or data.get("part_no") or "").strip(),
+        "opn_no": (data.get("opn_no") or "").strip(),
+        "description": (data.get("description") or "").strip(),
+        "runtime": float(data.get("runtime") or 0.0),
+        "cycle_time": float(data.get("cycle_time") or 0.0),
+        "target_qty": float(data.get("target_qty") or 0.0),
+        "prod_qty": float(data.get("prod_qty") if data.get("prod_qty") is not None else (data.get("qty_produced") or 0.0)),
+        "efficiency": float(data.get("efficiency") or 0.0),
+        "idle_hours": float(data.get("idle_hours") or 0.0),
+        "idle_reason": (data.get("idle_reason") or "None").strip(),
+        "idle_hours_2": float(data.get("idle_hours_2") or 0.0),
+        "idle_reason_2": (data.get("idle_reason_2") or "None").strip(),
+        "idle_hours_3": float(data.get("idle_hours_3") or 0.0),
+        "idle_reason_3": (data.get("idle_reason_3") or "None").strip(),
+        "multiple_mc": int(data.get("multiple_mc") or 1),
+        "log_date": (data.get("date") or data.get("log_date") or "").strip(),
+        "machine_name": (data.get("machine") or data.get("machine_name") or "").strip(),
+        "operator_name": (data.get("operator") or data.get("operator_name") or "").strip(),
+        "part_no": (data.get("partno") or data.get("part_no") or "").strip(),
+        "qty_produced": int(float(data.get("prod_qty") if data.get("prod_qty") is not None else (data.get("qty_produced") or 0.0)))
+    }
+    try:
+        db.execute(text("""
+            UPDATE production_logs SET
+                dept = :dept, date = :date, shift = :shift, setter = :setter,
+                machine = :machine, operator = :operator, partno = :partno,
+                opn_no = :opn_no, description = :description, runtime = :runtime,
+                cycle_time = :cycle_time, target_qty = :target_qty, prod_qty = :prod_qty,
+                efficiency = :efficiency, idle_hours = :idle_hours, idle_reason = :idle_reason,
+                idle_hours_2 = :idle_hours_2, idle_reason_2 = :idle_reason_2,
+                idle_hours_3 = :idle_hours_3, idle_reason_3 = :idle_reason_3,
+                multiple_mc = :multiple_mc, log_date = :log_date,
+                machine_name = :machine_name, operator_name = :operator_name,
+                part_no = :part_no, qty_produced = :qty_produced
+            WHERE id = :id
+        """), params)
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update production log: {ex}")
+    return {"id": log_id, "message": "Production Log updated successfully"}
+
+@app.delete("/api/prodlog/{log_id}")
 @app.delete("/api/production-logs/{log_id}")
 def delete_production_log(log_id: int, db: Session = Depends(get_db)):
-    db_log = db.query(models.ProductionLog).filter(models.ProductionLog.id == log_id).first()
-    if not db_log:
-        raise HTTPException(status_code=404, detail="Log entry not found")
-    db.delete(db_log)
-    db.commit()
+    try:
+        db.execute(text("DELETE FROM production_logs WHERE id = :id"), {"id": log_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            db_log = db.query(models.ProductionLog).filter(models.ProductionLog.id == log_id).first()
+            if db_log:
+                db.delete(db_log)
+                db.commit()
+        except Exception:
+            db.rollback()
+    return {"message": "Production Log deleted successfully"}
+
+@app.delete("/api/prodlog/clear-all")
+@app.delete("/api/prodlog/all")
+@app.post("/api/prodlog/clear-all")
+@app.delete("/api/production-logs/clear-all")
+def clear_all_prod_logs(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM production_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All production logs cleared successfully"}
+
 # --- Tooling ---
 @app.get("/api/tooling", response_model=List[ToolingResponse])
 def get_tooling(db: Session = Depends(get_db)):
