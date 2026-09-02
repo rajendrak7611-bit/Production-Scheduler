@@ -5129,6 +5129,75 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function populateProdLogDeptFields(dept = '') {
+        const deptUpper = (dept || '').trim().toUpperCase();
+        const machSelect = document.getElementById('prodLogMachine');
+        const opSelect = document.getElementById('prodLogOperator');
+        const setterSelect = document.getElementById('prodLogSetter');
+
+        if (machSelect) {
+            const currentMach = machSelect.value;
+            machSelect.innerHTML = '<option value="">-- Select Machine --</option>';
+            const machs = prodLogAllMachines.filter(m => !deptUpper || (m.department || m.dept || '').trim().toUpperCase() === deptUpper);
+            const machsToDisplay = machs.length > 0 ? machs : prodLogAllMachines;
+            machsToDisplay.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.name;
+                opt.textContent = m.name;
+                machSelect.appendChild(opt);
+            });
+            if (currentMach && machsToDisplay.some(m => m.name === currentMach)) {
+                machSelect.value = currentMach;
+            }
+        }
+
+        if (opSelect) {
+            const currentOp = opSelect.value;
+            opSelect.innerHTML = '<option value="">-- Select Operator --</option>';
+            const filteredOperators = prodLogAllOperators.filter(o => !deptUpper || (o.department || o.dept || '').trim().toUpperCase() === deptUpper);
+            const opsToDisplay = filteredOperators.length > 0 ? filteredOperators : prodLogAllOperators;
+            opsToDisplay.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(o => {
+                const opt = document.createElement('option');
+                opt.value = o.name;
+                opt.textContent = o.name;
+                opSelect.appendChild(opt);
+            });
+            if (currentOp && opsToDisplay.some(o => o.name === currentOp)) {
+                opSelect.value = currentOp;
+            }
+        }
+
+        if (setterSelect) {
+            const currentSetter = setterSelect.value;
+            setterSelect.innerHTML = '<option value="">-- Select Setter --</option>';
+            const filteredSetters = prodLogAllSetters.filter(s => !deptUpper || (s.department || s.dept || '').trim().toUpperCase() === deptUpper);
+            const settersToDisplay = filteredSetters.length > 0 ? filteredSetters : prodLogAllSetters;
+            settersToDisplay.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.name;
+                setterSelect.appendChild(opt);
+            });
+            if (currentSetter && settersToDisplay.some(s => s.name === currentSetter)) {
+                setterSelect.value = currentSetter;
+            }
+        }
+
+        if (prodLogPartNoTomSelect) prodLogPartNoTomSelect.clear();
+        else if (document.getElementById('prodLogPartNo')) document.getElementById('prodLogPartNo').value = '';
+
+        updateProdLogPartList(deptUpper);
+
+        // Reset dependent fields
+        const opnEl = document.getElementById('prodLogOpnNo');
+        if (opnEl) opnEl.innerHTML = '<option value="">-- Select Operation --</option>';
+        const descEl = document.getElementById('prodLogDescription');
+        if (descEl) descEl.value = '';
+        const ctEl = document.getElementById('prodLogCycleTime');
+        if (ctEl) ctEl.value = '';
+        recalcProdLog();
+    }
+
     async function initProdLog() {
         if (!document.getElementById('prodLogDate').value) {
             document.getElementById('prodLogDate').valueAsDate = new Date();
@@ -5150,59 +5219,14 @@ document.addEventListener('DOMContentLoaded', () => {
         prodLogSchedules = schedData.filter(s => s.status === 'Pending' || !s.status);
         prodLogAllPartMasters = await pmRes.json();
 
-        // Populate Setter dropdown
-        const setterSelect = document.getElementById('prodLogSetter');
-        if (setterSelect) {
-            setterSelect.innerHTML = '<option value="">-- Select Setter --</option>';
-            prodLogAllSetters.forEach(s => {
-                setterSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
-            });
-        }
-        
         const currentDept = document.getElementById('prodLogDept')?.value || '';
-        updateProdLogPartList(currentDept);
+        populateProdLogDeptFields(currentDept);
         
         fetchProdLogs();
     }
 
-    document.getElementById('prodLogDept').addEventListener('change', (e) => {
-        const dept = e.target.value.trim().toUpperCase();
-        const machSelect = document.getElementById('prodLogMachine');
-        const opSelect = document.getElementById('prodLogOperator');
-        const setterSelect = document.getElementById('prodLogSetter');
-        
-        machSelect.innerHTML = '<option value="">-- Select Machine --</option>';
-        opSelect.innerHTML = '<option value="">-- Select Operator --</option>';
-        if (setterSelect) setterSelect.innerHTML = '<option value="">-- Select Setter --</option>';
-        if (prodLogPartNoTomSelect) prodLogPartNoTomSelect.clear();
-        else if (document.getElementById('prodLogPartNo')) document.getElementById('prodLogPartNo').value = '';
-        
-        prodLogAllMachines.filter(m => (m.department || '').trim().toUpperCase() === dept).forEach(m => {
-            machSelect.innerHTML += `<option value="${m.name}">${m.name}</option>`;
-        });
-        
-        const filteredOperators = prodLogAllOperators.filter(o => !dept || !o.department || (o.department || '').trim().toUpperCase() === dept);
-        const opsToDisplay = filteredOperators.length > 0 ? filteredOperators : prodLogAllOperators;
-        opsToDisplay.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        opsToDisplay.forEach(o => {
-            opSelect.innerHTML += `<option value="${o.name}">${o.name}</option>`;
-        });
-
-        if (setterSelect) {
-            const filteredSetters = prodLogAllSetters.filter(s => !dept || !s.department || s.department.trim().toUpperCase() === dept);
-            const settersToDisplay = filteredSetters.length > 0 ? filteredSetters : prodLogAllSetters;
-            settersToDisplay.forEach(s => {
-                setterSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
-            });
-        }
-        
-        updateProdLogPartList(dept);
-        
-        // Reset dependent fields
-        document.getElementById('prodLogOpnNo').innerHTML = '<option value="">-- Select Operation --</option>';
-        document.getElementById('prodLogDescription').value = '';
-        document.getElementById('prodLogCycleTime').value = '';
-        recalcProdLog();
+    document.getElementById('prodLogDept')?.addEventListener('change', (e) => {
+        populateProdLogDeptFields(e.target.value);
     });
 
     document.getElementById('prodLogPartNo')?.addEventListener('change', async (e) => {
@@ -5211,7 +5235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('prodLogOpnNo').addEventListener('change', (e) => {
+    document.getElementById('prodLogOpnNo')?.addEventListener('change', (e) => {
         const opn_no = String(e.target.value).trim();
         const op = currentPartOperations.find(o => String(o.opn_no).trim() === opn_no);
         if (op) {
