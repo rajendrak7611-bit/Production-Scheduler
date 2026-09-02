@@ -51,7 +51,7 @@ def import_all_backup_tables():
         total_inserted = 0
         try:
             for table_name, rows in tables.items():
-                if not rows:
+                if not rows or table_name in ["production_logs", "users"]:
                     continue
                 
                 first_row = rows[0]
