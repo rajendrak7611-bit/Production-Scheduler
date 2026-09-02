@@ -2637,10 +2637,9 @@ def create_raw_material_log(data: dict, db: Session = Depends(get_db)):
         """), {"type": rtype, "date": rdate, "dc_type": dctype, "forge_pn": fpn, "dc_no": dcno, "finish_part_no": fpno, "part_prefix": pprefix, "qty": qty})
         
         # Auto sync stock in raw_materials
-        rec_sum = db.execute(text("SELECT COALESCE(SUM(qty), 0) AS total FROM raw_material_logs WHERE LOWER(type) = 'receipt' AND forge_pn = :fpn"), {"fpn": fpn}).mappings().first()
-        desp_sum = db.execute(text("SELECT COALESCE(SUM(qty), 0) AS total FROM raw_material_logs WHERE LOWER(type) = 'despatch' AND forge_pn = :fpn"), {"fpn": fpn}).mappings().first()
-        cur_rcpt = int(rec_sum["total"] if rec_sum else 0)
-        cur_dspt = int(desp_sum["total"] if desp_sum else 0)
+        logs_for_fpn = db.execute(text("SELECT type, qty FROM raw_material_logs WHERE forge_pn = :fpn"), {"fpn": fpn}).mappings().all()
+        cur_rcpt = sum(int(float(l["qty"] or 0)) for l in logs_for_fpn if (l.get("type") or "").strip().lower() == "receipt")
+        cur_dspt = sum(int(float(l["qty"] or 0)) for l in logs_for_fpn if (l.get("type") or "").strip().lower() == "despatch")
         cur_stk = cur_rcpt - cur_dspt
 
         existing_rm = db.execute(text("SELECT id FROM raw_materials WHERE forge_pn = :forge_pn"), {"forge_pn": fpn}).mappings().first()
@@ -2693,10 +2692,9 @@ def update_raw_material_log(log_id: int, data: dict, db: Session = Depends(get_d
         })
         
         # Recalculate stock for this forge_pn
-        rec_sum = db.execute(text("SELECT COALESCE(SUM(qty), 0) AS total FROM raw_material_logs WHERE LOWER(type) = 'receipt' AND forge_pn = :fpn"), {"fpn": fpn}).mappings().first()
-        desp_sum = db.execute(text("SELECT COALESCE(SUM(qty), 0) AS total FROM raw_material_logs WHERE LOWER(type) = 'despatch' AND forge_pn = :fpn"), {"fpn": fpn}).mappings().first()
-        cur_rcpt = int(rec_sum["total"] if rec_sum else 0)
-        cur_dspt = int(desp_sum["total"] if desp_sum else 0)
+        logs_for_fpn = db.execute(text("SELECT type, qty FROM raw_material_logs WHERE forge_pn = :fpn"), {"fpn": fpn}).mappings().all()
+        cur_rcpt = sum(int(float(l["qty"] or 0)) for l in logs_for_fpn if (l.get("type") or "").strip().lower() == "receipt")
+        cur_dspt = sum(int(float(l["qty"] or 0)) for l in logs_for_fpn if (l.get("type") or "").strip().lower() == "despatch")
         cur_stk = cur_rcpt - cur_dspt
 
         existing_rm = db.execute(text("SELECT id FROM raw_materials WHERE forge_pn = :forge_pn"), {"forge_pn": fpn}).mappings().first()
