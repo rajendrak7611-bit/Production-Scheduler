@@ -165,7 +165,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Special case for Clear All Parts tab (Admin only, visible in Part Master sub menu)
+        // Special case for Add Part tab and Clear All Parts tab (visible in Part Master sub menu)
+        const addPartTab = document.getElementById('addPartTab');
+        if (addPartTab) {
+            addPartTab.onclick = () => {
+                closePartModal();
+                openPartModal(false);
+            };
+            addPartTab.style.display = 'none';
+        }
+
         const clearAllPartsTab = document.getElementById('clearAllPartsTab');
         if (clearAllPartsTab) {
             clearAllPartsTab.onclick = async () => {
@@ -378,6 +387,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.sub-tab').forEach(btn => btn.classList.remove('active'));
         importBtn.style.display = 'none';
         if (addBtn) addBtn.style.display = 'none';
+        const addPartBtnTab = document.getElementById('addPartTab');
+        if (addPartBtnTab) addPartBtnTab.style.display = 'none';
         const clearBtn = document.getElementById('clearAllPartsTab');
         if (clearBtn) clearBtn.style.display = 'none';
     }
@@ -471,7 +482,10 @@ document.addEventListener('DOMContentLoaded', () => {
         'sidebarPartMaster': { tab: 'partmaster', action: () => { 
             partMasterSection.style.display = 'block'; 
             importBtn.style.display = 'inline-block';
+            addBtn.style.display = 'inline-flex';
             addBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Part';
+            const addPartBtnTab = document.getElementById('addPartTab');
+            if (addPartBtnTab) addPartBtnTab.style.display = 'inline-block';
             const clearBtn = document.getElementById('clearAllPartsTab');
             if (clearBtn) clearBtn.style.display = isUserAdmin() ? 'inline-block' : 'none';
             fetchPartMasters(); 
