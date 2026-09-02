@@ -6560,20 +6560,37 @@ document.addEventListener('DOMContentLoaded', () => {
             deptForm.reset();
             deptIdInput.value = '';
         }
+        deptModal.classList.add('active');
         deptModal.classList.add('show');
     }
 
-    if (cancelDeptBtn) {
-        cancelDeptBtn.addEventListener('click', () => {
+    function closeDeptModal() {
+        if (deptModal) {
+            deptModal.classList.remove('active');
             deptModal.classList.remove('show');
-        });
+        }
+        if (deptForm) deptForm.reset();
+        if (deptIdInput) deptIdInput.value = '';
+    }
+
+    if (cancelDeptBtn) {
+        cancelDeptBtn.addEventListener('click', closeDeptModal);
+    }
+    const closeDeptModalBtn = document.getElementById('closeDeptModalBtn');
+    if (closeDeptModalBtn) {
+        closeDeptModalBtn.addEventListener('click', closeDeptModal);
     }
 
     if (deptForm) {
         deptForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const nameVal = (deptNameInput.value || '').trim();
+            if (!nameVal) {
+                alert('Please enter a department name.');
+                return;
+            }
             const payload = {
-                name: deptNameInput.value
+                name: nameVal
             };
             const id = deptIdInput.value;
             const method = id ? 'PUT' : 'POST';
@@ -6586,14 +6603,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(payload)
                 });
                 if (res.ok) {
-                    deptModal.classList.remove('show');
+                    closeDeptModal();
                     fetchDepartments();
                 } else {
-                    alert('Error saving department');
+                    const errText = await res.text().catch(() => '');
+                    alert('Error saving department: ' + (errText || 'Please try again.'));
                 }
             } catch (err) {
                 console.error(err);
-                alert('Error saving department');
+                alert('Error saving department: ' + err);
             }
         });
     }

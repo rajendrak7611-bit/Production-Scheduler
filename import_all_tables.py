@@ -100,6 +100,28 @@ def import_all_backup_tables():
             with engine.connect() as conn2:
                 t2 = conn2.begin()
                 try:
+                    # Departments
+                    departments_data = tables.get("departments", [])
+                    if departments_data:
+                        try:
+                            conn2.execute(text("DELETE FROM departments;"))
+                        except Exception:
+                            pass
+                        for d in departments_data:
+                            did = int(safe_float(d.get("id"), 0))
+                            dname = d.get("name") or d.get("dept") or d.get("department")
+                            if dname:
+                                try:
+                                    if did:
+                                        conn2.execute(text("INSERT INTO departments (id, name) VALUES (:id, :name);"), {"id": did, "name": dname})
+                                    else:
+                                        conn2.execute(text("INSERT INTO departments (name) VALUES (:name);"), {"name": dname})
+                                except Exception:
+                                    try:
+                                        conn2.execute(text("INSERT INTO departments (name) VALUES (:name);"), {"name": dname})
+                                    except Exception:
+                                        pass
+
                     # Machines
                     machines_data = tables.get("machines", [])
                     if machines_data:

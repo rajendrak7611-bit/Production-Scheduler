@@ -3,6 +3,12 @@ from sqlalchemy.orm import relationship
 from database import Base
 import datetime
 
+class Department(Base):
+    __tablename__ = "departments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+
 class Machine(Base):
     __tablename__ = "machines"
 

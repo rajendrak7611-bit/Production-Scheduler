@@ -476,6 +476,95 @@ def bulk_import_machines(data: dict, db: Session = Depends(get_db)):
                         db.rollback()
     return {"message": f"Successfully imported {count} machines!", "imported_count": count}
 
+# --- Departments ---
+@app.get("/api/departments")
+def get_departments(db: Session = Depends(get_db)):
+    try:
+        from sqlalchemy import text
+        rows = db.execute(text("SELECT * FROM departments ORDER BY id ASC")).mappings().all()
+        if rows:
+            return [{"id": r.get("id"), "name": r.get("name") or ""} for r in rows]
+    except Exception:
+        db.rollback()
+
+    try:
+        depts = db.query(models.Department).order_by(models.Department.id.asc()).all()
+        return [{"id": d.id, "name": d.name} for d in depts]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/departments")
+def create_department(data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Department name cannot be empty")
+    try:
+        db.execute(text("INSERT INTO departments (name) VALUES (:name)"), {"name": name})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            d_obj = models.Department(name=name)
+            db.add(d_obj)
+            db.commit()
+        except Exception as ex:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to create department: {ex}")
+    
+    try:
+        row = db.execute(text("SELECT id, name FROM departments WHERE name = :name ORDER BY id DESC LIMIT 1"), {"name": name}).mappings().first()
+        return {"id": row.get("id") if row else 1, "name": name, "message": "Department created successfully"}
+    except Exception:
+        return {"name": name, "message": "Department created successfully"}
+
+@app.put("/api/departments/{dept_id}")
+def update_department(dept_id: int, data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Department name cannot be empty")
+    try:
+        db.execute(text("UPDATE departments SET name = :name WHERE id = :id"), {"id": dept_id, "name": name})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            d_obj = db.query(models.Department).filter(models.Department.id == dept_id).first()
+            if d_obj:
+                d_obj.name = name
+                db.commit()
+        except Exception as ex:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to update department: {ex}")
+    return {"id": dept_id, "name": name, "message": "Department updated successfully"}
+
+@app.delete("/api/departments/{dept_id}")
+def delete_department(dept_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM departments WHERE id = :id"), {"id": dept_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            d_obj = db.query(models.Department).filter(models.Department.id == dept_id).first()
+            if d_obj:
+                db.delete(d_obj)
+                db.commit()
+        except Exception:
+            db.rollback()
+    return {"message": "Department deleted"}
+
+@app.delete("/api/departments/clear-all")
+@app.delete("/api/departments/all")
+@app.post("/api/departments/clear-all")
+def clear_all_departments(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM departments;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All departments cleared successfully!"}
+
 # --- Operators ---
 @app.get("/api/operators")
 def get_operators(db: Session = Depends(get_db)):
