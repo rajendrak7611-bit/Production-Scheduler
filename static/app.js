@@ -6718,20 +6718,37 @@ document.addEventListener('DOMContentLoaded', () => {
             shiftForm.reset();
             shiftIdInput.value = '';
         }
+        shiftModal.classList.add('active');
         shiftModal.classList.add('show');
     }
 
-    if (cancelShiftBtn) {
-        cancelShiftBtn.addEventListener('click', () => {
+    function closeShiftModal() {
+        if (shiftModal) {
+            shiftModal.classList.remove('active');
             shiftModal.classList.remove('show');
-        });
+        }
+        if (shiftForm) shiftForm.reset();
+        if (shiftIdInput) shiftIdInput.value = '';
+    }
+
+    if (cancelShiftBtn) {
+        cancelShiftBtn.addEventListener('click', closeShiftModal);
+    }
+    const closeShiftModalBtn = document.getElementById('closeShiftModalBtn');
+    if (closeShiftModalBtn) {
+        closeShiftModalBtn.addEventListener('click', closeShiftModal);
     }
 
     if (shiftForm) {
         shiftForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const nameVal = (shiftNameInput.value || '').trim();
+            if (!nameVal) {
+                alert('Please enter a shift name.');
+                return;
+            }
             const payload = {
-                name: shiftNameInput.value,
+                name: nameVal,
                 hours: parseFloat(shiftHoursInput.value) || 8.0
             };
             const id = shiftIdInput.value;
@@ -6745,14 +6762,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(payload)
                 });
                 if (res.ok) {
-                    shiftModal.classList.remove('show');
+                    closeShiftModal();
                     fetchShifts();
                 } else {
-                    alert('Error saving shift');
+                    const errText = await res.text().catch(() => '');
+                    alert('Error saving shift: ' + (errText || 'Please try again.'));
                 }
             } catch (err) {
                 console.error(err);
-                alert('Error saving shift');
+                alert('Error saving shift: ' + err);
             }
         });
     }

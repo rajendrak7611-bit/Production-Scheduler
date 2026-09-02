@@ -122,6 +122,98 @@ def import_all_backup_tables():
                                     except Exception:
                                         pass
 
+                    # Shifts
+                    shifts_data = tables.get("shifts", [])
+                    if shifts_data:
+                        try:
+                            conn2.execute(text("DELETE FROM shifts;"))
+                        except Exception:
+                            pass
+                        for s in shifts_data:
+                            sid = int(safe_float(s.get("id"), 0))
+                            sname = s.get("name")
+                            shours = float(safe_float(s.get("hours"), 8.0))
+                            if sname:
+                                try:
+                                    if sid:
+                                        conn2.execute(text("INSERT INTO shifts (id, name, hours) VALUES (:id, :name, :hours);"), {"id": sid, "name": sname, "hours": shours})
+                                    else:
+                                        conn2.execute(text("INSERT INTO shifts (name, hours) VALUES (:name, :hours);"), {"name": sname, "hours": shours})
+                                except Exception:
+                                    try:
+                                        conn2.execute(text("INSERT INTO shifts (name, hours) VALUES (:name, :hours);"), {"name": sname, "hours": shours})
+                                    except Exception:
+                                        pass
+
+                    # Vendors
+                    vendors_data = tables.get("vendors", [])
+                    if vendors_data:
+                        try:
+                            conn2.execute(text("DELETE FROM vendors;"))
+                        except Exception:
+                            pass
+                        for v in vendors_data:
+                            vid = int(safe_float(v.get("id"), 0))
+                            vname = v.get("name")
+                            vdetails = v.get("details") or ""
+                            if vname:
+                                try:
+                                    if vid:
+                                        conn2.execute(text("INSERT INTO vendors (id, name, details) VALUES (:id, :name, :details);"), {"id": vid, "name": vname, "details": vdetails})
+                                    else:
+                                        conn2.execute(text("INSERT INTO vendors (name, details) VALUES (:name, :details);"), {"name": vname, "details": vdetails})
+                                except Exception:
+                                    try:
+                                        conn2.execute(text("INSERT INTO vendors (name, details) VALUES (:name, :details);"), {"name": vname, "details": vdetails})
+                                    except Exception:
+                                        pass
+
+                    # Setters
+                    setters_data = tables.get("setters", [])
+                    if setters_data:
+                        try:
+                            conn2.execute(text("DELETE FROM setters;"))
+                        except Exception:
+                            pass
+                        for st in setters_data:
+                            stid = int(safe_float(st.get("id"), 0))
+                            stname = st.get("name")
+                            stdept = st.get("department") or st.get("dept") or ""
+                            if stname:
+                                try:
+                                    if stid:
+                                        conn2.execute(text("INSERT INTO setters (id, name, department) VALUES (:id, :name, :dept);"), {"id": stid, "name": stname, "dept": stdept})
+                                    else:
+                                        conn2.execute(text("INSERT INTO setters (name, department) VALUES (:name, :dept);"), {"name": stname, "dept": stdept})
+                                except Exception:
+                                    try:
+                                        conn2.execute(text("INSERT INTO setters (name, department) VALUES (:name, :dept);"), {"name": stname, "dept": stdept})
+                                    except Exception:
+                                        pass
+
+                    # Suppliers
+                    suppliers_data = tables.get("suppliers", [])
+                    if suppliers_data:
+                        try:
+                            conn2.execute(text("DELETE FROM suppliers;"))
+                        except Exception:
+                            pass
+                        for sup in suppliers_data:
+                            supid = int(safe_float(sup.get("id"), 0))
+                            supname = sup.get("name")
+                            supdetails = sup.get("details") or ""
+                            if supname:
+                                try:
+                                    if supid:
+                                        conn2.execute(text("INSERT INTO suppliers (id, name, details) VALUES (:id, :name, :details);"), {"id": supid, "name": supname, "details": supdetails})
+                                    else:
+                                        conn2.execute(text("INSERT INTO suppliers (name, details) VALUES (:name, :details);"), {"name": supname, "details": supdetails})
+                                except Exception:
+                                    try:
+                                        conn2.execute(text("INSERT INTO suppliers (name, details) VALUES (:name, :details);"), {"name": supname, "details": supdetails})
+                                    except Exception:
+                                        pass
+
                     # Machines
                     machines_data = tables.get("machines", [])
                     if machines_data:

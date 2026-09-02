@@ -583,6 +583,434 @@ def clear_all_departments(db: Session = Depends(get_db)):
         db.rollback()
     return {"message": "All departments cleared successfully!"}
 
+# --- Shifts ---
+@app.get("/api/shifts")
+def get_shifts(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM shifts ORDER BY id ASC")).mappings().all()
+        if rows:
+            return [{"id": r.get("id"), "name": r.get("name") or "", "hours": float(r.get("hours") or 8.0)} for r in rows]
+    except Exception:
+        db.rollback()
+
+    try:
+        shifts = db.query(models.Shift).order_by(models.Shift.id.asc()).all()
+        return [{"id": s.id, "name": s.name, "hours": s.hours} for s in shifts]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/shifts")
+def create_shift(data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    hours = float(data.get("hours") or 8.0)
+    if not name:
+        raise HTTPException(status_code=400, detail="Shift name cannot be empty")
+    
+    try:
+        existing = db.execute(text("SELECT id, name, hours FROM shifts WHERE UPPER(name) = :name"), {"name": name.upper()}).mappings().first()
+        if existing:
+            return {"id": existing.get("id"), "name": existing.get("name"), "hours": existing.get("hours"), "message": "Shift already exists"}
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('shifts', 'id'), coalesce(max(id),0) + 1, false) FROM shifts;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM shifts")).mappings().first()
+        next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        
+        try:
+            db.execute(text("INSERT INTO shifts (id, name, hours) VALUES (:id, :name, :hours)"), {"id": next_id, "name": name, "hours": hours})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("INSERT INTO shifts (name, hours) VALUES (:name, :hours)"), {"name": name, "hours": hours})
+            db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create shift: {ex}")
+    
+    try:
+        row = db.execute(text("SELECT id, name, hours FROM shifts WHERE UPPER(name) = :name ORDER BY id DESC LIMIT 1"), {"name": name.upper()}).mappings().first()
+        return {"id": row.get("id") if row else next_id, "name": name, "hours": hours, "message": "Shift created successfully"}
+    except Exception:
+        return {"id": next_id, "name": name, "hours": hours, "message": "Shift created successfully"}
+
+@app.put("/api/shifts/{shift_id}")
+def update_shift(shift_id: int, data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    hours = float(data.get("hours") or 8.0)
+    if not name:
+        raise HTTPException(status_code=400, detail="Shift name cannot be empty")
+    try:
+        db.execute(text("UPDATE shifts SET name = :name, hours = :hours WHERE id = :id"), {"id": shift_id, "name": name, "hours": hours})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            s_obj = db.query(models.Shift).filter(models.Shift.id == shift_id).first()
+            if s_obj:
+                s_obj.name = name
+                s_obj.hours = hours
+                db.commit()
+        except Exception as ex:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to update shift: {ex}")
+    return {"id": shift_id, "name": name, "hours": hours, "message": "Shift updated successfully"}
+
+@app.delete("/api/shifts/{shift_id}")
+def delete_shift(shift_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM shifts WHERE id = :id"), {"id": shift_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            s_obj = db.query(models.Shift).filter(models.Shift.id == shift_id).first()
+            if s_obj:
+                db.delete(s_obj)
+                db.commit()
+        except Exception:
+            db.rollback()
+    return {"message": "Shift deleted"}
+
+@app.delete("/api/shifts/clear-all")
+@app.delete("/api/shifts/all")
+@app.post("/api/shifts/clear-all")
+def clear_all_shifts(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM shifts;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All shifts cleared successfully!"}
+
+# --- Vendors ---
+@app.get("/api/vendors")
+def get_vendors(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM vendors ORDER BY id ASC")).mappings().all()
+        if rows:
+            return [{"id": r.get("id"), "name": r.get("name") or "", "details": r.get("details") or ""} for r in rows]
+    except Exception:
+        db.rollback()
+
+    try:
+        vendors = db.query(models.Vendor).order_by(models.Vendor.id.asc()).all()
+        return [{"id": v.id, "name": v.name, "details": v.details or ""} for v in vendors]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/vendors")
+def create_vendor(data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    details = (data.get("details") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Vendor name cannot be empty")
+    
+    try:
+        existing = db.execute(text("SELECT id, name, details FROM vendors WHERE UPPER(name) = :name"), {"name": name.upper()}).mappings().first()
+        if existing:
+            return {"id": existing.get("id"), "name": existing.get("name"), "details": existing.get("details"), "message": "Vendor already exists"}
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('vendors', 'id'), coalesce(max(id),0) + 1, false) FROM vendors;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM vendors")).mappings().first()
+        next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        
+        try:
+            db.execute(text("INSERT INTO vendors (id, name, details) VALUES (:id, :name, :details)"), {"id": next_id, "name": name, "details": details})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("INSERT INTO vendors (name, details) VALUES (:name, :details)"), {"name": name, "details": details})
+            db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create vendor: {ex}")
+    
+    try:
+        row = db.execute(text("SELECT id, name, details FROM vendors WHERE UPPER(name) = :name ORDER BY id DESC LIMIT 1"), {"name": name.upper()}).mappings().first()
+        return {"id": row.get("id") if row else next_id, "name": name, "details": details, "message": "Vendor created successfully"}
+    except Exception:
+        return {"id": next_id, "name": name, "details": details, "message": "Vendor created successfully"}
+
+@app.put("/api/vendors/{vendor_id}")
+def update_vendor(vendor_id: int, data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    details = (data.get("details") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Vendor name cannot be empty")
+    try:
+        db.execute(text("UPDATE vendors SET name = :name, details = :details WHERE id = :id"), {"id": vendor_id, "name": name, "details": details})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            v_obj = db.query(models.Vendor).filter(models.Vendor.id == vendor_id).first()
+            if v_obj:
+                v_obj.name = name
+                v_obj.details = details
+                db.commit()
+        except Exception as ex:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to update vendor: {ex}")
+    return {"id": vendor_id, "name": name, "details": details, "message": "Vendor updated successfully"}
+
+@app.delete("/api/vendors/{vendor_id}")
+def delete_vendor(vendor_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM vendors WHERE id = :id"), {"id": vendor_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            v_obj = db.query(models.Vendor).filter(models.Vendor.id == vendor_id).first()
+            if v_obj:
+                db.delete(v_obj)
+                db.commit()
+        except Exception:
+            db.rollback()
+    return {"message": "Vendor deleted"}
+
+@app.delete("/api/vendors/clear-all")
+@app.delete("/api/vendors/all")
+@app.post("/api/vendors/clear-all")
+def clear_all_vendors(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM vendors;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All vendors cleared successfully!"}
+
+# --- Suppliers ---
+@app.get("/api/suppliers")
+def get_suppliers(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM suppliers ORDER BY id ASC")).mappings().all()
+        if rows:
+            return [{"id": r.get("id"), "name": r.get("name") or "", "details": r.get("details") or ""} for r in rows]
+    except Exception:
+        db.rollback()
+
+    try:
+        suppliers = db.query(models.Supplier).order_by(models.Supplier.id.asc()).all()
+        return [{"id": s.id, "name": s.name, "details": s.details or ""} for s in suppliers]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/suppliers")
+def create_supplier(data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    details = (data.get("details") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Supplier name cannot be empty")
+    
+    try:
+        existing = db.execute(text("SELECT id, name, details FROM suppliers WHERE UPPER(name) = :name"), {"name": name.upper()}).mappings().first()
+        if existing:
+            return {"id": existing.get("id"), "name": existing.get("name"), "details": existing.get("details"), "message": "Supplier already exists"}
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('suppliers', 'id'), coalesce(max(id),0) + 1, false) FROM suppliers;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM suppliers")).mappings().first()
+        next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        
+        try:
+            db.execute(text("INSERT INTO suppliers (id, name, details) VALUES (:id, :name, :details)"), {"id": next_id, "name": name, "details": details})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("INSERT INTO suppliers (name, details) VALUES (:name, :details)"), {"name": name, "details": details})
+            db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create supplier: {ex}")
+    
+    try:
+        row = db.execute(text("SELECT id, name, details FROM suppliers WHERE UPPER(name) = :name ORDER BY id DESC LIMIT 1"), {"name": name.upper()}).mappings().first()
+        return {"id": row.get("id") if row else next_id, "name": name, "details": details, "message": "Supplier created successfully"}
+    except Exception:
+        return {"id": next_id, "name": name, "details": details, "message": "Supplier created successfully"}
+
+@app.put("/api/suppliers/{supplier_id}")
+def update_supplier(supplier_id: int, data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    details = (data.get("details") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Supplier name cannot be empty")
+    try:
+        db.execute(text("UPDATE suppliers SET name = :name, details = :details WHERE id = :id"), {"id": supplier_id, "name": name, "details": details})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            s_obj = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
+            if s_obj:
+                s_obj.name = name
+                s_obj.details = details
+                db.commit()
+        except Exception as ex:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to update supplier: {ex}")
+    return {"id": supplier_id, "name": name, "details": details, "message": "Supplier updated successfully"}
+
+@app.delete("/api/suppliers/{supplier_id}")
+def delete_supplier(supplier_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM suppliers WHERE id = :id"), {"id": supplier_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            s_obj = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
+            if s_obj:
+                db.delete(s_obj)
+                db.commit()
+        except Exception:
+            db.rollback()
+    return {"message": "Supplier deleted"}
+
+@app.delete("/api/suppliers/clear-all")
+@app.delete("/api/suppliers/all")
+@app.post("/api/suppliers/clear-all")
+def clear_all_suppliers(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM suppliers;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All suppliers cleared successfully!"}
+
+# --- Setters ---
+@app.get("/api/setters")
+def get_setters(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM setters ORDER BY id ASC")).mappings().all()
+        if rows:
+            return [{"id": r.get("id"), "name": r.get("name") or "", "department": r.get("department") or r.get("dept") or ""} for r in rows]
+    except Exception:
+        db.rollback()
+
+    try:
+        setters = db.query(models.Setter).order_by(models.Setter.id.asc()).all()
+        return [{"id": s.id, "name": s.name, "department": s.department or ""} for s in setters]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/setters")
+def create_setter(data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    department = (data.get("department") or data.get("dept") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Setter name cannot be empty")
+    
+    try:
+        existing = db.execute(text("SELECT id, name, department FROM setters WHERE UPPER(name) = :name"), {"name": name.upper()}).mappings().first()
+        if existing:
+            return {"id": existing.get("id"), "name": existing.get("name"), "department": existing.get("department"), "message": "Setter already exists"}
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('setters', 'id'), coalesce(max(id),0) + 1, false) FROM setters;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        max_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM setters")).mappings().first()
+        next_id = int(max_row.get("next_id")) if max_row and max_row.get("next_id") else 1
+        
+        try:
+            db.execute(text("INSERT INTO setters (id, name, department) VALUES (:id, :name, :department)"), {"id": next_id, "name": name, "department": department})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("INSERT INTO setters (name, department) VALUES (:name, :department)"), {"name": name, "department": department})
+            db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create setter: {ex}")
+    
+    try:
+        row = db.execute(text("SELECT id, name, department FROM setters WHERE UPPER(name) = :name ORDER BY id DESC LIMIT 1"), {"name": name.upper()}).mappings().first()
+        return {"id": row.get("id") if row else next_id, "name": name, "department": department, "message": "Setter created successfully"}
+    except Exception:
+        return {"id": next_id, "name": name, "department": department, "message": "Setter created successfully"}
+
+@app.put("/api/setters/{setter_id}")
+def update_setter(setter_id: int, data: dict, db: Session = Depends(get_db)):
+    name = (data.get("name") or "").strip()
+    department = (data.get("department") or data.get("dept") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Setter name cannot be empty")
+    try:
+        db.execute(text("UPDATE setters SET name = :name, department = :department WHERE id = :id"), {"id": setter_id, "name": name, "department": department})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            s_obj = db.query(models.Setter).filter(models.Setter.id == setter_id).first()
+            if s_obj:
+                s_obj.name = name
+                s_obj.department = department
+                db.commit()
+        except Exception as ex:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to update setter: {ex}")
+    return {"id": setter_id, "name": name, "department": department, "message": "Setter updated successfully"}
+
+@app.delete("/api/setters/{setter_id}")
+def delete_setter(setter_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM setters WHERE id = :id"), {"id": setter_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            s_obj = db.query(models.Setter).filter(models.Setter.id == setter_id).first()
+            if s_obj:
+                db.delete(s_obj)
+                db.commit()
+        except Exception:
+            db.rollback()
+    return {"message": "Setter deleted"}
+
+@app.delete("/api/setters/clear-all")
+@app.delete("/api/setters/all")
+@app.post("/api/setters/clear-all")
+def clear_all_setters(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM setters;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All setters cleared successfully!"}
+
 # --- Operators ---
 @app.get("/api/operators")
 def get_operators(db: Session = Depends(get_db)):
