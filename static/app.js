@@ -3172,6 +3172,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ncProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'nc').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
                 const rejectionProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'rejection').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
                 const rfdProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'rfd').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+                const totalDespAllTime = allRmLogs.filter(l => {
+                    const isMatchPart = (l.finish_part_no || '').trim().toUpperCase() === (partno || '').trim().toUpperCase();
+                    return isMatchPart && l.type === 'despatch';
+                }).reduce((sum, l) => sum + (l.qty || 0), 0);
                 const despProd = allRmLogs.filter(l => {
                     const isMatchPart = (l.finish_part_no || '').trim().toUpperCase() === (partno || '').trim().toUpperCase();
                     const isDespatch = l.type === 'despatch';
@@ -3213,7 +3217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const effectiveForIns = deburredTotal > 0 ? deburredTotal : forInsLogTotal;
                 const totalInspected = Math.max(forInsLogTotal, rfdProd + reworkProd + ncProd + rejectionProd);
                 const forInsBal = Math.max(0, effectiveForIns - totalInspected);
-                const rfdBal = rfdProd - despProd;
+                const rfdBal = rfdProd - totalDespAllTime;
                 const rfdPhyVal = (partObj && partObj.rfd_phy !== undefined && partObj.rfd_phy !== null) ? partObj.rfd_phy : 0;
 
                 rowHtml += `<td>${deburBal}</td>`;
