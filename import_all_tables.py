@@ -451,6 +451,98 @@ def import_all_backup_tables():
                                 except Exception:
                                     pass
 
+                    # HT Logs
+                    ht_data = tables.get("ht_logs", [])
+                    if ht_data:
+                        try:
+                            conn2.execute(text("DELETE FROM ht_logs;"))
+                        except Exception:
+                            pass
+                        for h in ht_data:
+                            hid = int(safe_float(h.get("id"), 0))
+                            hdate = h.get("date") or ""
+                            hdc = h.get("dc_no") or ""
+                            hvend = h.get("vendor") or ""
+                            hpn = h.get("partno") or h.get("part_no") or ""
+                            hqty = int(safe_float(h.get("qty"), 0))
+                            if hpn:
+                                try:
+                                    if hid:
+                                        conn2.execute(text("INSERT INTO ht_logs (id, date, dc_no, vendor, partno, qty) VALUES (:id, :date, :dc_no, :vendor, :partno, :qty);"), {"id": hid, "date": hdate, "dc_no": hdc, "vendor": hvend, "partno": hpn, "qty": hqty})
+                                    else:
+                                        conn2.execute(text("INSERT INTO ht_logs (date, dc_no, vendor, partno, qty) VALUES (:date, :dc_no, :vendor, :partno, :qty);"), {"date": hdate, "dc_no": hdc, "vendor": hvend, "partno": hpn, "qty": hqty})
+                                except Exception:
+                                    pass
+
+                    # HT Receipt Logs
+                    htr_data = tables.get("ht_receipt_logs", [])
+                    if htr_data:
+                        try:
+                            conn2.execute(text("DELETE FROM ht_receipt_logs;"))
+                        except Exception:
+                            pass
+                        for hr in htr_data:
+                            hrid = int(safe_float(hr.get("id"), 0))
+                            hrdate = hr.get("date") or ""
+                            hrdc = hr.get("dc_no") or ""
+                            hrvend = hr.get("vendor") or ""
+                            hrpn = hr.get("partno") or hr.get("part_no") or ""
+                            hrqty = int(safe_float(hr.get("qty"), 0))
+                            if hrpn:
+                                try:
+                                    if hrid:
+                                        conn2.execute(text("INSERT INTO ht_receipt_logs (id, date, dc_no, vendor, partno, qty) VALUES (:id, :date, :dc_no, :vendor, :partno, :qty);"), {"id": hrid, "date": hrdate, "dc_no": hrdc, "vendor": hrvend, "partno": hrpn, "qty": hrqty})
+                                    else:
+                                        conn2.execute(text("INSERT INTO ht_receipt_logs (date, dc_no, vendor, partno, qty) VALUES (:date, :dc_no, :vendor, :partno, :qty);"), {"date": hrdate, "dc_no": hrdc, "vendor": hrvend, "partno": hrpn, "qty": hrqty})
+                                except Exception:
+                                    pass
+
+                    # PC Logs
+                    pc_data = tables.get("pc_logs", [])
+                    if pc_data:
+                        try:
+                            conn2.execute(text("DELETE FROM pc_logs;"))
+                        except Exception:
+                            pass
+                        for p in pc_data:
+                            pid = int(safe_float(p.get("id"), 0))
+                            pdate = p.get("date") or ""
+                            pdc = p.get("dc_no") or ""
+                            pvend = p.get("vendor") or ""
+                            ppn = p.get("partno") or p.get("part_no") or ""
+                            pqty = int(safe_float(p.get("qty"), 0))
+                            if ppn:
+                                try:
+                                    if pid:
+                                        conn2.execute(text("INSERT INTO pc_logs (id, date, dc_no, vendor, partno, qty) VALUES (:id, :date, :dc_no, :vendor, :partno, :qty);"), {"id": pid, "date": pdate, "dc_no": pdc, "vendor": pvend, "partno": ppn, "qty": pqty})
+                                    else:
+                                        conn2.execute(text("INSERT INTO pc_logs (date, dc_no, vendor, partno, qty) VALUES (:date, :dc_no, :vendor, :partno, :qty);"), {"date": pdate, "dc_no": pdc, "vendor": pvend, "partno": ppn, "qty": pqty})
+                                except Exception:
+                                    pass
+
+                    # PC Receipt Logs
+                    pcr_data = tables.get("pc_receipt_logs", [])
+                    if pcr_data:
+                        try:
+                            conn2.execute(text("DELETE FROM pc_receipt_logs;"))
+                        except Exception:
+                            pass
+                        for pr in pcr_data:
+                            prid = int(safe_float(pr.get("id"), 0))
+                            prdate = pr.get("date") or ""
+                            prdc = pr.get("dc_no") or ""
+                            prvend = pr.get("vendor") or ""
+                            prpn = pr.get("partno") or pr.get("part_no") or ""
+                            prqty = int(safe_float(pr.get("qty"), 0))
+                            if prpn:
+                                try:
+                                    if prid:
+                                        conn2.execute(text("INSERT INTO pc_receipt_logs (id, date, dc_no, vendor, partno, qty) VALUES (:id, :date, :dc_no, :vendor, :partno, :qty);"), {"id": prid, "date": prdate, "dc_no": prdc, "vendor": prvend, "partno": prpn, "qty": prqty})
+                                    else:
+                                        conn2.execute(text("INSERT INTO pc_receipt_logs (date, dc_no, vendor, partno, qty) VALUES (:date, :dc_no, :vendor, :partno, :qty);"), {"date": prdate, "dc_no": prdc, "vendor": prvend, "partno": prpn, "qty": prqty})
+                                except Exception:
+                                    pass
+
                     t2.commit()
                     print("Synced model tables successfully!")
                 except Exception as ex2:

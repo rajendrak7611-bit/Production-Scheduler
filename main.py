@@ -2709,6 +2709,251 @@ def clear_all_attendance(db: Session = Depends(get_db)):
         db.rollback()
     return {"message": "All attendance records cleared successfully"}
 
+# --- HT & PC LOGS CRUD ---
+@app.get("/api/ht_logs")
+def get_ht_logs(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM ht_logs ORDER BY id DESC;")).mappings().all()
+        return [{
+            "id": r.get("id"),
+            "date": r.get("date") or "",
+            "dc_no": r.get("dc_no") or "",
+            "vendor": r.get("vendor") or "",
+            "partno": r.get("partno") or "",
+            "qty": int(r.get("qty") or 0),
+            "created_at": str(r.get("created_at") or "")
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/ht_logs")
+def create_ht_log(data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('ht_logs', 'id'), coalesce(max(id),0) + 1, false) FROM ht_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("""
+            INSERT INTO ht_logs (date, dc_no, vendor, partno, qty)
+            VALUES (:date, :dc_no, :vendor, :partno, :qty)
+        """), {
+            "date": (data.get("date") or "").strip(),
+            "dc_no": (data.get("dc_no") or "").strip(),
+            "vendor": (data.get("vendor") or "").strip(),
+            "partno": (data.get("partno") or "").strip(),
+            "qty": int(data.get("qty") or 0)
+        })
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+    return {"message": "HT Log saved successfully"}
+
+@app.delete("/api/ht_logs/{log_id}")
+def delete_ht_log(log_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM ht_logs WHERE id = :id"), {"id": log_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "HT Log deleted"}
+
+@app.delete("/api/ht_logs/clear-all")
+@app.delete("/api/ht_logs/all")
+def clear_all_ht_logs(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM ht_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All HT logs cleared"}
+
+@app.get("/api/ht_receipt_logs")
+def get_ht_receipt_logs(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM ht_receipt_logs ORDER BY id DESC;")).mappings().all()
+        return [{
+            "id": r.get("id"),
+            "date": r.get("date") or "",
+            "dc_no": r.get("dc_no") or "",
+            "vendor": r.get("vendor") or "",
+            "partno": r.get("partno") or "",
+            "qty": int(r.get("qty") or 0),
+            "created_at": str(r.get("created_at") or "")
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/ht_receipt_logs")
+def create_ht_receipt_log(data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('ht_receipt_logs', 'id'), coalesce(max(id),0) + 1, false) FROM ht_receipt_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("""
+            INSERT INTO ht_receipt_logs (date, dc_no, vendor, partno, qty)
+            VALUES (:date, :dc_no, :vendor, :partno, :qty)
+        """), {
+            "date": (data.get("date") or "").strip(),
+            "dc_no": (data.get("dc_no") or "").strip(),
+            "vendor": (data.get("vendor") or "").strip(),
+            "partno": (data.get("partno") or "").strip(),
+            "qty": int(data.get("qty") or 0)
+        })
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+    return {"message": "HT Receipt Log saved successfully"}
+
+@app.delete("/api/ht_receipt_logs/{log_id}")
+def delete_ht_receipt_log(log_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM ht_receipt_logs WHERE id = :id"), {"id": log_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "HT Receipt Log deleted"}
+
+@app.delete("/api/ht_receipt_logs/clear-all")
+@app.delete("/api/ht_receipt_logs/all")
+def clear_all_ht_receipt_logs(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM ht_receipt_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All HT Receipt logs cleared"}
+
+@app.get("/api/pc_logs")
+def get_pc_logs(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM pc_logs ORDER BY id DESC;")).mappings().all()
+        return [{
+            "id": r.get("id"),
+            "date": r.get("date") or "",
+            "dc_no": r.get("dc_no") or "",
+            "vendor": r.get("vendor") or "",
+            "partno": r.get("partno") or "",
+            "qty": int(r.get("qty") or 0),
+            "created_at": str(r.get("created_at") or "")
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/pc_logs")
+def create_pc_log(data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('pc_logs', 'id'), coalesce(max(id),0) + 1, false) FROM pc_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("""
+            INSERT INTO pc_logs (date, dc_no, vendor, partno, qty)
+            VALUES (:date, :dc_no, :vendor, :partno, :qty)
+        """), {
+            "date": (data.get("date") or "").strip(),
+            "dc_no": (data.get("dc_no") or "").strip(),
+            "vendor": (data.get("vendor") or "").strip(),
+            "partno": (data.get("partno") or "").strip(),
+            "qty": int(data.get("qty") or 0)
+        })
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+    return {"message": "PC Log saved successfully"}
+
+@app.delete("/api/pc_logs/{log_id}")
+def delete_pc_log(log_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM pc_logs WHERE id = :id"), {"id": log_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "PC Log deleted"}
+
+@app.delete("/api/pc_logs/clear-all")
+@app.delete("/api/pc_logs/all")
+def clear_all_pc_logs(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM pc_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All PC logs cleared"}
+
+@app.get("/api/pc_receipt_logs")
+def get_pc_receipt_logs(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM pc_receipt_logs ORDER BY id DESC;")).mappings().all()
+        return [{
+            "id": r.get("id"),
+            "date": r.get("date") or "",
+            "dc_no": r.get("dc_no") or "",
+            "vendor": r.get("vendor") or "",
+            "partno": r.get("partno") or "",
+            "qty": int(r.get("qty") or 0),
+            "created_at": str(r.get("created_at") or "")
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/pc_receipt_logs")
+def create_pc_receipt_log(data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('pc_receipt_logs', 'id'), coalesce(max(id),0) + 1, false) FROM pc_receipt_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("""
+            INSERT INTO pc_receipt_logs (date, dc_no, vendor, partno, qty)
+            VALUES (:date, :dc_no, :vendor, :partno, :qty)
+        """), {
+            "date": (data.get("date") or "").strip(),
+            "dc_no": (data.get("dc_no") or "").strip(),
+            "vendor": (data.get("vendor") or "").strip(),
+            "partno": (data.get("partno") or "").strip(),
+            "qty": int(data.get("qty") or 0)
+        })
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+    return {"message": "PC Receipt Log saved successfully"}
+
+@app.delete("/api/pc_receipt_logs/{log_id}")
+def delete_pc_receipt_log(log_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM pc_receipt_logs WHERE id = :id"), {"id": log_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "PC Receipt Log deleted"}
+
+@app.delete("/api/pc_receipt_logs/clear-all")
+@app.delete("/api/pc_receipt_logs/all")
+def clear_all_pc_receipt_logs(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM pc_receipt_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All PC Receipt logs cleared"}
+
 # --- Tooling ---
 @app.get("/api/tooling", response_model=List[ToolingResponse])
 def get_tooling(db: Session = Depends(get_db)):

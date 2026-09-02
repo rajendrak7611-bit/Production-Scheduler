@@ -2939,30 +2939,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             populateStatusCustomerDropdown();
 
-            const [schedRes, logRes, rmLogRes, htLogRes, htReceiptLogRes, pcLogRes, pcReceiptLogRes, rmRes] = await Promise.all([
-                fetch('/api/schedule'),
-                fetch('/api/prodlog'),
-                fetch('/api/rawmateriallogs'),
-                fetch('/api/ht_logs'),
-                fetch('/api/ht_receipt_logs'),
-                fetch('/api/pc_logs'),
-                fetch('/api/pc_receipt_logs'),
-                fetch('/api/rawmaterials')
+            const [allSchedules, allLogs, allRmLogs, allHtLogs, allHtReceiptLogs, allPcLogs, allPcReceiptLogs, allRawMaterials] = await Promise.all([
+                fetch('/api/schedule').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/prodlog').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/rawmateriallogs').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/ht_logs').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/ht_receipt_logs').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/pc_logs').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/pc_receipt_logs').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/rawmaterials').then(r => r.ok ? r.json() : []).catch(() => [])
             ]);
             
-            if (requestId !== currentScheduleStatusRequestId) {
-                return;
-            }
-
-            const allSchedules = await schedRes.json();
-            const allLogs = await logRes.json();
-            const allRmLogs = await rmLogRes.json();
-            const allHtLogs = await htLogRes.json();
-            const allHtReceiptLogs = await htReceiptLogRes.json();
-            const allPcLogs = await pcLogRes.json();
-            const allPcReceiptLogs = await pcReceiptLogRes.json();
-            const allRawMaterials = await rmRes.json();
-
             if (requestId !== currentScheduleStatusRequestId) {
                 return;
             }

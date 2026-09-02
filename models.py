@@ -149,6 +149,48 @@ class RawMaterialLog(Base):
     finish_part_no = Column(String, nullable=True)
     part_prefix = Column(String, nullable=True)
     qty = Column(Integer, default=0)
+class HTLog(Base):
+    __tablename__ = "ht_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, nullable=True)
+    dc_no = Column(String, nullable=True)
+    vendor = Column(String, nullable=True)
+    partno = Column(String, index=True, nullable=False)
+    qty = Column(Integer, default=0)
+    created_at = Column(DateTime, default=get_now_ist)
+
+class HTReceiptLog(Base):
+    __tablename__ = "ht_receipt_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, nullable=True)
+    dc_no = Column(String, nullable=True)
+    vendor = Column(String, nullable=True)
+    partno = Column(String, index=True, nullable=False)
+    qty = Column(Integer, default=0)
+    created_at = Column(DateTime, default=get_now_ist)
+
+class PCLog(Base):
+    __tablename__ = "pc_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, nullable=True)
+    dc_no = Column(String, nullable=True)
+    vendor = Column(String, nullable=True)
+    partno = Column(String, index=True, nullable=False)
+    qty = Column(Integer, default=0)
+    created_at = Column(DateTime, default=get_now_ist)
+
+class PCReceiptLog(Base):
+    __tablename__ = "pc_receipt_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, nullable=True)
+    dc_no = Column(String, nullable=True)
+    vendor = Column(String, nullable=True)
+    partno = Column(String, index=True, nullable=False)
+    qty = Column(Integer, default=0)
     created_at = Column(DateTime, default=get_now_ist)
 
 class Tooling(Base):
