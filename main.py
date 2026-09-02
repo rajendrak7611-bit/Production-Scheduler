@@ -2613,7 +2613,7 @@ def get_raw_material_logs(db: Session = Depends(get_db)):
 @app.post("/api/rawmateriallogs")
 def create_raw_material_log(data: dict, db: Session = Depends(get_db)):
     rtype = (data.get("type") or "receipt").strip().lower()
-    rdate = (data.get("date") or "").strip()
+    rdate = normalize_date_str((data.get("date") or "").strip())
     dctype = (data.get("dc_type") or "").strip()
     fpn = (data.get("forge_pn") or "").strip()
     dcno = (data.get("dc_no") or "").strip()
@@ -2637,22 +2637,18 @@ def create_raw_material_log(data: dict, db: Session = Depends(get_db)):
         """), {"type": rtype, "date": rdate, "dc_type": dctype, "forge_pn": fpn, "dc_no": dcno, "finish_part_no": fpno, "part_prefix": pprefix, "qty": qty})
         
         # Auto sync stock in raw_materials
-        existing_rm = db.execute(text("SELECT id, receipt, despatch, stock FROM raw_materials WHERE forge_pn = :forge_pn"), {"forge_pn": fpn}).mappings().first()
+        rec_sum = db.execute(text("SELECT COALESCE(SUM(qty), 0) AS total FROM raw_material_logs WHERE LOWER(type) = 'receipt' AND forge_pn = :fpn"), {"fpn": fpn}).mappings().first()
+        desp_sum = db.execute(text("SELECT COALESCE(SUM(qty), 0) AS total FROM raw_material_logs WHERE LOWER(type) = 'despatch' AND forge_pn = :fpn"), {"fpn": fpn}).mappings().first()
+        cur_rcpt = int(rec_sum["total"] if rec_sum else 0)
+        cur_dspt = int(desp_sum["total"] if desp_sum else 0)
+        cur_stk = cur_rcpt - cur_dspt
+
+        existing_rm = db.execute(text("SELECT id FROM raw_materials WHERE forge_pn = :forge_pn"), {"forge_pn": fpn}).mappings().first()
         if existing_rm:
-            cur_rcpt = int(existing_rm["receipt"] or 0)
-            cur_dspt = int(existing_rm["despatch"] or 0)
-            if rtype == "receipt":
-                cur_rcpt += qty
-            elif rtype == "despatch":
-                cur_dspt += qty
-            cur_stk = cur_rcpt - cur_dspt
             db.execute(text("""
                 UPDATE raw_materials SET receipt = :receipt, despatch = :despatch, stock = :stock WHERE forge_pn = :forge_pn
             """), {"forge_pn": fpn, "receipt": cur_rcpt, "despatch": cur_dspt, "stock": cur_stk})
         else:
-            cur_rcpt = qty if rtype == "receipt" else 0
-            cur_dspt = qty if rtype == "despatch" else 0
-            cur_stk = cur_rcpt - cur_dspt
             db.execute(text("""
                 INSERT INTO raw_materials (forge_pn, receipt, despatch, stock) VALUES (:forge_pn, :receipt, :despatch, :stock)
             """), {"forge_pn": fpn, "receipt": cur_rcpt, "despatch": cur_dspt, "stock": cur_stk})
@@ -2663,6 +2659,63 @@ def create_raw_material_log(data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to create raw material log: {ex}")
 
     return {"message": "Raw Material Log saved successfully"}
+
+@app.put("/api/rawmateriallogs/{log_id}")
+def update_raw_material_log(log_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        rtype = (data.get("type") or "receipt").strip().lower()
+        rdate = normalize_date_str((data.get("date") or "").strip())
+        dctype = (data.get("dc_type") or "").strip()
+        fpn = (data.get("forge_pn") or "").strip()
+        dcno = (data.get("dc_no") or "").strip()
+        fpno = (data.get("finish_part_no") or "").strip()
+        pprefix = (data.get("part_prefix") or "").strip()
+        qty = int(data.get("qty") or data.get("quantity") or 0)
+
+        if not fpn:
+            raise HTTPException(status_code=400, detail="Forge PN is required")
+
+        db.execute(text("""
+            UPDATE raw_material_logs
+            SET type = :type, date = :date, dc_type = :dc_type, forge_pn = :forge_pn,
+                dc_no = :dc_no, finish_part_no = :finish_part_no, part_prefix = :part_prefix, qty = :qty
+            WHERE id = :id
+        """), {
+            "id": log_id,
+            "type": rtype,
+            "date": rdate,
+            "dc_type": dctype,
+            "forge_pn": fpn,
+            "dc_no": dcno,
+            "finish_part_no": fpno,
+            "part_prefix": pprefix,
+            "qty": qty
+        })
+        
+        # Recalculate stock for this forge_pn
+        rec_sum = db.execute(text("SELECT COALESCE(SUM(qty), 0) AS total FROM raw_material_logs WHERE LOWER(type) = 'receipt' AND forge_pn = :fpn"), {"fpn": fpn}).mappings().first()
+        desp_sum = db.execute(text("SELECT COALESCE(SUM(qty), 0) AS total FROM raw_material_logs WHERE LOWER(type) = 'despatch' AND forge_pn = :fpn"), {"fpn": fpn}).mappings().first()
+        cur_rcpt = int(rec_sum["total"] if rec_sum else 0)
+        cur_dspt = int(desp_sum["total"] if desp_sum else 0)
+        cur_stk = cur_rcpt - cur_dspt
+
+        existing_rm = db.execute(text("SELECT id FROM raw_materials WHERE forge_pn = :forge_pn"), {"forge_pn": fpn}).mappings().first()
+        if existing_rm:
+            db.execute(text("""
+                UPDATE raw_materials SET receipt = :receipt, despatch = :despatch, stock = :stock WHERE forge_pn = :forge_pn
+            """), {"forge_pn": fpn, "receipt": cur_rcpt, "despatch": cur_dspt, "stock": cur_stk})
+        else:
+            db.execute(text("""
+                INSERT INTO raw_materials (forge_pn, receipt, despatch, stock) VALUES (:forge_pn, :receipt, :despatch, :stock)
+            """), {"forge_pn": fpn, "receipt": cur_rcpt, "despatch": cur_dspt, "stock": cur_stk})
+
+        db.commit()
+        return {"message": "Raw Material Log updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update raw material log: {ex}")
 
 @app.delete("/api/rawmateriallogs/{log_id}")
 def delete_raw_material_log(log_id: int, db: Session = Depends(get_db)):
@@ -2850,6 +2903,27 @@ def create_ht_log(data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(ex))
     return {"message": "HT Log saved successfully"}
 
+@app.put("/api/ht_logs/{log_id}")
+def update_ht_log(log_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            UPDATE ht_logs
+            SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
+            WHERE id = :id
+        """), {
+            "id": log_id,
+            "date": normalize_date_str((data.get("date") or "").strip()),
+            "dc_no": (data.get("dc_no") or "").strip(),
+            "vendor": (data.get("vendor") or "").strip(),
+            "partno": (data.get("partno") or "").strip(),
+            "qty": int(data.get("qty") or 0)
+        })
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+    return {"message": "HT Log updated successfully"}
+
 @app.delete("/api/ht_logs/{log_id}")
 def delete_ht_log(log_id: int, db: Session = Depends(get_db)):
     try:
@@ -2899,7 +2973,7 @@ def create_ht_receipt_log(data: dict, db: Session = Depends(get_db)):
             INSERT INTO ht_receipt_logs (date, dc_no, vendor, partno, qty)
             VALUES (:date, :dc_no, :vendor, :partno, :qty)
         """), {
-            "date": (data.get("date") or "").strip(),
+            "date": normalize_date_str((data.get("date") or "").strip()),
             "dc_no": (data.get("dc_no") or "").strip(),
             "vendor": (data.get("vendor") or "").strip(),
             "partno": (data.get("partno") or "").strip(),
@@ -2910,6 +2984,27 @@ def create_ht_receipt_log(data: dict, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
     return {"message": "HT Receipt Log saved successfully"}
+
+@app.put("/api/ht_receipt_logs/{log_id}")
+def update_ht_receipt_log(log_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            UPDATE ht_receipt_logs
+            SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
+            WHERE id = :id
+        """), {
+            "id": log_id,
+            "date": normalize_date_str((data.get("date") or "").strip()),
+            "dc_no": (data.get("dc_no") or "").strip(),
+            "vendor": (data.get("vendor") or "").strip(),
+            "partno": (data.get("partno") or "").strip(),
+            "qty": int(data.get("qty") or 0)
+        })
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+    return {"message": "HT Receipt Log updated successfully"}
 
 @app.delete("/api/ht_receipt_logs/{log_id}")
 def delete_ht_receipt_log(log_id: int, db: Session = Depends(get_db)):
@@ -2960,7 +3055,7 @@ def create_pc_log(data: dict, db: Session = Depends(get_db)):
             INSERT INTO pc_logs (date, dc_no, vendor, partno, qty)
             VALUES (:date, :dc_no, :vendor, :partno, :qty)
         """), {
-            "date": (data.get("date") or "").strip(),
+            "date": normalize_date_str((data.get("date") or "").strip()),
             "dc_no": (data.get("dc_no") or "").strip(),
             "vendor": (data.get("vendor") or "").strip(),
             "partno": (data.get("partno") or "").strip(),
@@ -2971,6 +3066,27 @@ def create_pc_log(data: dict, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
     return {"message": "PC Log saved successfully"}
+
+@app.put("/api/pc_logs/{log_id}")
+def update_pc_log(log_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            UPDATE pc_logs
+            SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
+            WHERE id = :id
+        """), {
+            "id": log_id,
+            "date": normalize_date_str((data.get("date") or "").strip()),
+            "dc_no": (data.get("dc_no") or "").strip(),
+            "vendor": (data.get("vendor") or "").strip(),
+            "partno": (data.get("partno") or "").strip(),
+            "qty": int(data.get("qty") or 0)
+        })
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+    return {"message": "PC Log updated successfully"}
 
 @app.delete("/api/pc_logs/{log_id}")
 def delete_pc_log(log_id: int, db: Session = Depends(get_db)):
@@ -3021,7 +3137,7 @@ def create_pc_receipt_log(data: dict, db: Session = Depends(get_db)):
             INSERT INTO pc_receipt_logs (date, dc_no, vendor, partno, qty)
             VALUES (:date, :dc_no, :vendor, :partno, :qty)
         """), {
-            "date": (data.get("date") or "").strip(),
+            "date": normalize_date_str((data.get("date") or "").strip()),
             "dc_no": (data.get("dc_no") or "").strip(),
             "vendor": (data.get("vendor") or "").strip(),
             "partno": (data.get("partno") or "").strip(),
@@ -3032,6 +3148,27 @@ def create_pc_receipt_log(data: dict, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
     return {"message": "PC Receipt Log saved successfully"}
+
+@app.put("/api/pc_receipt_logs/{log_id}")
+def update_pc_receipt_log(log_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            UPDATE pc_receipt_logs
+            SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
+            WHERE id = :id
+        """), {
+            "id": log_id,
+            "date": normalize_date_str((data.get("date") or "").strip()),
+            "dc_no": (data.get("dc_no") or "").strip(),
+            "vendor": (data.get("vendor") or "").strip(),
+            "partno": (data.get("partno") or "").strip(),
+            "qty": int(data.get("qty") or 0)
+        })
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+    return {"message": "PC Receipt Log updated successfully"}
 
 @app.delete("/api/pc_receipt_logs/{log_id}")
 def delete_pc_receipt_log(log_id: int, db: Session = Depends(get_db)):
