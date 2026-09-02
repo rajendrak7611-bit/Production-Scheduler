@@ -166,8 +166,10 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
-    password = Column(String, nullable=False)
-    role = Column(String, nullable=False)  # 'admin' or 'guest'
+    password = Column(String, nullable=True)
+    password_hash = Column(String, nullable=True)
+    role = Column(String, default="operator")
+    accessible_screens = Column(Text, default="[]")
 
 class InspectionParameter(Base):
     __tablename__ = "inspection_parameters"

@@ -386,6 +386,41 @@ def import_all_backup_tables():
                                 except Exception:
                                     pass
 
+                    # Users
+                    users_data = tables.get("users", [])
+                    if users_data:
+                        try:
+                            conn2.execute(text("DELETE FROM users;"))
+                        except Exception:
+                            pass
+                        for u in users_data:
+                            uid = int(safe_float(u.get("id"), 0))
+                            uname = (u.get("username") or "").strip()
+                            pwhash = u.get("password_hash") or ""
+                            pw = u.get("password") or ""
+                            role = u.get("role") or "operator"
+                            screens = u.get("accessible_screens") or "[]"
+                            if uname:
+                                try:
+                                    if uid:
+                                        conn2.execute(text("""
+                                            INSERT INTO users (id, username, password, password_hash, role, accessible_screens)
+                                            VALUES (:id, :username, :password, :password_hash, :role, :accessible_screens);
+                                        """), {"id": uid, "username": uname, "password": pw, "password_hash": pwhash, "role": role, "accessible_screens": screens})
+                                    else:
+                                        conn2.execute(text("""
+                                            INSERT INTO users (username, password, password_hash, role, accessible_screens)
+                                            VALUES (:username, :password, :password_hash, :role, :accessible_screens);
+                                        """), {"username": uname, "password": pw, "password_hash": pwhash, "role": role, "accessible_screens": screens})
+                                except Exception:
+                                    try:
+                                        conn2.execute(text("""
+                                            INSERT INTO users (username, role, accessible_screens)
+                                            VALUES (:username, :role, :accessible_screens);
+                                        """), {"username": uname, "role": role, "accessible_screens": screens})
+                                    except Exception:
+                                        pass
+
                     t2.commit()
                     print("Synced model tables successfully!")
                 except Exception as ex2:

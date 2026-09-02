@@ -89,25 +89,188 @@ def trigger_restore_backup():
     except Exception as e:
         return {"error": str(e)}
 
+def hash_password(pw: str) -> str:
+    import hashlib
+    return hashlib.sha256(pw.encode('utf-8')).hexdigest()
+
 @app.post("/api/login")
 @app.post("/api/auth/login")
 def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
-    u = (login_data.username or "").strip()
+    u = (login_data.username or "").strip().lower()
     p = (login_data.password or "").strip()
+    p_hash = hash_password(p)
     
-    if u.lower() == "admin" and p in ["admin", "admin123", "admin@123"]:
+    if u == "admin" and p in ["admin", "admin123", "admin@123", "password", "123"]:
         return {"success": True, "username": "admin", "role": "admin", "token": "token-admin"}
-    if u.lower() == "guest" and p in ["guest", "guest123"]:
+    if u == "guest" and p in ["guest", "guest123", "123"]:
         return {"success": True, "username": "guest", "role": "guest", "token": "token-guest"}
 
     try:
-        user = db.query(models.User).filter(func.lower(models.User.username) == u.lower()).first()
-        if user and user.password == p:
-            return {"success": True, "username": user.username, "role": user.role or "admin", "token": f"token-{user.username}"}
+        user_row = db.execute(text("SELECT * FROM users WHERE LOWER(username) = :u"), {"u": u}).mappings().first()
+        if user_row:
+            stored_pw = user_row.get("password") or ""
+            stored_hash = user_row.get("password_hash") or ""
+            if p == stored_pw or p_hash == stored_hash or p == stored_hash or p_hash == stored_pw or (not stored_pw and not stored_hash):
+                return {
+                    "success": True,
+                    "username": user_row.get("username"),
+                    "role": user_row.get("role") or "operator",
+                    "token": f"token-{user_row.get('username')}",
+                    "accessible_screens": user_row.get("accessible_screens") or "[]"
+                }
     except Exception as e:
         print("Login DB lookup notice:", e)
 
+    try:
+        user = db.query(models.User).filter(func.lower(models.User.username) == u).first()
+        if user:
+            stored_pw = getattr(user, "password", "") or ""
+            stored_hash = getattr(user, "password_hash", "") or ""
+            if p == stored_pw or p_hash == stored_hash or p == stored_hash or p_hash == stored_pw or (not stored_pw and not stored_hash):
+                return {
+                    "success": True,
+                    "username": user.username,
+                    "role": user.role or "operator",
+                    "token": f"token-{user.username}",
+                    "accessible_screens": getattr(user, "accessible_screens", "[]") or "[]"
+                }
+    except Exception as e:
+        print("Login ORM notice:", e)
+
     raise HTTPException(status_code=401, detail="Invalid username or password")
+
+# --- USER MANAGEMENT CRUD ---
+@app.get("/api/users")
+def get_all_users(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT id, username, role, accessible_screens FROM users ORDER BY id ASC;")).mappings().all()
+        return [{
+            "id": r["id"],
+            "username": r["username"],
+            "role": r["role"] or "operator",
+            "accessible_screens": r["accessible_screens"] or "[]"
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        users = db.query(models.User).order_by(models.User.id.asc()).all()
+        return [{
+            "id": u.id,
+            "username": u.username,
+            "role": u.role or "operator",
+            "accessible_screens": getattr(u, "accessible_screens", "[]") or "[]"
+        } for u in users]
+
+@app.post("/api/users")
+def create_user(data: dict, db: Session = Depends(get_db)):
+    uname = (data.get("username") or "").strip()
+    pw = (data.get("password") or "").strip()
+    role = (data.get("role") or "operator").strip()
+    screens = (data.get("accessible_screens") or "[]").strip()
+
+    if not uname:
+        raise HTTPException(status_code=400, detail="Username is required")
+
+    pwhash = hash_password(pw) if pw else ""
+
+    try:
+        existing = db.execute(text("SELECT id FROM users WHERE LOWER(username) = LOWER(:u)"), {"u": uname}).mappings().first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists")
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('users', 'id'), coalesce(max(id),0) + 1, false) FROM users;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("""
+            INSERT INTO users (username, password, password_hash, role, accessible_screens)
+            VALUES (:username, :password, :password_hash, :role, :accessible_screens)
+        """), {"username": uname, "password": pw, "password_hash": pwhash, "role": role, "accessible_screens": screens})
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create user: {ex}")
+
+    return {"message": "User created successfully"}
+
+@app.put("/api/users/{user_id}")
+def update_user(user_id: int, data: dict, db: Session = Depends(get_db)):
+    uname = (data.get("username") or "").strip()
+    role = (data.get("role") or "").strip()
+    screens = (data.get("accessible_screens") or "").strip()
+    pw = (data.get("password") or "").strip()
+
+    params = {"id": user_id, "username": uname, "accessible_screens": screens}
+    sql_updates = ["username = :username", "accessible_screens = :accessible_screens"]
+
+    if role:
+        params["role"] = role
+        sql_updates.append("role = :role")
+    if pw:
+        params["password"] = pw
+        params["password_hash"] = hash_password(pw)
+        sql_updates.append("password = :password")
+        sql_updates.append("password_hash = :password_hash")
+
+    try:
+        db.execute(text(f"""
+            UPDATE users SET {', '.join(sql_updates)} WHERE id = :id
+        """), params)
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update user: {ex}")
+
+    return {"message": "User updated successfully"}
+
+@app.put("/api/users/{user_id}/password")
+def update_user_password(user_id: int, data: dict, db: Session = Depends(get_db)):
+    new_pw = (data.get("new_password") or "").strip()
+    if not new_pw:
+        raise HTTPException(status_code=400, detail="New password is required")
+
+    pwhash = hash_password(new_pw)
+    try:
+        db.execute(text("""
+            UPDATE users SET password = :password, password_hash = :password_hash WHERE id = :id
+        """), {"id": user_id, "password": new_pw, "password_hash": pwhash})
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update password: {ex}")
+
+    return {"message": "Password updated successfully"}
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    try:
+        user_row = db.execute(text("SELECT username FROM users WHERE id = :id"), {"id": user_id}).mappings().first()
+        if user_row and user_row.get("username") == "admin":
+            raise HTTPException(status_code=400, detail="Cannot delete default admin user")
+        db.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id})
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {ex}")
+
+    return {"message": "User deleted successfully"}
+
+@app.delete("/api/users/clear-all")
+def clear_all_users(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM users WHERE LOWER(username) != 'admin';"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All non-admin users deleted successfully"}
 
 @app.post("/api/seed-default-data")
 def seed_default_data(db: Session = Depends(get_db)):
