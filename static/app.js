@@ -1460,9 +1460,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error saving operations:', e);
             alert('Error saving operations.');
         }
-    });
-
-    // --- MACHINES LOGIC ---
+    });    // --- MACHINES LOGIC ---
     async function fetchMachines() {
         try {
             const response = await fetch('/api/machines');
@@ -1470,33 +1468,55 @@ document.addEventListener('DOMContentLoaded', () => {
             availableMachines = machines; // update global list
             machinesBody.innerHTML = '';
             if (machines.length === 0) {
-                machinesBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted)">No machines found.</td></tr>';
+                machinesBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No machines found.</td></tr>';
                 return;
             }
             machines.forEach(m => {
                 const tr = document.createElement('tr');
+                const deptVal = m.department || m.dept || '';
                 tr.innerHTML = `
-                    <td>${m.id}</td><td>${m.department || ''}</td><td>${m.name}</td>
+                    <td>${m.id}</td>
+                    <td>${escapeHtml(deptVal)}</td>
+                    <td>${escapeHtml(m.name || '')}</td>
                     <td class="actions">
                         <button class="btn btn-edit" onclick="editMachine(${m.id})">Edit</button>
                         <button class="btn btn-danger" onclick="deleteMachine(${m.id})">Delete</button>
                     </td>`;
                 machinesBody.appendChild(tr);
             });
+            if (typeof applyTableColFilters === 'function') {
+                applyTableColFilters('machinesTable');
+            }
         } catch (e) { console.error(e); }
     }
 
     function openMachineModal(isEdit) {
-        machineModal.classList.add('show');
-        machineModalTitle.textContent = isEdit ? 'Edit Machine' : 'Add Machine';
+        if (machineModal) {
+            machineModal.classList.add('active');
+            machineModal.classList.add('show');
+        }
+        if (machineModalTitle) machineModalTitle.textContent = isEdit ? 'Edit Machine' : 'Add Machine';
     }
-    function closeMachineModal() { machineModal.classList.remove('show'); machineForm.reset(); document.getElementById('machineId').value = ''; }
+    function closeMachineModal() { 
+        if (machineModal) {
+            machineModal.classList.remove('active');
+            machineModal.classList.remove('show');
+        }
+        if (machineForm) machineForm.reset(); 
+        const mId = document.getElementById('machineId');
+        if (mId) mId.value = ''; 
+    }
     closeMachineBtn.addEventListener('click', closeMachineModal); cancelMachineBtn.addEventListener('click', closeMachineModal);
 
     machineForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('machineId').value;
-        const data = { name: document.getElementById('machineName').value, department: document.getElementById('machineDept').value };
+        const deptVal = document.getElementById('machineDept') ? document.getElementById('machineDept').value : '';
+        const data = { 
+            name: document.getElementById('machineName').value, 
+            dept: deptVal,
+            department: deptVal 
+        };
         const url = id ? `/api/machines/${id}` : '/api/machines';
         await fetch(url, { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         closeMachineModal(); fetchMachines();
@@ -1513,8 +1533,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch('/api/machines'); const data = await res.json();
         const m = data.find(x => x.id === id);
         if (m) {
-            document.getElementById('machineId').value = m.id; document.getElementById('machineName').value = m.name;
-            document.getElementById('machineDept').value = m.department || '';
+            document.getElementById('machineId').value = m.id;
+            document.getElementById('machineName').value = m.name || '';
+            const mDept = document.getElementById('machineDept');
+            if (mDept) mDept.value = m.department || m.dept || '';
             openMachineModal(true);
         }
     };

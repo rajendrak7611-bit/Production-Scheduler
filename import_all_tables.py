@@ -108,14 +108,21 @@ def import_all_backup_tables():
                         except Exception:
                             pass
                         for m in machines_data:
+                            mid = int(safe_float(m.get("id"), 0))
                             name = m.get("name") or m.get("machine_name") or m.get("machine")
-                            dept = m.get("dept") or m.get("department") or "General"
+                            dept = m.get("department") or m.get("dept") or ""
                             status = m.get("status") or "Active"
                             if name:
                                 try:
-                                    conn2.execute(text("INSERT INTO machines (name, dept, status) VALUES (:name, :dept, :status);"), {"name": name, "dept": dept, "status": status})
+                                    if mid:
+                                        conn2.execute(text("INSERT INTO machines (id, name, dept, status) VALUES (:id, :name, :dept, :status);"), {"id": mid, "name": name, "dept": dept, "status": status})
+                                    else:
+                                        conn2.execute(text("INSERT INTO machines (name, dept, status) VALUES (:name, :dept, :status);"), {"name": name, "dept": dept, "status": status})
                                 except Exception:
-                                    pass
+                                    try:
+                                        conn2.execute(text("INSERT INTO machines (name, dept, status) VALUES (:name, :dept, :status);"), {"name": name, "dept": dept, "status": status})
+                                    except Exception:
+                                        pass
 
                     # Operators
                     operators_data = tables.get("operators", [])

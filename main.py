@@ -336,16 +336,28 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 @app.get("/api/machines")
 def get_machines(db: Session = Depends(get_db)):
     try:
-        machines = db.query(models.Machine).all()
-        if machines:
-            return machines
+        from sqlalchemy import text
+        rows = db.execute(text("SELECT * FROM machines ORDER BY id ASC")).mappings().all()
+        if rows:
+            return [{
+                "id": r.get("id"),
+                "name": r.get("name") or r.get("machine_name") or "",
+                "dept": r.get("department") or r.get("dept") or "",
+                "department": r.get("department") or r.get("dept") or "",
+                "status": r.get("status") or "Active"
+            } for r in rows]
     except Exception:
         db.rollback()
-    
+
     try:
-        from sqlalchemy import text
-        rows = db.execute(text("SELECT * FROM machines")).mappings().all()
-        return [{"id": r.get("id"), "name": r.get("name") or r.get("machine_name") or "", "dept": r.get("dept") or r.get("department") or "General", "status": r.get("status") or "Active"} for r in rows]
+        machines = db.query(models.Machine).order_by(models.Machine.id.asc()).all()
+        return [{
+            "id": m.id,
+            "name": m.name,
+            "dept": m.dept or "",
+            "department": m.dept or "",
+            "status": m.status or "Active"
+        } for m in machines]
     except Exception:
         db.rollback()
         return []
