@@ -2967,7 +2967,10 @@ def adjust_part_wip(data: dict, db: Session = Depends(get_db)):
         target_map = {}
         for adj in adjustments:
             opn_key = str(adj.get("opn_no") or "").strip().lower()
-            target_val = float(adj.get("target_balance") or 0)
+            try:
+                target_val = float(adj.get("target_balance") or 0)
+            except Exception:
+                target_val = 0.0
             target_map[opn_key] = target_val
 
         stages = []
@@ -2980,11 +2983,17 @@ def adjust_part_wip(data: dict, db: Session = Depends(get_db)):
         if "rfd" not in stages:
             stages.append("rfd")
 
-        desp_row = db.execute(text("""
-            SELECT COALESCE(SUM(qty), 0) as desp_total FROM raw_material_logs
+        # Despatch total from raw_material_logs
+        rm_rows = db.execute(text("""
+            SELECT qty FROM raw_material_logs
             WHERE LOWER(type) = 'despatch' AND LOWER(finish_part_no) = LOWER(:p);
-        """), {"p": partno}).mappings().first()
-        desp_total = float(desp_row["desp_total"]) if desp_row else 0.0
+        """), {"p": partno}).mappings().all()
+        desp_total = 0.0
+        for r in rm_rows:
+            try:
+                desp_total += float(r.get("qty") or 0)
+            except Exception:
+                pass
 
         cum_req = {}
         running_cum = desp_total
@@ -2996,11 +3005,16 @@ def adjust_part_wip(data: dict, db: Session = Depends(get_db)):
 
         for stage in stages:
             if stage in target_map:
-                curr_row = db.execute(text("""
-                    SELECT COALESCE(SUM(prod_qty), 0) as total_prod FROM production_logs
+                prod_rows = db.execute(text("""
+                    SELECT prod_qty FROM production_logs
                     WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);
-                """), {"p": partno, "opn": stage}).mappings().first()
-                curr_prod = float(curr_row["total_prod"]) if curr_row else 0.0
+                """), {"p": partno, "opn": stage}).mappings().all()
+                curr_prod = 0.0
+                for pr in prod_rows:
+                    try:
+                        curr_prod += float(pr.get("prod_qty") or 0)
+                    except Exception:
+                        pass
 
                 needed_cum = cum_req[stage]
                 delta = int(round(needed_cum - curr_prod))
@@ -3083,11 +3097,11 @@ def autofix_wip(data: dict, db: Session = Depends(get_db)):
                 curr_op = operations[i]
                 next_op = operations[i+1]
 
-                curr_prod_row = db.execute(text("SELECT COALESCE(SUM(prod_qty), 0) as s FROM production_logs WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);"), {"p": pno, "opn": curr_op}).mappings().first()
-                next_prod_row = db.execute(text("SELECT COALESCE(SUM(prod_qty), 0) as s FROM production_logs WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);"), {"p": pno, "opn": next_op}).mappings().first()
+                curr_prod_rows = db.execute(text("SELECT prod_qty FROM production_logs WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);"), {"p": pno, "opn": curr_op}).mappings().all()
+                next_prod_rows = db.execute(text("SELECT prod_qty FROM production_logs WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);"), {"p": pno, "opn": next_op}).mappings().all()
 
-                c_prod = float(curr_prod_row["s"]) if curr_prod_row else 0.0
-                n_prod = float(next_prod_row["s"]) if next_prod_row else 0.0
+                c_prod = sum(float(r.get("prod_qty") or 0) for r in curr_prod_rows)
+                n_prod = sum(float(r.get("prod_qty") or 0) for r in next_prod_rows)
 
                 if c_prod < n_prod:
                     diff = int(round(n_prod - c_prod))
