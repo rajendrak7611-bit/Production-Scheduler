@@ -451,6 +451,80 @@ def import_all_backup_tables():
                                 except Exception:
                                     pass
 
+                    # Production Logs
+                    prod_logs_data = tables.get("production_logs", [])
+                    if prod_logs_data:
+                        try:
+                            conn2.execute(text("DELETE FROM production_logs;"))
+                        except Exception:
+                            pass
+                        for pl in prod_logs_data:
+                            plid = int(safe_float(pl.get("id"), 0))
+                            pldept = pl.get("dept") or "General"
+                            pldate = pl.get("date") or ""
+                            plshift = pl.get("shift") or "First"
+                            plsetter = pl.get("setter") or ""
+                            plmach = pl.get("machine") or ""
+                            plop = pl.get("operator") or ""
+                            plpart = pl.get("partno") or ""
+                            plopn = str(pl.get("opn_no") or "")
+                            pldesc = pl.get("description") or ""
+                            plrun = safe_float(pl.get("runtime"), 0)
+                            plcyc = safe_float(pl.get("cycle_time"), 0)
+                            pltgt = safe_float(pl.get("target_qty"), 0)
+                            plprod = safe_float(pl.get("prod_qty"), 0)
+                            pleff = safe_float(pl.get("efficiency"), 0)
+                            plidle1 = safe_float(pl.get("idle_hours"), 0)
+                            plreason1 = pl.get("idle_reason") or "None"
+                            plidle2 = safe_float(pl.get("idle_hours_2"), 0)
+                            plreason2 = pl.get("idle_reason_2") or "None"
+                            plidle3 = safe_float(pl.get("idle_hours_3"), 0)
+                            plreason3 = pl.get("idle_reason_3") or "None"
+                            plmult = str(pl.get("multiple_mc") or 1)
+
+                            if plpart or plmach or plop:
+                                try:
+                                    if plid:
+                                        conn2.execute(text("""
+                                            INSERT INTO production_logs (
+                                                id, dept, date, shift, setter, machine, operator, partno, opn_no,
+                                                description, runtime, cycle_time, target_qty, prod_qty, efficiency,
+                                                idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc
+                                            ) VALUES (
+                                                :id, :dept, :date, :shift, :setter, :machine, :operator, :partno, :opn_no,
+                                                :description, :runtime, :cycle_time, :target_qty, :prod_qty, :efficiency,
+                                                :idle_hours, :idle_reason, :idle_hours_2, :idle_reason_2, :idle_hours_3, :idle_reason_3, :multiple_mc
+                                            );
+                                        """), {
+                                            "id": plid, "dept": pldept, "date": pldate, "shift": plshift, "setter": plsetter,
+                                            "machine": plmach, "operator": plop, "partno": plpart, "opn_no": plopn,
+                                            "description": pldesc, "runtime": plrun, "cycle_time": plcyc, "target_qty": pltgt,
+                                            "prod_qty": plprod, "efficiency": pleff, "idle_hours": plidle1, "idle_reason": plreason1,
+                                            "idle_hours_2": plidle2, "idle_reason_2": plreason2, "idle_hours_3": plidle3, "idle_reason_3": plreason3,
+                                            "multiple_mc": plmult
+                                        })
+                                    else:
+                                        conn2.execute(text("""
+                                            INSERT INTO production_logs (
+                                                dept, date, shift, setter, machine, operator, partno, opn_no,
+                                                description, runtime, cycle_time, target_qty, prod_qty, efficiency,
+                                                idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc
+                                            ) VALUES (
+                                                :dept, :date, :shift, :setter, :machine, :operator, :partno, :opn_no,
+                                                :description, :runtime, :cycle_time, :target_qty, :prod_qty, :efficiency,
+                                                :idle_hours, :idle_reason, :idle_hours_2, :idle_reason_2, :idle_hours_3, :idle_reason_3, :multiple_mc
+                                            );
+                                        """), {
+                                            "dept": pldept, "date": pldate, "shift": plshift, "setter": plsetter,
+                                            "machine": plmach, "operator": plop, "partno": plpart, "opn_no": plopn,
+                                            "description": pldesc, "runtime": plrun, "cycle_time": plcyc, "target_qty": pltgt,
+                                            "prod_qty": plprod, "efficiency": pleff, "idle_hours": plidle1, "idle_reason": plreason1,
+                                            "idle_hours_2": plidle2, "idle_reason_2": plreason2, "idle_hours_3": plidle3, "idle_reason_3": plreason3,
+                                            "multiple_mc": plmult
+                                        })
+                                except Exception:
+                                    pass
+
                     # HT Logs
                     ht_data = tables.get("ht_logs", [])
                     if ht_data:
