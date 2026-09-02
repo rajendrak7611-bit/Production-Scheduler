@@ -132,14 +132,21 @@ def import_all_backup_tables():
                         except Exception:
                             pass
                         for o in operators_data:
+                            oid = int(safe_float(o.get("id"), 0))
                             name = o.get("name") or o.get("operator_name") or o.get("operator")
-                            dept = o.get("dept") or o.get("department") or "General"
+                            dept = o.get("department") or o.get("dept") or ""
                             desig = o.get("designation") or o.get("role") or "Operator"
                             if name:
                                 try:
-                                    conn2.execute(text("INSERT INTO operators (name, dept, designation) VALUES (:name, :dept, :desig);"), {"name": name, "dept": dept, "desig": desig})
+                                    if oid:
+                                        conn2.execute(text("INSERT INTO operators (id, name, dept, designation) VALUES (:id, :name, :dept, :desig);"), {"id": oid, "name": name, "dept": dept, "desig": desig})
+                                    else:
+                                        conn2.execute(text("INSERT INTO operators (name, dept, designation) VALUES (:name, :dept, :desig);"), {"name": name, "dept": dept, "desig": desig})
                                 except Exception:
-                                    pass
+                                    try:
+                                        conn2.execute(text("INSERT INTO operators (name, dept, designation) VALUES (:name, :dept, :desig);"), {"name": name, "dept": dept, "desig": desig})
+                                    except Exception:
+                                        pass
 
                     # Parts
                     part_masters = tables.get("part_masters", [])

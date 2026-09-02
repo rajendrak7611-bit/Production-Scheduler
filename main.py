@@ -445,27 +445,47 @@ def delete_machine(machine_id: int, db: Session = Depends(get_db)):
 @app.get("/api/operators")
 def get_operators(db: Session = Depends(get_db)):
     try:
-        operators = db.query(models.Operator).all()
-        if operators:
-            return operators
+        from sqlalchemy import text
+        rows = db.execute(text("SELECT * FROM operators ORDER BY id ASC")).mappings().all()
+        if rows:
+            return [{
+                "id": r.get("id"),
+                "name": r.get("name") or r.get("operator_name") or "",
+                "dept": r.get("department") or r.get("dept") or "",
+                "department": r.get("department") or r.get("dept") or "",
+                "designation": r.get("designation") or "Operator"
+            } for r in rows]
     except Exception:
         db.rollback()
-    
+
     try:
-        from sqlalchemy import text
-        rows = db.execute(text("SELECT * FROM operators")).mappings().all()
-        return [{"id": r.get("id"), "name": r.get("name") or r.get("operator_name") or "", "dept": r.get("dept") or r.get("department") or "General", "designation": r.get("designation") or "Operator"} for r in rows]
+        operators = db.query(models.Operator).order_by(models.Operator.id.asc()).all()
+        return [{
+            "id": o.id,
+            "name": o.name,
+            "dept": o.dept or "",
+            "department": o.dept or "",
+            "designation": o.designation or "Operator"
+        } for o in operators]
     except Exception:
         db.rollback()
         return []
 
-@app.post("/api/operators", response_model=OperatorResponse)
-def create_operator(op: OperatorCreate, db: Session = Depends(get_db)):
-    db_op = models.Operator(**op.model_dump())
-    db.add(db_op)
-    db.commit()
-    db.refresh(db_op)
-    return db_op
+@app.post("/api/operators")
+def create_operator(data: dict, db: Session = Depends(get_db)):
+    name = data.get("name") or ""
+    dept = data.get("department") or data.get("dept") or ""
+    desig = data.get("designation") or "Operator"
+    try:
+        db.execute(text("INSERT INTO operators (name, dept, designation) VALUES (:name, :dept, :designation)"), {"name": name, "dept": dept, "designation": desig})
+        db.commit()
+    except Exception:
+        try:
+            db.execute(text("INSERT INTO operators (name, department, designation) VALUES (:name, :dept, :designation)"), {"name": name, "dept": dept, "designation": desig})
+            db.commit()
+        except Exception:
+            db.rollback()
+    return {"message": "Operator created", "name": name, "dept": dept, "department": dept, "designation": desig}
 
 @app.post("/api/operators/import-excel")
 async def import_operators_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -512,30 +532,52 @@ async def import_operators_excel(file: UploadFile = File(...), db: Session = Dep
     db.commit()
     return {"imported_count": imported_count, "message": f"Successfully imported {imported_count} new operators!"}
 
-@app.put("/api/operators/{op_id}", response_model=OperatorResponse)
-def update_operator(op_id: int, op: OperatorCreate, db: Session = Depends(get_db)):
-    db_op = db.query(models.Operator).filter(models.Operator.id == op_id).first()
-    if not db_op:
-        raise HTTPException(status_code=404, detail="Operator not found")
-    for k, v in op.model_dump().items():
-        setattr(db_op, k, v)
-    db.commit()
-    db.refresh(db_op)
-    return db_op
+@app.put("/api/operators/{op_id}")
+def update_operator(op_id: int, data: dict, db: Session = Depends(get_db)):
+    name = data.get("name") or ""
+    dept = data.get("department") or data.get("dept") or ""
+    desig = data.get("designation") or "Operator"
+    try:
+        db.execute(text("UPDATE operators SET name = :name, dept = :dept, designation = :designation WHERE id = :id"), {"id": op_id, "name": name, "dept": dept, "designation": desig})
+        db.commit()
+    except Exception:
+        try:
+            db.execute(text("UPDATE operators SET name = :name, department = :dept, designation = :designation WHERE id = :id"), {"id": op_id, "name": name, "dept": dept, "designation": desig})
+            db.commit()
+        except Exception:
+            db.rollback()
+    return {"id": op_id, "name": name, "dept": dept, "department": dept, "designation": desig}
 
 @app.delete("/api/operators/clear-all")
+@app.delete("/api/operators/all")
+@app.post("/api/operators/clear-all")
 def clear_all_operators(db: Session = Depends(get_db)):
-    db.query(models.Operator).delete()
-    db.commit()
-    return {"message": "All operators cleared successfully!"}
+    try:
+        db.execute(text("DELETE FROM operators;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        db.query(models.Operator).delete()
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"success": True, "message": "All operators cleared successfully!"}
 
 @app.delete("/api/operators/{op_id}")
 def delete_operator(op_id: int, db: Session = Depends(get_db)):
-    db_op = db.query(models.Operator).filter(models.Operator.id == op_id).first()
-    if not db_op:
-        raise HTTPException(status_code=404, detail="Operator not found")
-    db.delete(db_op)
-    db.commit()
+    try:
+        db.execute(text("DELETE FROM operators WHERE id = :id;"), {"id": op_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        db_op = db.query(models.Operator).filter(models.Operator.id == op_id).first()
+        if db_op:
+            db.delete(db_op)
+            db.commit()
+    except Exception:
+        db.rollback()
     return {"message": "Operator deleted"}
 
 # --- Part Master API ---

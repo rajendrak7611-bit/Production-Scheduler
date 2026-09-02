@@ -1553,30 +1553,50 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             operators.forEach((o, idx) => {
                 const tr = document.createElement('tr');
+                const deptVal = o.department || o.dept || '';
                 tr.innerHTML = `
-                    <td>${idx + 1}</td><td>${o.department}</td><td>${o.name}</td><td>${o.designation || 'Operator'}</td>
+                    <td>${idx + 1}</td>
+                    <td>${escapeHtml(deptVal)}</td>
+                    <td>${escapeHtml(o.name || '')}</td>
+                    <td>${escapeHtml(o.designation || 'Operator')}</td>
                     <td class="actions">
                         <button class="btn btn-edit" onclick="editOperator(${o.id})">Edit</button>
                         <button class="btn btn-danger" onclick="deleteOperator(${o.id})">Delete</button>
                     </td>`;
                 operatorsBody.appendChild(tr);
             });
+            if (typeof applyTableColFilters === 'function') {
+                applyTableColFilters('operatorsTable');
+            }
         } catch (e) { console.error(e); }
     }
 
     function openOperatorModal(isEdit) {
-        operatorModal.classList.add('show');
-        operatorModalTitle.textContent = isEdit ? 'Edit Operator' : 'Add Operator';
+        if (operatorModal) {
+            operatorModal.classList.add('active');
+            operatorModal.classList.add('show');
+        }
+        if (operatorModalTitle) operatorModalTitle.textContent = isEdit ? 'Edit Operator' : 'Add Operator';
     }
-    function closeOperatorModal() { operatorModal.classList.remove('show'); operatorForm.reset(); document.getElementById('operatorId').value = ''; }
+    function closeOperatorModal() { 
+        if (operatorModal) {
+            operatorModal.classList.remove('active');
+            operatorModal.classList.remove('show');
+        }
+        if (operatorForm) operatorForm.reset(); 
+        const opId = document.getElementById('operatorId');
+        if (opId) opId.value = ''; 
+    }
     closeOperatorBtn.addEventListener('click', closeOperatorModal); cancelOperatorBtn.addEventListener('click', closeOperatorModal);
 
     operatorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('operatorId').value;
+        const deptVal = document.getElementById('operatorDepartment') ? document.getElementById('operatorDepartment').value : '';
         const data = {
             name: document.getElementById('operatorName').value,
-            department: document.getElementById('operatorDepartment').value,
+            dept: deptVal,
+            department: deptVal,
             designation: document.getElementById('operatorDesignation').value || 'Operator'
         };
         const url = id ? `/api/operators/${id}` : '/api/operators';
@@ -1596,9 +1616,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const o = data.find(x => x.id === id);
         if (o) {
             document.getElementById('operatorId').value = o.id; 
-            document.getElementById('operatorName').value = o.name;
-            document.getElementById('operatorDepartment').value = o.department;
-            document.getElementById('operatorDesignation').value = o.designation || 'Operator';
+            document.getElementById('operatorName').value = o.name || '';
+            const deptEl = document.getElementById('operatorDepartment');
+            if (deptEl) deptEl.value = o.department || o.dept || '';
+            const desigEl = document.getElementById('operatorDesignation');
+            if (desigEl) desigEl.value = o.designation || 'Operator';
             openOperatorModal(true);
         }
     };
@@ -1606,7 +1628,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('deleteAllOperatorsBtn')?.addEventListener('click', async () => {
         if (confirm('Are you sure you want to delete ALL operator records? This cannot be undone.')) {
             try {
-                const res = await fetch('/api/operators/all', { method: 'DELETE' });
+                const res = await fetch('/api/operators/clear-all', { method: 'DELETE' });
                 if (res.ok) {
                     alert('All operators deleted successfully.');
                     fetchOperators();
