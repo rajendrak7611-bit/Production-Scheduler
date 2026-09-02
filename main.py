@@ -2105,26 +2105,21 @@ def create_prod_log(data: dict, db: Session = Depends(get_db)):
         "idle_reason_2": idle_reason_2,
         "idle_hours_3": idle_hours_3,
         "idle_reason_3": idle_reason_3,
-        "multiple_mc": multiple_mc,
-        "log_date": date_val,
-        "machine_name": machine,
-        "operator_name": operator,
-        "part_no": partno,
-        "qty_produced": int(prod_qty)
+        "multiple_mc": multiple_mc
     }
 
     try:
         db.execute(text("""
-            INSERT INTO production_logs (id, dept, date, shift, setter, machine, operator, partno, opn_no, description, runtime, cycle_time, target_qty, prod_qty, efficiency, idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc, log_date, machine_name, operator_name, part_no, qty_produced)
-            VALUES (:id, :dept, :date, :shift, :setter, :machine, :operator, :partno, :opn_no, :description, :runtime, :cycle_time, :target_qty, :prod_qty, :efficiency, :idle_hours, :idle_reason, :idle_hours_2, :idle_reason_2, :idle_hours_3, :idle_reason_3, :multiple_mc, :log_date, :machine_name, :operator_name, :part_no, :qty_produced)
+            INSERT INTO production_logs (id, dept, date, shift, setter, machine, operator, partno, opn_no, description, runtime, cycle_time, target_qty, prod_qty, efficiency, idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc)
+            VALUES (:id, :dept, :date, :shift, :setter, :machine, :operator, :partno, :opn_no, :description, :runtime, :cycle_time, :target_qty, :prod_qty, :efficiency, :idle_hours, :idle_reason, :idle_hours_2, :idle_reason_2, :idle_hours_3, :idle_reason_3, :multiple_mc)
         """), params)
         db.commit()
     except Exception:
         db.rollback()
         try:
             db.execute(text("""
-                INSERT INTO production_logs (dept, date, shift, setter, machine, operator, partno, opn_no, description, runtime, cycle_time, target_qty, prod_qty, efficiency, idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc, log_date, machine_name, operator_name, part_no, qty_produced)
-                VALUES (:dept, :date, :shift, :setter, :machine, :operator, :partno, :opn_no, :description, :runtime, :cycle_time, :target_qty, :prod_qty, :efficiency, :idle_hours, :idle_reason, :idle_hours_2, :idle_reason_2, :idle_hours_3, :idle_reason_3, :multiple_mc, :log_date, :machine_name, :operator_name, :part_no, :qty_produced)
+                INSERT INTO production_logs (dept, date, shift, setter, machine, operator, partno, opn_no, description, runtime, cycle_time, target_qty, prod_qty, efficiency, idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc)
+                VALUES (:dept, :date, :shift, :setter, :machine, :operator, :partno, :opn_no, :description, :runtime, :cycle_time, :target_qty, :prod_qty, :efficiency, :idle_hours, :idle_reason, :idle_hours_2, :idle_reason_2, :idle_hours_3, :idle_reason_3, :multiple_mc)
             """), params)
             db.commit()
         except Exception as ex:
@@ -2158,12 +2153,7 @@ def update_prod_log(log_id: int, data: dict, db: Session = Depends(get_db)):
         "idle_reason_2": (data.get("idle_reason_2") or "None").strip(),
         "idle_hours_3": float(data.get("idle_hours_3") or 0.0),
         "idle_reason_3": (data.get("idle_reason_3") or "None").strip(),
-        "multiple_mc": int(data.get("multiple_mc") or 1),
-        "log_date": (data.get("date") or data.get("log_date") or "").strip(),
-        "machine_name": (data.get("machine") or data.get("machine_name") or "").strip(),
-        "operator_name": (data.get("operator") or data.get("operator_name") or "").strip(),
-        "part_no": (data.get("partno") or data.get("part_no") or "").strip(),
-        "qty_produced": int(float(data.get("prod_qty") if data.get("prod_qty") is not None else (data.get("qty_produced") or 0.0)))
+        "multiple_mc": int(data.get("multiple_mc") or 1)
     }
     try:
         db.execute(text("""
@@ -2175,9 +2165,7 @@ def update_prod_log(log_id: int, data: dict, db: Session = Depends(get_db)):
                 efficiency = :efficiency, idle_hours = :idle_hours, idle_reason = :idle_reason,
                 idle_hours_2 = :idle_hours_2, idle_reason_2 = :idle_reason_2,
                 idle_hours_3 = :idle_hours_3, idle_reason_3 = :idle_reason_3,
-                multiple_mc = :multiple_mc, log_date = :log_date,
-                machine_name = :machine_name, operator_name = :operator_name,
-                part_no = :part_no, qty_produced = :qty_produced
+                multiple_mc = :multiple_mc
             WHERE id = :id
         """), params)
         db.commit()

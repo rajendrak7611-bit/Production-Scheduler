@@ -126,15 +126,6 @@ class ProductionLog(Base):
     idle_hours_3 = Column(Float, default=0.0)
     idle_reason_3 = Column(String, default="None")
     multiple_mc = Column(Integer, default=1)
-    # backward compatible fields
-    log_date = Column(String, nullable=True)
-    machine_name = Column(String, nullable=True)
-    operator_name = Column(String, nullable=True)
-    part_no = Column(String, nullable=True)
-    qty_produced = Column(Integer, default=0)
-    scrap_qty = Column(Integer, default=0)
-    completed_sl_nos = Column(Text, nullable=True)
-    remarks = Column(Text, nullable=True)
     created_at = Column(DateTime, default=get_now_ist)
 
 class Tooling(Base):
