@@ -2955,7 +2955,7 @@ def adjust_part_wip(data: dict, db: Session = Depends(get_db)):
         if not partno:
             raise HTTPException(status_code=400, detail="Part number is required")
 
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
 
         # Fetch operations for this part
         part_row = db.execute(text("SELECT id FROM partmaster WHERE LOWER(partno) = LOWER(:p);"), {"p": partno}).mappings().first()
@@ -3058,7 +3058,7 @@ def clear_backlog_corrections(db: Session = Depends(get_db)):
 def autofix_wip(data: dict, db: Session = Depends(get_db)):
     try:
         dept = (data.get("department") or "").strip()
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
 
         q = "SELECT id, partno, department FROM partmaster"
         params = {}
