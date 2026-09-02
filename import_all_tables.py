@@ -338,6 +338,54 @@ def import_all_backup_tables():
                                 except Exception:
                                     pass
 
+                    # Raw Materials
+                    rm_data = tables.get("raw_materials", [])
+                    if rm_data:
+                        try:
+                            conn2.execute(text("DELETE FROM raw_materials;"))
+                        except Exception:
+                            pass
+                        for r in rm_data:
+                            rid = int(safe_float(r.get("id"), 0))
+                            fpn = r.get("forge_pn") or ""
+                            rcpt = int(safe_float(r.get("receipt"), 0))
+                            dspt = int(safe_float(r.get("despatch"), 0))
+                            stk = int(safe_float(r.get("stock"), rcpt - dspt))
+                            if fpn:
+                                try:
+                                    if rid:
+                                        conn2.execute(text("INSERT INTO raw_materials (id, forge_pn, receipt, despatch, stock) VALUES (:id, :forge_pn, :receipt, :despatch, :stock);"), {"id": rid, "forge_pn": fpn, "receipt": rcpt, "despatch": dspt, "stock": stk})
+                                    else:
+                                        conn2.execute(text("INSERT INTO raw_materials (forge_pn, receipt, despatch, stock) VALUES (:forge_pn, :receipt, :despatch, :stock);"), {"forge_pn": fpn, "receipt": rcpt, "despatch": dspt, "stock": stk})
+                                except Exception:
+                                    pass
+
+                    # Raw Material Logs
+                    rm_logs_data = tables.get("raw_material_logs", [])
+                    if rm_logs_data:
+                        try:
+                            conn2.execute(text("DELETE FROM raw_material_logs;"))
+                        except Exception:
+                            pass
+                        for rl in rm_logs_data:
+                            rlid = int(safe_float(rl.get("id"), 0))
+                            rtype = rl.get("type") or "receipt"
+                            rdate = rl.get("date") or ""
+                            dctype = rl.get("dc_type") or ""
+                            fpn = rl.get("forge_pn") or ""
+                            dcno = rl.get("dc_no") or ""
+                            fpno = rl.get("finish_part_no") or ""
+                            pprefix = rl.get("part_prefix") or ""
+                            rqty = int(safe_float(rl.get("qty"), 0))
+                            if fpn:
+                                try:
+                                    if rlid:
+                                        conn2.execute(text("INSERT INTO raw_material_logs (id, type, date, dc_type, forge_pn, dc_no, finish_part_no, part_prefix, qty) VALUES (:id, :type, :date, :dc_type, :forge_pn, :dc_no, :finish_part_no, :part_prefix, :qty);"), {"id": rlid, "type": rtype, "date": rdate, "dc_type": dctype, "forge_pn": fpn, "dc_no": dcno, "finish_part_no": fpno, "part_prefix": pprefix, "qty": rqty})
+                                    else:
+                                        conn2.execute(text("INSERT INTO raw_material_logs (type, date, dc_type, forge_pn, dc_no, finish_part_no, part_prefix, qty) VALUES (:type, :date, :dc_type, :forge_pn, :dc_no, :finish_part_no, :part_prefix, :qty);"), {"type": rtype, "date": rdate, "dc_type": dctype, "forge_pn": fpn, "dc_no": dcno, "finish_part_no": fpno, "part_prefix": pprefix, "qty": rqty})
+                                except Exception:
+                                    pass
+
                     t2.commit()
                     print("Synced model tables successfully!")
                 except Exception as ex2:

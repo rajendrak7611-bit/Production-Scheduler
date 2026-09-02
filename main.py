@@ -2203,6 +2203,244 @@ def clear_all_prod_logs(db: Session = Depends(get_db)):
         db.rollback()
     return {"message": "All production logs cleared successfully"}
 
+# --- RAW MATERIALS & RAW MATERIAL LOGS ---
+@app.get("/api/rawmaterials")
+def get_raw_materials(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT id, forge_pn, receipt, despatch, stock FROM raw_materials ORDER BY forge_pn ASC;")).mappings().all()
+        return [{
+            "id": r["id"],
+            "forge_pn": r["forge_pn"],
+            "receipt": int(r["receipt"] or 0),
+            "despatch": int(r["despatch"] or 0),
+            "stock": int(r["stock"] or 0)
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        rms = db.query(models.RawMaterial).order_by(models.RawMaterial.forge_pn.asc()).all()
+        return [{
+            "id": r.id,
+            "forge_pn": r.forge_pn,
+            "receipt": r.receipt or 0,
+            "despatch": r.despatch or 0,
+            "stock": r.stock or 0
+        } for r in rms]
+
+@app.post("/api/rawmaterials")
+def create_raw_material(data: dict, db: Session = Depends(get_db)):
+    fpn = (data.get("forge_pn") or "").strip()
+    if not fpn:
+        raise HTTPException(status_code=400, detail="Forge PN is required")
+    receipt = int(data.get("receipt") or data.get("quantity") or 0)
+    despatch = int(data.get("despatch") or 0)
+    stock = int(data.get("stock") if data.get("stock") is not None else (receipt - despatch))
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('raw_materials', 'id'), coalesce(max(id),0) + 1, false) FROM raw_materials;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("""
+            INSERT INTO raw_materials (forge_pn, receipt, despatch, stock)
+            VALUES (:forge_pn, :receipt, :despatch, :stock)
+        """), {"forge_pn": fpn, "receipt": receipt, "despatch": despatch, "stock": stock})
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create raw material: {ex}")
+    return {"message": "Raw Material created successfully"}
+
+@app.put("/api/rawmaterials/{rm_id}")
+def update_raw_material(rm_id: int, data: dict, db: Session = Depends(get_db)):
+    fpn = (data.get("forge_pn") or "").strip()
+    receipt = int(data.get("receipt") or data.get("quantity") or 0)
+    despatch = int(data.get("despatch") or 0)
+    stock = int(data.get("stock") if data.get("stock") is not None else (receipt - despatch))
+
+    try:
+        db.execute(text("""
+            UPDATE raw_materials SET forge_pn = :forge_pn, receipt = :receipt, despatch = :despatch, stock = :stock
+            WHERE id = :id
+        """), {"id": rm_id, "forge_pn": fpn, "receipt": receipt, "despatch": despatch, "stock": stock})
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update raw material: {ex}")
+    return {"message": "Raw Material updated successfully"}
+
+@app.delete("/api/rawmaterials/all")
+@app.delete("/api/rawmaterials/clear-all")
+@app.post("/api/rawmaterials/clear-all")
+def clear_all_raw_materials(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM raw_materials;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All Raw Material items deleted successfully"}
+
+@app.delete("/api/rawmaterials/{rm_id}")
+def delete_raw_material(rm_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM raw_materials WHERE id = :id"), {"id": rm_id})
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete raw material: {ex}")
+    return {"message": "Raw Material deleted"}
+
+@app.post("/api/rawmaterials/bulk")
+def bulk_import_raw_materials(items: list, db: Session = Depends(get_db)):
+    for r in items:
+        fpn = (r.get("forge_pn") or "").strip()
+        if not fpn:
+            continue
+        rcpt = int(r.get("receipt") or r.get("quantity") or 0)
+        dspt = int(r.get("despatch") or 0)
+        stk = int(r.get("stock") if r.get("stock") is not None else (rcpt - dspt))
+        try:
+            db.execute(text("""
+                INSERT INTO raw_materials (forge_pn, receipt, despatch, stock)
+                VALUES (:forge_pn, :receipt, :despatch, :stock)
+            """), {"forge_pn": fpn, "receipt": rcpt, "despatch": dspt, "stock": stk})
+        except Exception:
+            pass
+    db.commit()
+    return {"message": f"Imported {len(items)} raw materials successfully"}
+
+# --- RAW MATERIAL LOGS ---
+@app.get("/api/rawmateriallogs")
+def get_raw_material_logs(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT id, type, date, dc_type, forge_pn, dc_no, finish_part_no, part_prefix, qty, created_at FROM raw_material_logs ORDER BY id DESC;")).mappings().all()
+        return [{
+            "id": r["id"],
+            "type": r["type"] or "receipt",
+            "date": r["date"] or "",
+            "dc_type": r["dc_type"] or "",
+            "forge_pn": r["forge_pn"] or "",
+            "dc_no": r["dc_no"] or "",
+            "finish_part_no": r["finish_part_no"] or "",
+            "part_prefix": r["part_prefix"] or "",
+            "qty": int(r["qty"] or 0),
+            "created_at": str(r["created_at"] or "")
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        logs = db.query(models.RawMaterialLog).order_by(models.RawMaterialLog.id.desc()).all()
+        return [{
+            "id": l.id,
+            "type": l.type or "receipt",
+            "date": l.date or "",
+            "dc_type": l.dc_type or "",
+            "forge_pn": l.forge_pn or "",
+            "dc_no": l.dc_no or "",
+            "finish_part_no": l.finish_part_no or "",
+            "part_prefix": l.part_prefix or "",
+            "qty": l.qty or 0,
+            "created_at": str(l.created_at or "")
+        } for l in logs]
+
+@app.post("/api/rawmateriallogs")
+def create_raw_material_log(data: dict, db: Session = Depends(get_db)):
+    rtype = (data.get("type") or "receipt").strip().lower()
+    rdate = (data.get("date") or "").strip()
+    dctype = (data.get("dc_type") or "").strip()
+    fpn = (data.get("forge_pn") or "").strip()
+    dcno = (data.get("dc_no") or "").strip()
+    fpno = (data.get("finish_part_no") or "").strip()
+    pprefix = (data.get("part_prefix") or "").strip()
+    qty = int(data.get("qty") or data.get("quantity") or 0)
+
+    if not fpn:
+        raise HTTPException(status_code=400, detail="Forge PN is required")
+
+    try:
+        db.execute(text("SELECT setval(pg_get_serial_sequence('raw_material_logs', 'id'), coalesce(max(id),0) + 1, false) FROM raw_material_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("""
+            INSERT INTO raw_material_logs (type, date, dc_type, forge_pn, dc_no, finish_part_no, part_prefix, qty)
+            VALUES (:type, :date, :dc_type, :forge_pn, :dc_no, :finish_part_no, :part_prefix, :qty)
+        """), {"type": rtype, "date": rdate, "dc_type": dctype, "forge_pn": fpn, "dc_no": dcno, "finish_part_no": fpno, "part_prefix": pprefix, "qty": qty})
+        
+        # Auto sync stock in raw_materials
+        existing_rm = db.execute(text("SELECT id, receipt, despatch, stock FROM raw_materials WHERE forge_pn = :forge_pn"), {"forge_pn": fpn}).mappings().first()
+        if existing_rm:
+            cur_rcpt = int(existing_rm["receipt"] or 0)
+            cur_dspt = int(existing_rm["despatch"] or 0)
+            if rtype == "receipt":
+                cur_rcpt += qty
+            elif rtype == "despatch":
+                cur_dspt += qty
+            cur_stk = cur_rcpt - cur_dspt
+            db.execute(text("""
+                UPDATE raw_materials SET receipt = :receipt, despatch = :despatch, stock = :stock WHERE forge_pn = :forge_pn
+            """), {"forge_pn": fpn, "receipt": cur_rcpt, "despatch": cur_dspt, "stock": cur_stk})
+        else:
+            cur_rcpt = qty if rtype == "receipt" else 0
+            cur_dspt = qty if rtype == "despatch" else 0
+            cur_stk = cur_rcpt - cur_dspt
+            db.execute(text("""
+                INSERT INTO raw_materials (forge_pn, receipt, despatch, stock) VALUES (:forge_pn, :receipt, :despatch, :stock)
+            """), {"forge_pn": fpn, "receipt": cur_rcpt, "despatch": cur_dspt, "stock": cur_stk})
+
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create raw material log: {ex}")
+
+    return {"message": "Raw Material Log saved successfully"}
+
+@app.delete("/api/rawmateriallogs/{log_id}")
+def delete_raw_material_log(log_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM raw_material_logs WHERE id = :id"), {"id": log_id})
+        db.commit()
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete raw material log: {ex}")
+    return {"message": "Log deleted"}
+
+@app.delete("/api/rawmateriallogs/all")
+@app.delete("/api/rawmateriallogs/clear-all")
+@app.post("/api/rawmateriallogs/clear-all")
+def clear_all_raw_material_logs(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM raw_material_logs;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "All Raw Material logs deleted successfully"}
+
+@app.post("/api/rawmateriallogs/bulk")
+def bulk_import_raw_material_logs(items: list, db: Session = Depends(get_db)):
+    for rl in items:
+        rtype = (rl.get("type") or "receipt").strip().lower()
+        rdate = (rl.get("date") or "").strip()
+        dctype = (rl.get("dc_type") or "").strip()
+        fpn = (rl.get("forge_pn") or "").strip()
+        dcno = (rl.get("dc_no") or "").strip()
+        fpno = (rl.get("finish_part_no") or "").strip()
+        pprefix = (rl.get("part_prefix") or "").strip()
+        rqty = int(rl.get("qty") or rl.get("quantity") or 0)
+        if not fpn:
+            continue
+        try:
+            db.execute(text("""
+                INSERT INTO raw_material_logs (type, date, dc_type, forge_pn, dc_no, finish_part_no, part_prefix, qty)
+                VALUES (:type, :date, :dc_type, :forge_pn, :dc_no, :finish_part_no, :part_prefix, :qty)
+            """), {"type": rtype, "date": rdate, "dc_type": dctype, "forge_pn": fpn, "dc_no": dcno, "finish_part_no": fpno, "part_prefix": pprefix, "qty": rqty})
+        except Exception:
+            pass
+    db.commit()
+    return {"message": f"Imported {len(items)} logs successfully"}
+
 # --- Tooling ---
 @app.get("/api/tooling", response_model=List[ToolingResponse])
 def get_tooling(db: Session = Depends(get_db)):

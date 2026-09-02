@@ -128,6 +128,29 @@ class ProductionLog(Base):
     multiple_mc = Column(Integer, default=1)
     created_at = Column(DateTime, default=get_now_ist)
 
+class RawMaterial(Base):
+    __tablename__ = "raw_materials"
+
+    id = Column(Integer, primary_key=True, index=True)
+    forge_pn = Column(String, index=True, nullable=False)
+    receipt = Column(Integer, default=0)
+    despatch = Column(Integer, default=0)
+    stock = Column(Integer, default=0)
+
+class RawMaterialLog(Base):
+    __tablename__ = "raw_material_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String, nullable=False)  # 'receipt' or 'despatch'
+    date = Column(String, nullable=True)
+    dc_type = Column(String, nullable=True)
+    forge_pn = Column(String, index=True, nullable=False)
+    dc_no = Column(String, nullable=True)
+    finish_part_no = Column(String, nullable=True)
+    part_prefix = Column(String, nullable=True)
+    qty = Column(Integer, default=0)
+    created_at = Column(DateTime, default=get_now_ist)
+
 class Tooling(Base):
     __tablename__ = "tooling"
 
