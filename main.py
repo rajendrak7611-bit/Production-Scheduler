@@ -51,21 +51,26 @@ def parse_excel_bytes(file_bytes: bytes):
     return rows
 
 # Ensure tables are created
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+    models.Base.metadata.create_all(bind=engine)
+except Exception as _ex:
+    print("create_all notice:", _ex)
 
 # Auto migrate inspection_reports columns if missing
 try:
-    with engine.begin() as conn:
-        from sqlalchemy import text
+    with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN report_code VARCHAR;"))
+            conn.commit()
         except Exception:
             pass
         try:
             conn.execute(text("ALTER TABLE inspection_reports ADD COLUMN prod_log_id INTEGER;"))
+            conn.commit()
         except Exception:
             pass
-except Exception as _ex:
+except Exception:
     pass
 
 app = FastAPI(title="Production Management API")
@@ -3581,18 +3586,21 @@ def export_inspection_reports_excel(db: Session = Depends(get_db)):
 
 @app.get("/api/insert_masters")
 def get_insert_masters(db: Session = Depends(get_db)):
-    rows = db.query(models.InsertMaster).order_by(models.InsertMaster.id.asc()).all()
-    return [{
-        "id": r.id,
-        "insert_spec": r.insert_spec,
-        "no_of_edges": r.no_of_edges,
-        "name": r.name,
-        "specification": r.specification,
-        "grade": r.grade,
-        "make": r.make,
-        "stock": r.stock,
-        "price": r.price
-    } for r in rows]
+    try:
+        rows = db.query(models.InsertMaster).order_by(models.InsertMaster.id.asc()).all()
+        return [{
+            "id": r.id,
+            "insert_spec": r.insert_spec,
+            "no_of_edges": r.no_of_edges,
+            "name": r.name,
+            "specification": r.specification,
+            "grade": r.grade,
+            "make": r.make,
+            "stock": r.stock,
+            "price": r.price
+        } for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/insert_masters")
 def create_insert_master(data: dict, db: Session = Depends(get_db)):
@@ -3672,19 +3680,22 @@ def delete_insert_master(id: int, db: Session = Depends(get_db)):
 # --- DRILL MASTER CRUD ---
 @app.get("/api/drill_masters")
 def get_drill_masters(db: Session = Depends(get_db)):
-    rows = db.query(models.DrillMaster).order_by(models.DrillMaster.id.asc()).all()
-    return [{
-        "id": r.id,
-        "drill_size": r.drill_size,
-        "sl_no": r.sl_no,
-        "resharp_count": r.resharp_count,
-        "name": r.name,
-        "size_dia": r.size_dia,
-        "specification": r.specification,
-        "make": r.make,
-        "stock": r.stock,
-        "price": r.price
-    } for r in rows]
+    try:
+        rows = db.query(models.DrillMaster).order_by(models.DrillMaster.id.asc()).all()
+        return [{
+            "id": r.id,
+            "drill_size": r.drill_size,
+            "sl_no": r.sl_no,
+            "resharp_count": r.resharp_count,
+            "name": r.name,
+            "size_dia": r.size_dia,
+            "specification": r.specification,
+            "make": r.make,
+            "stock": r.stock,
+            "price": r.price
+        } for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/drill_masters")
 def create_drill_master(data: dict, db: Session = Depends(get_db)):
@@ -3756,16 +3767,19 @@ def delete_drill_master(id: int, db: Session = Depends(get_db)):
 # --- TAP MASTER CRUD ---
 @app.get("/api/tap_masters")
 def get_tap_masters(db: Session = Depends(get_db)):
-    rows = db.query(models.TapMaster).order_by(models.TapMaster.id.asc()).all()
-    return [{
-        "id": r.id,
-        "tap_spec": r.tap_spec,
-        "name": r.name,
-        "specification": r.specification,
-        "make": r.make,
-        "stock": r.stock,
-        "price": r.price
-    } for r in rows]
+    try:
+        rows = db.query(models.TapMaster).order_by(models.TapMaster.id.asc()).all()
+        return [{
+            "id": r.id,
+            "tap_spec": r.tap_spec,
+            "name": r.name,
+            "specification": r.specification,
+            "make": r.make,
+            "stock": r.stock,
+            "price": r.price
+        } for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/tap_masters")
 def create_tap_master(data: dict, db: Session = Depends(get_db)):
@@ -3831,17 +3845,20 @@ def delete_tap_master(id: int, db: Session = Depends(get_db)):
 # --- INSERT RECEIPTS CRUD ---
 @app.get("/api/insert_receipts")
 def get_insert_receipts(db: Session = Depends(get_db)):
-    rows = db.query(models.InsertReceipt).order_by(models.InsertReceipt.id.desc()).all()
-    return [{
-        "id": r.id,
-        "date": r.date,
-        "supplier": r.supplier,
-        "insert_spec": r.insert_spec,
-        "batch_no": r.batch_no,
-        "qty": r.qty,
-        "rate": r.rate,
-        "created_at": r.created_at.isoformat() if r.created_at else None
-    } for r in rows]
+    try:
+        rows = db.query(models.InsertReceipt).order_by(models.InsertReceipt.id.desc()).all()
+        return [{
+            "id": r.id,
+            "date": r.date,
+            "supplier": r.supplier,
+            "insert_spec": r.insert_spec,
+            "batch_no": r.batch_no,
+            "qty": r.qty,
+            "rate": r.rate,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        } for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/insert_receipts")
 def create_insert_receipt(data: dict, db: Session = Depends(get_db)):
@@ -3908,16 +3925,19 @@ def delete_insert_receipt(id: int, db: Session = Depends(get_db)):
 # --- TAP RECEIPTS CRUD ---
 @app.get("/api/tap_receipts")
 def get_tap_receipts(db: Session = Depends(get_db)):
-    rows = db.query(models.TapReceipt).order_by(models.TapReceipt.id.desc()).all()
-    return [{
-        "id": r.id,
-        "date": r.date,
-        "supplier": r.supplier,
-        "tap_spec": r.tap_spec,
-        "qty": r.qty,
-        "rate": r.rate,
-        "created_at": r.created_at.isoformat() if r.created_at else None
-    } for r in rows]
+    try:
+        rows = db.query(models.TapReceipt).order_by(models.TapReceipt.id.desc()).all()
+        return [{
+            "id": r.id,
+            "date": r.date,
+            "supplier": r.supplier,
+            "tap_spec": r.tap_spec,
+            "qty": r.qty,
+            "rate": r.rate,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        } for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/tap_receipts")
 def create_tap_receipt(data: dict, db: Session = Depends(get_db)):
@@ -3981,49 +4001,57 @@ def delete_tap_receipt(id: int, db: Session = Depends(get_db)):
 # --- INSERT ISSUES CRUD ---
 @app.get("/api/insert_issues")
 def get_insert_issues(db: Session = Depends(get_db)):
-    rows = db.query(models.InsertIssue).order_by(models.InsertIssue.id.desc()).all()
-    return [{
-        "id": r.id,
-        "date": r.date,
-        "shift": r.shift,
-        "department": r.department,
-        "insert_spec": r.insert_spec,
-        "batch_no": r.batch_no,
-        "qty_issued": r.qty_issued,
-        "qty_received": r.qty_received,
-        "machine": r.machine,
-        "operator": r.operator,
-        "partno": r.partno,
-        "opn_no": r.opn_no,
-        "usages": r.usages,
-        "receipt_id": r.receipt_id,
-        "edge_data": r.edge_data,
-        "created_at": r.created_at.isoformat() if r.created_at else None
-    } for r in rows]
+    try:
+        rows = db.query(models.InsertIssue).order_by(models.InsertIssue.id.desc()).all()
+        return [{
+            "id": r.id,
+            "date": r.date,
+            "shift": r.shift,
+            "department": r.department,
+            "insert_spec": r.insert_spec,
+            "batch_no": r.batch_no,
+            "qty_issued": r.qty_issued,
+            "qty_received": r.qty_received,
+            "machine": r.machine,
+            "operator": r.operator,
+            "partno": r.partno,
+            "opn_no": r.opn_no,
+            "usages": r.usages,
+            "receipt_id": r.receipt_id,
+            "edge_data": r.edge_data,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        } for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/insert_issues/{id}")
 def get_insert_issue(id: int, db: Session = Depends(get_db)):
-    r = db.query(models.InsertIssue).filter(models.InsertIssue.id == id).first()
-    if not r:
-        raise HTTPException(status_code=404, detail="Insert issue record not found")
-    return {
-        "id": r.id,
-        "date": r.date,
-        "shift": r.shift,
-        "department": r.department,
-        "insert_spec": r.insert_spec,
-        "batch_no": r.batch_no,
-        "qty_issued": r.qty_issued,
-        "qty_received": r.qty_received,
-        "machine": r.machine,
-        "operator": r.operator,
-        "partno": r.partno,
-        "opn_no": r.opn_no,
-        "usages": r.usages,
-        "receipt_id": r.receipt_id,
-        "edge_data": r.edge_data,
-        "created_at": r.created_at.isoformat() if r.created_at else None
-    }
+    try:
+        r = db.query(models.InsertIssue).filter(models.InsertIssue.id == id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="Insert issue record not found")
+        return {
+            "id": r.id,
+            "date": r.date,
+            "shift": r.shift,
+            "department": r.department,
+            "insert_spec": r.insert_spec,
+            "batch_no": r.batch_no,
+            "qty_issued": r.qty_issued,
+            "qty_received": r.qty_received,
+            "machine": r.machine,
+            "operator": r.operator,
+            "partno": r.partno,
+            "opn_no": r.opn_no,
+            "usages": r.usages,
+            "receipt_id": r.receipt_id,
+            "edge_data": r.edge_data,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/insert_issues")
 def create_insert_issue(data: dict, db: Session = Depends(get_db)):
@@ -4114,21 +4142,24 @@ def delete_insert_issue(id: int, db: Session = Depends(get_db)):
 # --- TAP ISSUES CRUD ---
 @app.get("/api/tap_issues")
 def get_tap_issues(db: Session = Depends(get_db)):
-    rows = db.query(models.TapIssue).order_by(models.TapIssue.id.desc()).all()
-    return [{
-        "id": r.id,
-        "date": r.date,
-        "shift": r.shift,
-        "department": r.department,
-        "tap_spec": r.tap_spec,
-        "qty_issued": r.qty_issued,
-        "qty_received": r.qty_received,
-        "machine": r.machine,
-        "operator": r.operator,
-        "partno": r.partno,
-        "opn_no": r.opn_no,
-        "created_at": r.created_at.isoformat() if r.created_at else None
-    } for r in rows]
+    try:
+        rows = db.query(models.TapIssue).order_by(models.TapIssue.id.desc()).all()
+        return [{
+            "id": r.id,
+            "date": r.date,
+            "shift": r.shift,
+            "department": r.department,
+            "tap_spec": r.tap_spec,
+            "qty_issued": r.qty_issued,
+            "qty_received": r.qty_received,
+            "machine": r.machine,
+            "operator": r.operator,
+            "partno": r.partno,
+            "opn_no": r.opn_no,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        } for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/tap_issues")
 def create_tap_issue(data: dict, db: Session = Depends(get_db)):
