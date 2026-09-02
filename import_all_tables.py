@@ -621,6 +621,223 @@ def import_all_backup_tables():
                                 except Exception:
                                     pass
 
+                    # Insert Masters
+                    ins_data = tables.get("insert_masters", [])
+                    if ins_data:
+                        try:
+                            conn2.execute(text("DELETE FROM insert_masters;"))
+                        except Exception:
+                            pass
+                        for im in ins_data:
+                            imid = int(safe_float(im.get("id"), 0))
+                            ispec = (im.get("insert_spec") or im.get("name") or "").strip()
+                            edges = int(safe_float(im.get("no_of_edges"), 1))
+                            grade = (im.get("grade") or "").strip()
+                            make = (im.get("make") or "").strip()
+                            stock = safe_float(im.get("stock"), 0.0)
+                            price = safe_float(im.get("price"), 0.0)
+                            if ispec:
+                                try:
+                                    if imid:
+                                        conn2.execute(text("INSERT INTO insert_masters (id, insert_spec, no_of_edges, grade, make, stock, price) VALUES (:id, :spec, :edges, :grade, :make, :stock, :price);"), {"id": imid, "spec": ispec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price})
+                                    else:
+                                        conn2.execute(text("INSERT INTO insert_masters (insert_spec, no_of_edges, grade, make, stock, price) VALUES (:spec, :edges, :grade, :make, :stock, :price);"), {"spec": ispec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price})
+                                except Exception:
+                                    pass
+                        try:
+                            conn2.execute(text("SELECT setval(pg_get_serial_sequence('insert_masters', 'id'), coalesce(max(id),0) + 1, false) FROM insert_masters;"))
+                        except Exception:
+                            pass
+
+                    # Drill Masters
+                    drill_data = tables.get("drill_masters", [])
+                    if drill_data:
+                        try:
+                            conn2.execute(text("DELETE FROM drill_masters;"))
+                        except Exception:
+                            pass
+                        for dm in drill_data:
+                            dmid = int(safe_float(dm.get("id"), 0))
+                            dsize = (dm.get("drill_size") or dm.get("size_dia") or dm.get("name") or "").strip()
+                            sl = (dm.get("sl_no") or "").strip()
+                            rc = int(safe_float(dm.get("resharp_count"), 0))
+                            make = (dm.get("make") or "").strip()
+                            stock = safe_float(dm.get("stock"), 0.0)
+                            price = safe_float(dm.get("price"), 0.0)
+                            if dsize or sl:
+                                try:
+                                    if dmid:
+                                        conn2.execute(text("INSERT INTO drill_masters (id, drill_size, sl_no, resharp_count, make, stock, price) VALUES (:id, :dsize, :sl, :rc, :make, :stock, :price);"), {"id": dmid, "dsize": dsize, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price})
+                                    else:
+                                        conn2.execute(text("INSERT INTO drill_masters (drill_size, sl_no, resharp_count, make, stock, price) VALUES (:dsize, :sl, :rc, :make, :stock, :price);"), {"dsize": dsize, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price})
+                                except Exception:
+                                    pass
+                        try:
+                            conn2.execute(text("SELECT setval(pg_get_serial_sequence('drill_masters', 'id'), coalesce(max(id),0) + 1, false) FROM drill_masters;"))
+                        except Exception:
+                            pass
+
+                    # Tap Masters
+                    tap_data = tables.get("tap_masters", [])
+                    if tap_data:
+                        try:
+                            conn2.execute(text("DELETE FROM tap_masters;"))
+                        except Exception:
+                            pass
+                        for tm in tap_data:
+                            tmid = int(safe_float(tm.get("id"), 0))
+                            tspec = (tm.get("tap_spec") or tm.get("specification") or tm.get("name") or "").strip()
+                            make = (tm.get("make") or "").strip()
+                            stock = safe_float(tm.get("stock"), 0.0)
+                            price = safe_float(tm.get("price"), 0.0)
+                            if tspec:
+                                try:
+                                    if tmid:
+                                        conn2.execute(text("INSERT INTO tap_masters (id, tap_spec, make, stock, price) VALUES (:id, :spec, :make, :stock, :price);"), {"id": tmid, "spec": tspec, "make": make, "stock": stock, "price": price})
+                                    else:
+                                        conn2.execute(text("INSERT INTO tap_masters (tap_spec, make, stock, price) VALUES (:spec, :make, :stock, :price);"), {"spec": tspec, "make": make, "stock": stock, "price": price})
+                                except Exception:
+                                    pass
+                        try:
+                            conn2.execute(text("SELECT setval(pg_get_serial_sequence('tap_masters', 'id'), coalesce(max(id),0) + 1, false) FROM tap_masters;"))
+                        except Exception:
+                            pass
+
+                    # Insert Receipts
+                    ir_data = tables.get("insert_receipts", [])
+                    if ir_data:
+                        try:
+                            conn2.execute(text("DELETE FROM insert_receipts;"))
+                        except Exception:
+                            pass
+                        for ir in ir_data:
+                            irid = int(safe_float(ir.get("id"), 0))
+                            rdate = ir.get("date") or ""
+                            rsupp = ir.get("supplier") or ""
+                            rspec = ir.get("insert_spec") or ""
+                            rbatch = ir.get("batch_no") or ""
+                            rqty = safe_float(ir.get("qty"), 0.0)
+                            rrate = safe_float(ir.get("rate"), 0.0)
+                            if rspec:
+                                try:
+                                    if irid:
+                                        conn2.execute(text("INSERT INTO insert_receipts (id, date, supplier, insert_spec, batch_no, qty, rate) VALUES (:id, :date, :supp, :spec, :batch, :qty, :rate);"), {"id": irid, "date": rdate, "supp": rsupp, "spec": rspec, "batch": rbatch, "qty": rqty, "rate": rrate})
+                                    else:
+                                        conn2.execute(text("INSERT INTO insert_receipts (date, supplier, insert_spec, batch_no, qty, rate) VALUES (:date, :supp, :spec, :batch, :qty, :rate);"), {"date": rdate, "supp": rsupp, "spec": rspec, "batch": rbatch, "qty": rqty, "rate": rrate})
+                                except Exception:
+                                    pass
+                        try:
+                            conn2.execute(text("SELECT setval(pg_get_serial_sequence('insert_receipts', 'id'), coalesce(max(id),0) + 1, false) FROM insert_receipts;"))
+                        except Exception:
+                            pass
+
+                    # Tap Receipts
+                    tr_data = tables.get("tap_receipts", [])
+                    if tr_data:
+                        try:
+                            conn2.execute(text("DELETE FROM tap_receipts;"))
+                        except Exception:
+                            pass
+                        for tr in tr_data:
+                            trid = int(safe_float(tr.get("id"), 0))
+                            rdate = tr.get("date") or ""
+                            rsupp = tr.get("supplier") or ""
+                            rspec = tr.get("tap_spec") or ""
+                            rqty = safe_float(tr.get("qty"), 0.0)
+                            rrate = safe_float(tr.get("rate"), 0.0)
+                            if rspec:
+                                try:
+                                    if trid:
+                                        conn2.execute(text("INSERT INTO tap_receipts (id, date, supplier, tap_spec, qty, rate) VALUES (:id, :date, :supp, :spec, :qty, :rate);"), {"id": trid, "date": rdate, "supp": rsupp, "spec": rspec, "qty": rqty, "rate": rrate})
+                                    else:
+                                        conn2.execute(text("INSERT INTO tap_receipts (date, supplier, tap_spec, qty, rate) VALUES (:date, :supp, :spec, :qty, :rate);"), {"date": rdate, "supp": rsupp, "spec": rspec, "qty": rqty, "rate": rrate})
+                                except Exception:
+                                    pass
+                        try:
+                            conn2.execute(text("SELECT setval(pg_get_serial_sequence('tap_receipts', 'id'), coalesce(max(id),0) + 1, false) FROM tap_receipts;"))
+                        except Exception:
+                            pass
+
+                    # Insert Issues
+                    ii_data = tables.get("insert_issues", [])
+                    if ii_data:
+                        try:
+                            conn2.execute(text("DELETE FROM insert_issues;"))
+                        except Exception:
+                            pass
+                        for ii in ii_data:
+                            iiid = int(safe_float(ii.get("id"), 0))
+                            idate = ii.get("date") or ""
+                            ishift = ii.get("shift") or "First"
+                            idept = ii.get("department") or "WIPRO"
+                            ispec = ii.get("insert_spec") or ""
+                            ibatch = ii.get("batch_no") or ""
+                            iqty_iss = safe_float(ii.get("qty_issued"), 0.0)
+                            iqty_rec = safe_float(ii.get("qty_received"), 0.0)
+                            imac = ii.get("machine") or ""
+                            iop = ii.get("operator") or ""
+                            ipn = ii.get("partno") or ""
+                            iopn = str(ii.get("opn_no") or "")
+                            iusages = str(ii.get("usages") or "")
+                            irid = int(safe_float(ii.get("receipt_id"), 0)) if ii.get("receipt_id") else None
+                            iedge = str(ii.get("edge_data") or "")
+                            if ispec:
+                                try:
+                                    if iiid:
+                                        conn2.execute(text("""
+                                            INSERT INTO insert_issues (id, date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
+                                            VALUES (:id, :date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
+                                        """), {"id": iiid, "date": idate, "shift": ishift, "dept": idept, "spec": ispec, "batch": ibatch, "qty_iss": iqty_iss, "qty_rec": iqty_rec, "mach": imac, "op": iop, "partno": ipn, "opn": iopn, "usages": iusages, "rid": irid, "edge": iedge})
+                                    else:
+                                        conn2.execute(text("""
+                                            INSERT INTO insert_issues (date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
+                                            VALUES (:date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
+                                        """), {"date": idate, "shift": ishift, "dept": idept, "spec": ispec, "batch": ibatch, "qty_iss": iqty_iss, "qty_rec": iqty_rec, "mach": imac, "op": iop, "partno": ipn, "opn": iopn, "usages": iusages, "rid": irid, "edge": iedge})
+                                except Exception:
+                                    pass
+                        try:
+                            conn2.execute(text("SELECT setval(pg_get_serial_sequence('insert_issues', 'id'), coalesce(max(id),0) + 1, false) FROM insert_issues;"))
+                        except Exception:
+                            pass
+
+                    # Tap Issues
+                    ti_data = tables.get("tap_issues", [])
+                    if ti_data:
+                        try:
+                            conn2.execute(text("DELETE FROM tap_issues;"))
+                        except Exception:
+                            pass
+                        for ti in ti_data:
+                            tiid = int(safe_float(ti.get("id"), 0))
+                            tdate = ti.get("date") or ""
+                            tshift = ti.get("shift") or "First"
+                            tdept = ti.get("department") or "WIPRO"
+                            tspec = ti.get("tap_spec") or ""
+                            tqty_iss = safe_float(ti.get("qty_issued"), 0.0)
+                            tqty_rec = safe_float(ti.get("qty_received"), 0.0)
+                            tmac = ti.get("machine") or ""
+                            top = ti.get("operator") or ""
+                            tpn = ti.get("partno") or ""
+                            topn = str(ti.get("opn_no") or "")
+                            if tspec:
+                                try:
+                                    if tiid:
+                                        conn2.execute(text("""
+                                            INSERT INTO tap_issues (id, date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
+                                            VALUES (:id, :date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
+                                        """), {"id": tiid, "date": tdate, "shift": tshift, "dept": tdept, "spec": tspec, "qty_iss": tqty_iss, "qty_rec": tqty_rec, "mach": tmac, "op": top, "partno": tpn, "opn": topn})
+                                    else:
+                                        conn2.execute(text("""
+                                            INSERT INTO tap_issues (date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
+                                            VALUES (:date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
+                                        """), {"date": tdate, "shift": tshift, "dept": tdept, "spec": tspec, "qty_iss": tqty_iss, "qty_rec": tqty_rec, "mach": tmac, "op": top, "partno": tpn, "opn": topn})
+                                except Exception:
+                                    pass
+                        try:
+                            conn2.execute(text("SELECT setval(pg_get_serial_sequence('tap_issues', 'id'), coalesce(max(id),0) + 1, false) FROM tap_issues;"))
+                        except Exception:
+                            pass
+
                     t2.commit()
                     print("Synced model tables successfully!")
                 except Exception as ex2:

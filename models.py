@@ -250,3 +250,101 @@ class Attendance(Base):
     day = Column(Integer, nullable=False)                     # 1-31
     hours = Column(String, default="0")
     created_at = Column(DateTime, default=get_now_ist)
+
+class InsertMaster(Base):
+    __tablename__ = "insert_masters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    insert_spec = Column(String, index=True, nullable=False)
+    no_of_edges = Column(Integer, default=1)
+    name = Column(String, nullable=True)
+    specification = Column(String, nullable=True)
+    grade = Column(String, nullable=True)
+    make = Column(String, nullable=True)
+    stock = Column(Float, default=0.0)
+    price = Column(Float, default=0.0)
+
+class DrillMaster(Base):
+    __tablename__ = "drill_masters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    drill_size = Column(String, index=True, nullable=True)
+    sl_no = Column(String, nullable=True)
+    resharp_count = Column(Integer, default=0)
+    name = Column(String, nullable=True)
+    size_dia = Column(String, nullable=True)
+    specification = Column(String, nullable=True)
+    make = Column(String, nullable=True)
+    stock = Column(Float, default=0.0)
+    price = Column(Float, default=0.0)
+
+class TapMaster(Base):
+    __tablename__ = "tap_masters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tap_spec = Column(String, index=True, nullable=False)
+    name = Column(String, nullable=True)
+    specification = Column(String, nullable=True)
+    make = Column(String, nullable=True)
+    stock = Column(Float, default=0.0)
+    price = Column(Float, default=0.0)
+
+class InsertReceipt(Base):
+    __tablename__ = "insert_receipts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, index=True, nullable=False)
+    supplier = Column(String, nullable=True)
+    insert_spec = Column(String, index=True, nullable=False)
+    batch_no = Column(String, nullable=True)
+    qty = Column(Float, default=0.0)
+    rate = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=get_now_ist)
+
+class TapReceipt(Base):
+    __tablename__ = "tap_receipts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, index=True, nullable=False)
+    supplier = Column(String, nullable=True)
+    tap_spec = Column(String, index=True, nullable=False)
+    qty = Column(Float, default=0.0)
+    rate = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=get_now_ist)
+
+class InsertIssue(Base):
+    __tablename__ = "insert_issues"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, index=True, nullable=False)
+    shift = Column(String, nullable=True)
+    department = Column(String, nullable=True)
+    insert_spec = Column(String, index=True, nullable=False)
+    batch_no = Column(String, nullable=True)
+    qty_issued = Column(Float, default=0.0)
+    qty_received = Column(Float, default=0.0)
+    machine = Column(String, nullable=True)
+    operator = Column(String, nullable=True)
+    partno = Column(String, nullable=True)
+    opn_no = Column(String, nullable=True)
+    usages = Column(Text, nullable=True)
+    receipt_id = Column(Integer, nullable=True)
+    edge_data = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_now_ist)
+
+class TapIssue(Base):
+    __tablename__ = "tap_issues"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, index=True, nullable=False)
+    shift = Column(String, nullable=True)
+    department = Column(String, nullable=True)
+    tap_spec = Column(String, index=True, nullable=False)
+    qty_issued = Column(Float, default=0.0)
+    qty_received = Column(Float, default=0.0)
+    machine = Column(String, nullable=True)
+    operator = Column(String, nullable=True)
+    partno = Column(String, nullable=True)
+    opn_no = Column(String, nullable=True)
+    created_at = Column(DateTime, default=get_now_ist)
+
