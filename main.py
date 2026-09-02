@@ -443,28 +443,37 @@ def bulk_import_machines(data: dict, db: Session = Depends(get_db)):
     machines = data.get("machines") or []
     count = 0
     for m in machines:
-        name = m.get("name") or m.get("machine_name") or ""
-        dept = m.get("department") or m.get("dept") or ""
-        status = m.get("status") or "Active"
+        name = (m.get("name") or m.get("machine_name") or "").strip()
+        dept = (m.get("department") or m.get("dept") or "").strip()
+        status = (m.get("status") or "Active").strip()
         if name:
             try:
-                db.execute(text("INSERT INTO machines (name, dept, status) VALUES (:name, :dept, :status)"), {
-                    "name": name,
-                    "dept": dept,
-                    "status": status
-                })
+                m_obj = models.Machine(name=name, dept=dept, status=status)
+                db.add(m_obj)
+                db.commit()
                 count += 1
             except Exception:
+                db.rollback()
                 try:
-                    db.execute(text("INSERT INTO machines (name, department, status) VALUES (:name, :dept, :status)"), {
+                    db.execute(text("INSERT INTO machines (name, dept, status) VALUES (:name, :dept, :status)"), {
                         "name": name,
                         "dept": dept,
                         "status": status
                     })
+                    db.commit()
                     count += 1
                 except Exception:
-                    pass
-    db.commit()
+                    db.rollback()
+                    try:
+                        db.execute(text("INSERT INTO machines (name, department, status) VALUES (:name, :dept, :status)"), {
+                            "name": name,
+                            "dept": dept,
+                            "status": status
+                        })
+                        db.commit()
+                        count += 1
+                    except Exception:
+                        db.rollback()
     return {"message": f"Successfully imported {count} machines!", "imported_count": count}
 
 # --- Operators ---
@@ -593,28 +602,29 @@ def bulk_import_operators(data: dict, db: Session = Depends(get_db)):
     operators = data.get("operators") or []
     count = 0
     for op in operators:
-        name = op.get("name") or op.get("operator_name") or ""
-        dept = op.get("department") or op.get("dept") or ""
-        desig = op.get("designation") or op.get("role") or "Operator"
+        name = (op.get("name") or op.get("operator_name") or "").strip()
+        dept = (op.get("department") or op.get("dept") or "").strip()
+        desig = (op.get("designation") or op.get("role") or "Operator").strip()
         if name:
             try:
-                db.execute(text("INSERT INTO operators (name, dept, designation) VALUES (:name, :dept, :designation)"), {
-                    "name": name,
-                    "dept": dept,
-                    "designation": desig
-                })
+                op_obj = models.Operator(name=name, dept=dept, designation=desig)
+                db.add(op_obj)
+                db.commit()
                 count += 1
             except Exception:
+                db.rollback()
                 try:
-                    db.execute(text("INSERT INTO operators (name, department, designation) VALUES (:name, :dept, :designation)"), {
-                        "name": name,
-                        "dept": dept,
-                        "designation": desig
-                    })
+                    db.execute(text("INSERT INTO operators (name, dept, designation) VALUES (:name, :dept, :desig)"), {"name": name, "dept": dept, "desig": desig})
+                    db.commit()
                     count += 1
                 except Exception:
-                    pass
-    db.commit()
+                    db.rollback()
+                    try:
+                        db.execute(text("INSERT INTO operators (name, department, designation) VALUES (:name, :dept, :desig)"), {"name": name, "dept": dept, "desig": desig})
+                        db.commit()
+                        count += 1
+                    except Exception:
+                        db.rollback()
     return {"message": f"Successfully imported {count} operators!", "imported_count": count}
 
 # --- Part Master API ---
@@ -623,12 +633,12 @@ def bulk_import_partmasters(data: dict, db: Session = Depends(get_db)):
     parts = data.get("parts") or []
     count = 0
     for p in parts:
-        partno = p.get("partno") or p.get("part_no") or ""
-        family = p.get("family") or ""
-        forge_pn = p.get("forge_pn") or p.get("forgepn") or ""
-        part_prefix = p.get("part_prefix") or p.get("prefix") or ""
-        department = p.get("department") or p.get("dept") or ""
-        customer = p.get("customer") or ""
+        partno = (p.get("partno") or p.get("part_no") or "").strip()
+        family = (p.get("family") or "").strip()
+        forge_pn = (p.get("forge_pn") or p.get("forgepn") or "").strip()
+        part_prefix = (p.get("part_prefix") or p.get("prefix") or "").strip()
+        department = (p.get("department") or p.get("dept") or "").strip()
+        customer = (p.get("customer") or "").strip()
         va = str(p.get("va") or 0)
         operations = p.get("operations") or []
         if partno:
@@ -643,34 +653,47 @@ def bulk_import_partmasters(data: dict, db: Session = Depends(get_db)):
                     "va": va,
                     "rfd_phy": 0
                 })
+                db.commit()
                 count += 1
             except Exception:
-                pass
+                db.rollback()
+                try:
+                    db.execute(text("INSERT INTO parts (part_no, customer, dept, family, forge_pn, va) VALUES (:part_no, :customer, :dept, :family, :forge_pn, :va)"), {
+                        "part_no": partno,
+                        "customer": customer,
+                        "dept": department,
+                        "family": family,
+                        "forge_pn": forge_pn,
+                        "va": float(va) if va.replace('.','',1).isdigit() else 0.0
+                    })
+                    db.commit()
+                    count += 1
+                except Exception:
+                    db.rollback()
             
             if operations:
                 try:
                     row = db.execute(text("SELECT id FROM part_masters WHERE partno = :p ORDER BY id DESC LIMIT 1"), {"p": partno}).mappings().first()
-                    if row:
-                        part_id = row.get("id")
-                        for op in operations:
-                            opn = str(op.get("opn_no") or "")
-                            desc = op.get("description") or ""
-                            mc = op.get("machine") or op.get("machine_name") or ""
-                            cyc = float(op.get("cycle_time") or 0)
-                            if opn or desc:
-                                try:
-                                    db.execute(text("INSERT INTO part_operations (part_id, opn_no, description, machine, cycle_time) VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)"), {
-                                        "part_id": str(part_id),
-                                        "opn_no": opn,
-                                        "description": desc,
-                                        "machine": mc,
-                                        "cycle_time": cyc
-                                    })
-                                except Exception:
-                                    pass
+                    part_id = row.get("id") if row else None
+                    for op in operations:
+                        opn = str(op.get("opn_no") or "")
+                        desc = op.get("description") or ""
+                        mc = op.get("machine") or op.get("machine_name") or ""
+                        cyc = float(op.get("cycle_time") or 0)
+                        if (opn or desc) and part_id:
+                            try:
+                                db.execute(text("INSERT INTO part_operations (part_id, opn_no, description, machine, cycle_time) VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)"), {
+                                    "part_id": str(part_id),
+                                    "opn_no": opn,
+                                    "description": desc,
+                                    "machine": mc,
+                                    "cycle_time": cyc
+                                })
+                                db.commit()
+                            except Exception:
+                                db.rollback()
                 except Exception:
-                    pass
-    db.commit()
+                    db.rollback()
     return {"message": f"Successfully imported {count} parts!", "imported_count": count}
 @app.delete("/api/partmaster/clear-all")
 @app.post("/api/partmaster/clear-all")
