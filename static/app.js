@@ -1264,7 +1264,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cell = tr.children[f.colIdx];
                 if (cell) {
                     const text = (cell.textContent || '').trim().toLowerCase();
-                    if (!text.includes(f.val)) {
+                    let matches = text.includes(f.val);
+                    
+                    if (!matches && /^\d{4}-\d{2}-\d{2}/.test(text)) {
+                        const mIndex = parseInt(text.substring(5, 7), 10) - 1;
+                        const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+                        const shortMonths = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                        if (monthNames[mIndex] && (monthNames[mIndex].includes(f.val) || shortMonths[mIndex].includes(f.val))) {
+                            matches = true;
+                        }
+                    }
+                    if (!matches) {
                         show = false;
                         break;
                     }

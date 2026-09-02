@@ -2858,7 +2858,163 @@ def clear_all_attendance(db: Session = Depends(get_db)):
         db.rollback()
     return {"message": "All attendance records cleared successfully"}
 
-# --- HT & PC LOGS CRUD ---
+# --- HT & PC LOGS CRUD & HELPER ENDPOINTS ---
+@app.get("/api/ht/spider_parts")
+def get_ht_spider_parts(db: Session = Depends(get_db)):
+    try:
+        parts_rows = db.execute(text("SELECT id, partno, department FROM part_master WHERE UPPER(department) = 'SPIDER' OR partno IN (SELECT DISTINCT partno FROM ht_logs) ORDER BY partno;")).mappings().all()
+        prod_rows = db.execute(text("SELECT partno, opn_no, prod_qty FROM prod_log;")).mappings().all()
+        ht_rows = db.execute(text("SELECT partno, qty FROM ht_logs;")).mappings().all()
+
+        prod_map = {}
+        for r in prod_rows:
+            pno = (r.get("partno") or "").strip().upper()
+            op = str(r.get("opn_no") or "").strip()
+            if op in ["40", "Opn 40", "Opn. 40"]:
+                prod_map[pno] = prod_map.get(pno, 0) + int(float(r.get("prod_qty") or 0))
+
+        ht_map = {}
+        for r in ht_rows:
+            pno = (r.get("partno") or "").strip().upper()
+            ht_map[pno] = ht_map.get(pno, 0) + int(float(r.get("qty") or 0))
+
+        result = []
+        for p in parts_rows:
+            pno = (p.get("partno") or "").strip()
+            pno_upper = pno.upper()
+            dept = p.get("department") or "SPIDER"
+            prod_qty = prod_map.get(pno_upper, 0)
+            ht_sent = ht_map.get(pno_upper, 0)
+            avail = max(0, prod_qty - ht_sent)
+            result.append({
+                "partno": pno,
+                "department": dept,
+                "produced_qty": prod_qty,
+                "ht_sent_qty": ht_sent,
+                "available_qty": avail
+            })
+        return result
+    except Exception as ex:
+        db.rollback()
+        return []
+
+@app.get("/api/ht/vendor_pending_parts")
+def get_ht_vendor_pending_parts(db: Session = Depends(get_db)):
+    try:
+        ht_rows = db.execute(text("SELECT vendor, partno, qty FROM ht_logs;")).mappings().all()
+        rec_rows = db.execute(text("SELECT vendor, partno, qty FROM ht_receipt_logs;")).mappings().all()
+
+        sent_map = {}
+        for r in ht_rows:
+            v = (r.get("vendor") or "").strip()
+            p = (r.get("partno") or "").strip()
+            if v and p:
+                key = (v, p)
+                sent_map[key] = sent_map.get(key, 0) + int(float(r.get("qty") or 0))
+
+        rec_map = {}
+        for r in rec_rows:
+            v = (r.get("vendor") or "").strip()
+            p = (r.get("partno") or "").strip()
+            if v and p:
+                key = (v, p)
+                rec_map[key] = rec_map.get(key, 0) + int(float(r.get("qty") or 0))
+
+        all_keys = sorted(set(list(sent_map.keys()) + list(rec_map.keys())), key=lambda x: (x[0].lower(), x[1].lower()))
+        result = []
+        for v, p in all_keys:
+            sent = sent_map.get((v, p), 0)
+            rec = rec_map.get((v, p), 0)
+            pending = max(0, sent - rec)
+            result.append({
+                "vendor": v,
+                "partno": p,
+                "sent_qty": sent,
+                "received_qty": rec,
+                "pending_qty": pending
+            })
+        return result
+    except Exception as ex:
+        db.rollback()
+        return []
+
+@app.get("/api/pc/available_parts")
+def get_pc_available_parts(db: Session = Depends(get_db)):
+    try:
+        parts_rows = db.execute(text("SELECT id, partno, department FROM part_master ORDER BY partno;")).mappings().all()
+        prod_rows = db.execute(text("SELECT partno, opn_no, prod_qty FROM prod_log;")).mappings().all()
+        pc_rows = db.execute(text("SELECT partno, qty FROM pc_logs;")).mappings().all()
+
+        prod_map = {}
+        for r in prod_rows:
+            pno = (r.get("partno") or "").strip().upper()
+            prod_map[pno] = prod_map.get(pno, 0) + int(float(r.get("prod_qty") or 0))
+
+        pc_map = {}
+        for r in pc_rows:
+            pno = (r.get("partno") or "").strip().upper()
+            pc_map[pno] = pc_map.get(pno, 0) + int(float(r.get("qty") or 0))
+
+        result = []
+        for p in parts_rows:
+            pno = (p.get("partno") or "").strip()
+            pno_upper = pno.upper()
+            dept = p.get("department") or ""
+            prod_qty = prod_map.get(pno_upper, 0)
+            pc_sent = pc_map.get(pno_upper, 0)
+            avail = max(0, prod_qty - pc_sent)
+            result.append({
+                "partno": pno,
+                "department": dept,
+                "produced_qty": prod_qty,
+                "pc_sent_qty": pc_sent,
+                "available_qty": avail
+            })
+        return result
+    except Exception as ex:
+        db.rollback()
+        return []
+
+@app.get("/api/pc/vendor_pending_parts")
+def get_pc_vendor_pending_parts(db: Session = Depends(get_db)):
+    try:
+        pc_rows = db.execute(text("SELECT vendor, partno, qty FROM pc_logs;")).mappings().all()
+        rec_rows = db.execute(text("SELECT vendor, partno, qty FROM pc_receipt_logs;")).mappings().all()
+
+        sent_map = {}
+        for r in pc_rows:
+            v = (r.get("vendor") or "").strip()
+            p = (r.get("partno") or "").strip()
+            if v and p:
+                key = (v, p)
+                sent_map[key] = sent_map.get(key, 0) + int(float(r.get("qty") or 0))
+
+        rec_map = {}
+        for r in rec_rows:
+            v = (r.get("vendor") or "").strip()
+            p = (r.get("partno") or "").strip()
+            if v and p:
+                key = (v, p)
+                rec_map[key] = rec_map.get(key, 0) + int(float(r.get("qty") or 0))
+
+        all_keys = sorted(set(list(sent_map.keys()) + list(rec_map.keys())), key=lambda x: (x[0].lower(), x[1].lower()))
+        result = []
+        for v, p in all_keys:
+            sent = sent_map.get((v, p), 0)
+            rec = rec_map.get((v, p), 0)
+            pending = max(0, sent - rec)
+            result.append({
+                "vendor": v,
+                "partno": p,
+                "sent_qty": sent,
+                "received_qty": rec,
+                "pending_qty": pending
+            })
+        return result
+    except Exception as ex:
+        db.rollback()
+        return []
+
 @app.get("/api/ht_logs")
 def get_ht_logs(db: Session = Depends(get_db)):
     try:
