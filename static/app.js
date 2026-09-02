@@ -5027,10 +5027,71 @@ document.addEventListener('DOMContentLoaded', () => {
     let prodLogAllPartMasters = [];
     let currentPartOperations = [];
 
+    let prodLogPartNoTomSelect = null;
+
+    function initProdLogPartNoTomSelect() {
+        const selectEl = document.getElementById('prodLogPartNo');
+        if (!selectEl) return;
+        if (prodLogPartNoTomSelect) {
+            try { prodLogPartNoTomSelect.destroy(); } catch (e) {}
+            prodLogPartNoTomSelect = null;
+        }
+        if (window.TomSelect) {
+            prodLogPartNoTomSelect = new TomSelect(selectEl, {
+                create: false,
+                maxItems: 1,
+                placeholder: 'Type to search Part No...',
+                allowEmptyOption: true,
+                sortField: { field: 'text', direction: 'asc' },
+                onChange: async (val) => {
+                    await handleProdLogPartChange(val);
+                }
+            });
+        }
+    }
+
+    async function handleProdLogPartChange(partno) {
+        const opnSelect = document.getElementById('prodLogOpnNo');
+        if (!opnSelect) return;
+        opnSelect.innerHTML = '<option value="">-- Select Operation --</option>';
+        document.getElementById('prodLogDescription').value = '';
+        document.getElementById('prodLogCycleTime').value = '';
+        recalcProdLog();
+        
+        if (!partno) return;
+        
+        let part = prodLogAllPartMasters.find(p => String(p.partno).trim().toLowerCase() === String(partno).trim().toLowerCase());
+        if (!part) {
+            try {
+                const res = await fetch('/api/partmaster');
+                const allParts = await res.json();
+                prodLogAllPartMasters = allParts;
+                part = allParts.find(p => String(p.partno).trim().toLowerCase() === String(partno).trim().toLowerCase());
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        if (part) {
+            try {
+                const opRes = await fetch(`/api/partmaster/${part.id}/operations`);
+                currentPartOperations = await opRes.json();
+                opnSelect.innerHTML = '<option value="">-- Select Operation --</option>';
+                currentPartOperations.forEach(op => {
+                    opnSelect.innerHTML += `<option value="${op.opn_no}">${op.opn_no}</option>`;
+                });
+                if (currentPartOperations.length === 1) {
+                    opnSelect.value = currentPartOperations[0].opn_no;
+                    opnSelect.dispatchEvent(new Event('change'));
+                }
+            } catch (e) {
+                console.error('Error fetching operations:', e);
+            }
+        }
+    }
+
     function updateProdLogPartList(dept = '') {
-        const partList = document.getElementById('prodLogPartNoList');
-        if (!partList) return;
-        partList.innerHTML = '';
+        const selectEl = document.getElementById('prodLogPartNo');
+        if (!selectEl) return;
 
         const deptUpper = (dept || '').trim().toUpperCase();
         const partNoSet = new Set();
@@ -5048,11 +5109,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const sortedParts = Array.from(partNoSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-        sortedParts.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p;
-            partList.appendChild(opt);
-        });
+        if (prodLogPartNoTomSelect) {
+            prodLogPartNoTomSelect.clear();
+            prodLogPartNoTomSelect.clearOptions();
+            prodLogPartNoTomSelect.addOption({ value: '', text: '-- Select Part No --' });
+            sortedParts.forEach(p => {
+                prodLogPartNoTomSelect.addOption({ value: p, text: p });
+            });
+            prodLogPartNoTomSelect.refreshOptions(false);
+        } else {
+            selectEl.innerHTML = '<option value="">-- Select Part No --</option>';
+            sortedParts.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = p;
+                selectEl.appendChild(opt);
+            });
+            initProdLogPartNoTomSelect();
+        }
     }
 
     async function initProdLog() {
@@ -5100,7 +5174,8 @@ document.addEventListener('DOMContentLoaded', () => {
         machSelect.innerHTML = '<option value="">-- Select Machine --</option>';
         opSelect.innerHTML = '<option value="">-- Select Operator --</option>';
         if (setterSelect) setterSelect.innerHTML = '<option value="">-- Select Setter --</option>';
-        document.getElementById('prodLogPartNo').value = '';
+        if (prodLogPartNoTomSelect) prodLogPartNoTomSelect.clear();
+        else if (document.getElementById('prodLogPartNo')) document.getElementById('prodLogPartNo').value = '';
         
         prodLogAllMachines.filter(m => (m.department || '').trim().toUpperCase() === dept).forEach(m => {
             machSelect.innerHTML += `<option value="${m.name}">${m.name}</option>`;
@@ -5130,26 +5205,9 @@ document.addEventListener('DOMContentLoaded', () => {
         recalcProdLog();
     });
 
-    document.getElementById('prodLogPartNo').addEventListener('change', async (e) => {
-        const partno = e.target.value;
-        const opnSelect = document.getElementById('prodLogOpnNo');
-        opnSelect.innerHTML = '<option value="">-- Select Operation --</option>';
-        document.getElementById('prodLogDescription').value = '';
-        document.getElementById('prodLogCycleTime').value = '';
-        recalcProdLog();
-        
-        if (!partno) return;
-        
-        // Need part_id to get operations. Let's fetch partmaster and find the id.
-        const res = await fetch('/api/partmaster');
-        const allParts = await res.json();
-        const part = allParts.find(p => String(p.partno).trim().toLowerCase() === String(partno).trim().toLowerCase());
-        if (part) {
-            const opRes = await fetch(`/api/partmaster/${part.id}/operations`);
-            currentPartOperations = await opRes.json();
-            currentPartOperations.forEach(op => {
-                opnSelect.innerHTML += `<option value="${op.opn_no}">${op.opn_no}</option>`;
-            });
+    document.getElementById('prodLogPartNo')?.addEventListener('change', async (e) => {
+        if (!prodLogPartNoTomSelect) {
+            await handleProdLogPartChange(e.target.value);
         }
     });
 
@@ -5392,7 +5450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 machine: document.getElementById('prodLogMachine').value,
                 operator: isIdle ? "" : document.getElementById('prodLogOperator').value,
                 multiple_mc: isIdle ? 1 : (parseInt(document.getElementById('prodLogMultipleMc').value) || 1),
-                partno: isIdle ? "MACHINE IDLE" : document.getElementById('prodLogPartNo').value,
+                partno: isIdle ? "MACHINE IDLE" : (prodLogPartNoTomSelect ? prodLogPartNoTomSelect.getValue() : (document.getElementById('prodLogPartNo')?.value || '')),
                 opn_no: isIdle ? "IDLE" : document.getElementById('prodLogOpnNo').value,
                 description: isIdle ? (document.getElementById('prodLogIdleReason').value || "Machine Idle") : document.getElementById('prodLogDescription').value,
                 cycle_time: isIdle ? 0 : (parseFloat(document.getElementById('prodLogCycleTime').value) || 0),
