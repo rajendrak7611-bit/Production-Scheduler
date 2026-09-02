@@ -2947,90 +2947,96 @@ def delete_pc_receipt_log(log_id: int, db: Session = Depends(get_db)):
 # --- SCHEDULE STATUS WIP ADJUSTMENTS ---
 @app.post("/api/schedule_status/adjust_part_wip")
 def adjust_part_wip(data: dict, db: Session = Depends(get_db)):
-    dept = (data.get("department") or "General").strip()
-    partno = (data.get("partno") or "").strip()
-    adjustments = data.get("adjustments") or []
+    try:
+        dept = (data.get("department") or "General").strip()
+        partno = (data.get("partno") or "").strip()
+        adjustments = data.get("adjustments") or []
 
-    if not partno:
-        raise HTTPException(status_code=400, detail="Part number is required")
+        if not partno:
+            raise HTTPException(status_code=400, detail="Part number is required")
 
-    today_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d")
+        today_str = datetime.now().strftime("%Y-%m-%d")
 
-    # Fetch operations for this part
-    part_row = db.execute(text("SELECT id FROM partmaster WHERE LOWER(partno) = LOWER(:p);"), {"p": partno}).mappings().first()
-    operations = []
-    if part_row:
-        op_rows = db.execute(text("SELECT opn_no, description FROM operations WHERE part_id = :pid ORDER BY id ASC;"), {"pid": part_row["id"]}).mappings().all()
-        operations = [str(r["opn_no"]).strip() for r in op_rows]
+        # Fetch operations for this part
+        part_row = db.execute(text("SELECT id FROM partmaster WHERE LOWER(partno) = LOWER(:p);"), {"p": partno}).mappings().first()
+        operations = []
+        if part_row:
+            op_rows = db.execute(text("SELECT opn_no, description FROM operations WHERE part_id = :pid ORDER BY id ASC;"), {"pid": part_row["id"]}).mappings().all()
+            operations = [str(r["opn_no"]).strip() for r in op_rows]
 
-    target_map = {}
-    for adj in adjustments:
-        opn_key = str(adj.get("opn_no") or "").strip().lower()
-        target_val = float(adj.get("target_balance") or 0)
-        target_map[opn_key] = target_val
+        target_map = {}
+        for adj in adjustments:
+            opn_key = str(adj.get("opn_no") or "").strip().lower()
+            target_val = float(adj.get("target_balance") or 0)
+            target_map[opn_key] = target_val
 
-    stages = []
-    for op in operations:
-        stages.append(op.lower())
-    if "debur" not in stages:
-        stages.append("debur")
-    if "for ins" not in stages:
-        stages.append("for ins")
-    if "rfd" not in stages:
-        stages.append("rfd")
+        stages = []
+        for op in operations:
+            stages.append(op.lower())
+        if "debur" not in stages:
+            stages.append("debur")
+        if "for ins" not in stages:
+            stages.append("for ins")
+        if "rfd" not in stages:
+            stages.append("rfd")
 
-    desp_row = db.execute(text("""
-        SELECT COALESCE(SUM(qty), 0) as desp_total FROM raw_material_logs
-        WHERE LOWER(type) = 'despatch' AND LOWER(finish_part_no) = LOWER(:p);
-    """), {"p": partno}).mappings().first()
-    desp_total = float(desp_row["desp_total"]) if desp_row else 0.0
+        desp_row = db.execute(text("""
+            SELECT COALESCE(SUM(qty), 0) as desp_total FROM raw_material_logs
+            WHERE LOWER(type) = 'despatch' AND LOWER(finish_part_no) = LOWER(:p);
+        """), {"p": partno}).mappings().first()
+        desp_total = float(desp_row["desp_total"]) if desp_row else 0.0
 
-    cum_req = {}
-    running_cum = desp_total
+        cum_req = {}
+        running_cum = desp_total
 
-    for stage in reversed(stages):
-        target_bal = target_map.get(stage, 0.0)
-        running_cum += target_bal
-        cum_req[stage] = running_cum
+        for stage in reversed(stages):
+            target_bal = target_map.get(stage, 0.0)
+            running_cum += target_bal
+            cum_req[stage] = running_cum
 
-    for stage in stages:
-        if stage in target_map:
-            curr_row = db.execute(text("""
-                SELECT COALESCE(SUM(prod_qty), 0) as total_prod FROM production_logs
-                WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);
-            """), {"p": partno, "opn": stage}).mappings().first()
-            curr_prod = float(curr_row["total_prod"]) if curr_row else 0.0
+        for stage in stages:
+            if stage in target_map:
+                curr_row = db.execute(text("""
+                    SELECT COALESCE(SUM(prod_qty), 0) as total_prod FROM production_logs
+                    WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);
+                """), {"p": partno, "opn": stage}).mappings().first()
+                curr_prod = float(curr_row["total_prod"]) if curr_row else 0.0
 
-            needed_cum = cum_req[stage]
-            delta = int(round(needed_cum - curr_prod))
+                needed_cum = cum_req[stage]
+                delta = int(round(needed_cum - curr_prod))
 
-            if delta != 0:
-                try:
-                    db.execute(text("SELECT setval(pg_get_serial_sequence('production_logs', 'id'), coalesce(max(id),0) + 1, false) FROM production_logs;"))
+                if delta != 0:
+                    try:
+                        db.execute(text("SELECT setval(pg_get_serial_sequence('production_logs', 'id'), coalesce(max(id),0) + 1, false) FROM production_logs;"))
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+
+                    db.execute(text("""
+                        INSERT INTO production_logs (
+                            dept, date, shift, setter, machine, operator, partno, opn_no,
+                            description, runtime, cycle_time, target_qty, prod_qty, efficiency,
+                            idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc
+                        ) VALUES (
+                            :dept, :date, 'General', 'WIP Adjustment', 'Adjustment', 'WIP Adjustment', :partno, :opn_no,
+                            'WIP Adjustment', 0, 0, 0, :prod_qty, 100,
+                            0, '', 0, '', 0, '', 'no'
+                        );
+                    """), {
+                        "dept": dept,
+                        "date": today_str,
+                        "partno": partno,
+                        "opn_no": stage.upper() if stage not in ["debur", "for ins", "rfd"] else stage,
+                        "prod_qty": delta
+                    })
                     db.commit()
-                except Exception:
-                    db.rollback()
 
-                db.execute(text("""
-                    INSERT INTO production_logs (
-                        dept, date, shift, setter, machine, operator, partno, opn_no,
-                        description, runtime, cycle_time, target_qty, prod_qty, efficiency,
-                        idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc
-                    ) VALUES (
-                        :dept, :date, 'General', 'WIP Adjustment', 'Adjustment', 'WIP Adjustment', :partno, :opn_no,
-                        'WIP Adjustment', 0, 0, 0, :prod_qty, 100,
-                        0, '', 0, '', 0, '', 'no'
-                    );
-                """), {
-                    "dept": dept,
-                    "date": today_str,
-                    "partno": partno,
-                    "opn_no": stage.upper() if stage not in ["debur", "for ins", "rfd"] else stage,
-                    "prod_qty": delta
-                })
-                db.commit()
-
-    return {"message": f"WIP balances for part {partno} adjusted successfully"}
+        return {"message": f"WIP balances for part {partno} adjusted successfully"}
+    except HTTPException:
+        raise
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
 
 @app.post("/api/schedule_status/clear_backlog_corrections")
 def clear_backlog_corrections(db: Session = Depends(get_db)):
@@ -3050,60 +3056,64 @@ def clear_backlog_corrections(db: Session = Depends(get_db)):
 
 @app.post("/api/schedule_status/autofix_wip")
 def autofix_wip(data: dict, db: Session = Depends(get_db)):
-    dept = (data.get("department") or "").strip()
-    today_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d")
+    try:
+        dept = (data.get("department") or "").strip()
+        today_str = datetime.now().strftime("%Y-%m-%d")
 
-    q = "SELECT id, partno, department FROM partmaster"
-    params = {}
-    if dept:
-        q += " WHERE LOWER(department) = LOWER(:dept) OR LOWER(dept) = LOWER(:dept)"
-        params["dept"] = dept
-    q += " ORDER BY id ASC;"
+        q = "SELECT id, partno, department FROM partmaster"
+        params = {}
+        if dept:
+            q += " WHERE LOWER(department) = LOWER(:dept) OR LOWER(dept) = LOWER(:dept)"
+            params["dept"] = dept
+        q += " ORDER BY id ASC;"
 
-    parts = db.execute(text(q), params).mappings().all()
+        parts = db.execute(text(q), params).mappings().all()
 
-    for p in parts:
-        pno = (p.get("partno") or "").strip()
-        pdept = p.get("department") or dept or "General"
-        if not pno:
-            continue
-        op_rows = db.execute(text("SELECT opn_no FROM operations WHERE part_id = :pid ORDER BY id ASC;"), {"pid": p["id"]}).mappings().all()
-        operations = [str(r["opn_no"]).strip().lower() for r in op_rows]
-        if not operations:
-            continue
+        for p in parts:
+            pno = (p.get("partno") or "").strip()
+            pdept = p.get("department") or dept or "General"
+            if not pno:
+                continue
+            op_rows = db.execute(text("SELECT opn_no FROM operations WHERE part_id = :pid ORDER BY id ASC;"), {"pid": p["id"]}).mappings().all()
+            operations = [str(r["opn_no"]).strip().lower() for r in op_rows]
+            if not operations:
+                continue
 
-        for i in range(len(operations) - 1):
-            curr_op = operations[i]
-            next_op = operations[i+1]
+            for i in range(len(operations) - 1):
+                curr_op = operations[i]
+                next_op = operations[i+1]
 
-            curr_prod_row = db.execute(text("SELECT COALESCE(SUM(prod_qty), 0) as s FROM production_logs WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);"), {"p": pno, "opn": curr_op}).mappings().first()
-            next_prod_row = db.execute(text("SELECT COALESCE(SUM(prod_qty), 0) as s FROM production_logs WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);"), {"p": pno, "opn": next_op}).mappings().first()
+                curr_prod_row = db.execute(text("SELECT COALESCE(SUM(prod_qty), 0) as s FROM production_logs WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);"), {"p": pno, "opn": curr_op}).mappings().first()
+                next_prod_row = db.execute(text("SELECT COALESCE(SUM(prod_qty), 0) as s FROM production_logs WHERE LOWER(partno) = LOWER(:p) AND LOWER(opn_no) = LOWER(:opn);"), {"p": pno, "opn": next_op}).mappings().first()
 
-            c_prod = float(curr_prod_row["s"]) if curr_prod_row else 0.0
-            n_prod = float(next_prod_row["s"]) if next_prod_row else 0.0
+                c_prod = float(curr_prod_row["s"]) if curr_prod_row else 0.0
+                n_prod = float(next_prod_row["s"]) if next_prod_row else 0.0
 
-            if c_prod < n_prod:
-                diff = int(round(n_prod - c_prod))
-                db.execute(text("""
-                    INSERT INTO production_logs (
-                        dept, date, shift, setter, machine, operator, partno, opn_no,
-                        description, runtime, cycle_time, target_qty, prod_qty, efficiency,
-                        idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc
-                    ) VALUES (
-                        :dept, :date, 'General', 'Backlog Correction', 'Adjustment', 'Backlog Correction', :partno, :opn_no,
-                        'Backlog Correction', 0, 0, 0, :prod_qty, 100,
-                        0, '', 0, '', 0, '', 'no'
-                    );
-                """), {
-                    "dept": pdept,
-                    "date": today_str,
-                    "partno": pno,
-                    "opn_no": curr_op.upper(),
-                    "prod_qty": diff
-                })
+                if c_prod < n_prod:
+                    diff = int(round(n_prod - c_prod))
+                    db.execute(text("""
+                        INSERT INTO production_logs (
+                            dept, date, shift, setter, machine, operator, partno, opn_no,
+                            description, runtime, cycle_time, target_qty, prod_qty, efficiency,
+                            idle_hours, idle_reason, idle_hours_2, idle_reason_2, idle_hours_3, idle_reason_3, multiple_mc
+                        ) VALUES (
+                            :dept, :date, 'General', 'Backlog Correction', 'Adjustment', 'Backlog Correction', :partno, :opn_no,
+                            'Backlog Correction', 0, 0, 0, :prod_qty, 100,
+                            0, '', 0, '', 0, '', 'no'
+                        );
+                    """), {
+                        "dept": pdept,
+                        "date": today_str,
+                        "partno": pno,
+                        "opn_no": curr_op.upper(),
+                        "prod_qty": diff
+                    })
 
-    db.commit()
-    return {"message": f"Backlog correction completed successfully for {len(parts)} parts"}
+        db.commit()
+        return {"message": f"Backlog correction completed successfully for {len(parts)} parts"}
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
 
 # --- Tooling ---
 @app.get("/api/tooling", response_model=List[ToolingResponse])
