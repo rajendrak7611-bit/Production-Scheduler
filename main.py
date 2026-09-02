@@ -3587,18 +3587,22 @@ def export_inspection_reports_excel(db: Session = Depends(get_db)):
 @app.get("/api/insert_masters")
 def get_insert_masters(db: Session = Depends(get_db)):
     try:
-        rows = db.query(models.InsertMaster).order_by(models.InsertMaster.id.asc()).all()
-        return [{
-            "id": r.id,
-            "insert_spec": r.insert_spec,
-            "no_of_edges": r.no_of_edges,
-            "name": r.name,
-            "specification": r.specification,
-            "grade": r.grade,
-            "make": r.make,
-            "stock": r.stock,
-            "price": r.price
-        } for r in rows]
+        rows = db.execute(text("SELECT * FROM insert_masters ORDER BY id ASC;")).mappings().all()
+        result = []
+        for r in rows:
+            d = dict(r)
+            result.append({
+                "id": d.get("id"),
+                "insert_spec": d.get("insert_spec") or d.get("name") or "",
+                "no_of_edges": int(float(d.get("no_of_edges") or 1)),
+                "name": d.get("name") or d.get("insert_spec") or "",
+                "specification": d.get("specification") or d.get("insert_spec") or "",
+                "grade": d.get("grade") or "",
+                "make": d.get("make") or "",
+                "stock": float(d.get("stock") or 0.0),
+                "price": float(d.get("price") or 0.0)
+            })
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -3608,18 +3612,16 @@ def create_insert_master(data: dict, db: Session = Depends(get_db)):
     if not spec:
         raise HTTPException(status_code=400, detail="Insert spec is required")
     edges = int(data.get("no_of_edges") or 1)
-    item = models.InsertMaster(
-        insert_spec=spec,
-        no_of_edges=edges,
-        grade=(data.get("grade") or "").strip(),
-        make=(data.get("make") or "").strip(),
-        stock=float(data.get("stock") or 0.0),
-        price=float(data.get("price") or 0.0)
-    )
-    db.add(item)
+    grade = (data.get("grade") or "").strip()
+    make = (data.get("make") or "").strip()
+    stock = float(data.get("stock") or 0.0)
+    price = float(data.get("price") or 0.0)
+    db.execute(text("""
+        INSERT INTO insert_masters (insert_spec, no_of_edges, grade, make, stock, price)
+        VALUES (:spec, :edges, :grade, :make, :stock, :price);
+    """), {"spec": spec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price})
     db.commit()
-    db.refresh(item)
-    return {"id": item.id, "insert_spec": item.insert_spec, "no_of_edges": item.no_of_edges}
+    return {"message": "Created successfully"}
 
 @app.post("/api/insert_masters/bulk")
 def bulk_create_insert_masters(data: dict, db: Session = Depends(get_db)):
@@ -3628,52 +3630,44 @@ def bulk_create_insert_masters(data: dict, db: Session = Depends(get_db)):
     for ins in inserts:
         spec = (ins.get("insert_spec") or ins.get("name") or "").strip()
         if spec:
-            item = models.InsertMaster(
-                insert_spec=spec,
-                no_of_edges=int(ins.get("no_of_edges") or 1),
-                grade=(ins.get("grade") or "").strip(),
-                make=(ins.get("make") or "").strip(),
-                stock=float(ins.get("stock") or 0.0),
-                price=float(ins.get("price") or 0.0)
-            )
-            db.add(item)
+            edges = int(ins.get("no_of_edges") or 1)
+            grade = (ins.get("grade") or "").strip()
+            make = (ins.get("make") or "").strip()
+            stock = float(ins.get("stock") or 0.0)
+            price = float(ins.get("price") or 0.0)
+            db.execute(text("""
+                INSERT INTO insert_masters (insert_spec, no_of_edges, grade, make, stock, price)
+                VALUES (:spec, :edges, :grade, :make, :stock, :price);
+            """), {"spec": spec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price})
             count += 1
     db.commit()
     return {"message": f"Successfully created {count} insert master records"}
 
 @app.put("/api/insert_masters/{id}")
 def update_insert_master(id: int, data: dict, db: Session = Depends(get_db)):
-    item = db.query(models.InsertMaster).filter(models.InsertMaster.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Insert record not found")
     spec = (data.get("insert_spec") or data.get("name") or "").strip()
-    if spec:
-        item.insert_spec = spec
-    if "no_of_edges" in data:
-        item.no_of_edges = int(data["no_of_edges"] or 1)
-    if "grade" in data:
-        item.grade = (data["grade"] or "").strip()
-    if "make" in data:
-        item.make = (data["make"] or "").strip()
-    if "stock" in data:
-        item.stock = float(data["stock"] or 0.0)
-    if "price" in data:
-        item.price = float(data["price"] or 0.0)
+    edges = int(data.get("no_of_edges") or 1)
+    grade = (data.get("grade") or "").strip()
+    make = (data.get("make") or "").strip()
+    stock = float(data.get("stock") or 0.0)
+    price = float(data.get("price") or 0.0)
+    db.execute(text("""
+        UPDATE insert_masters
+        SET insert_spec = :spec, no_of_edges = :edges, grade = :grade, make = :make, stock = :stock, price = :price
+        WHERE id = :id;
+    """), {"id": id, "spec": spec, "edges": edges, "grade": grade, "make": make, "stock": stock, "price": price})
     db.commit()
     return {"message": "Updated successfully"}
 
 @app.delete("/api/insert_masters/all")
 def clear_all_insert_masters(db: Session = Depends(get_db)):
-    db.query(models.InsertMaster).delete()
+    db.execute(text("DELETE FROM insert_masters;"))
     db.commit()
     return {"message": "All insert master records cleared successfully"}
 
 @app.delete("/api/insert_masters/{id}")
 def delete_insert_master(id: int, db: Session = Depends(get_db)):
-    item = db.query(models.InsertMaster).filter(models.InsertMaster.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Insert record not found")
-    db.delete(item)
+    db.execute(text("DELETE FROM insert_masters WHERE id = :id;"), {"id": id})
     db.commit()
     return {"message": "Deleted successfully"}
 
@@ -3681,19 +3675,23 @@ def delete_insert_master(id: int, db: Session = Depends(get_db)):
 @app.get("/api/drill_masters")
 def get_drill_masters(db: Session = Depends(get_db)):
     try:
-        rows = db.query(models.DrillMaster).order_by(models.DrillMaster.id.asc()).all()
-        return [{
-            "id": r.id,
-            "drill_size": r.drill_size,
-            "sl_no": r.sl_no,
-            "resharp_count": r.resharp_count,
-            "name": r.name,
-            "size_dia": r.size_dia,
-            "specification": r.specification,
-            "make": r.make,
-            "stock": r.stock,
-            "price": r.price
-        } for r in rows]
+        rows = db.execute(text("SELECT * FROM drill_masters ORDER BY id ASC;")).mappings().all()
+        result = []
+        for r in rows:
+            d = dict(r)
+            result.append({
+                "id": d.get("id"),
+                "drill_size": d.get("drill_size") or d.get("size_dia") or d.get("name") or "",
+                "sl_no": d.get("sl_no") or "",
+                "resharp_count": int(float(d.get("resharp_count") or 0)),
+                "name": d.get("name") or d.get("drill_size") or "",
+                "size_dia": d.get("size_dia") or d.get("drill_size") or "",
+                "specification": d.get("specification") or d.get("drill_size") or "",
+                "make": d.get("make") or "",
+                "stock": float(d.get("stock") or 0.0),
+                "price": float(d.get("price") or 0.0)
+            })
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -3701,18 +3699,16 @@ def get_drill_masters(db: Session = Depends(get_db)):
 def create_drill_master(data: dict, db: Session = Depends(get_db)):
     size = (data.get("drill_size") or data.get("size_dia") or data.get("name") or "").strip()
     sl = (data.get("sl_no") or "").strip()
-    item = models.DrillMaster(
-        drill_size=size,
-        sl_no=sl,
-        resharp_count=int(data.get("resharp_count") or 0),
-        make=(data.get("make") or "").strip(),
-        stock=float(data.get("stock") or 0.0),
-        price=float(data.get("price") or 0.0)
-    )
-    db.add(item)
+    rc = int(data.get("resharp_count") or 0)
+    make = (data.get("make") or "").strip()
+    stock = float(data.get("stock") or 0.0)
+    price = float(data.get("price") or 0.0)
+    db.execute(text("""
+        INSERT INTO drill_masters (drill_size, sl_no, resharp_count, make, stock, price)
+        VALUES (:size, :sl, :rc, :make, :stock, :price);
+    """), {"size": size, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price})
     db.commit()
-    db.refresh(item)
-    return {"id": item.id}
+    return {"message": "Created successfully"}
 
 @app.post("/api/drill_masters/bulk")
 def bulk_create_drill_masters(data: dict, db: Session = Depends(get_db)):
@@ -3722,45 +3718,43 @@ def bulk_create_drill_masters(data: dict, db: Session = Depends(get_db)):
         size = (dr.get("drill_size") or dr.get("size_dia") or dr.get("name") or "").strip()
         sl = (dr.get("sl_no") or "").strip()
         if size or sl:
-            item = models.DrillMaster(
-                drill_size=size,
-                sl_no=sl,
-                resharp_count=int(dr.get("resharp_count") or 0),
-                make=(dr.get("make") or "").strip(),
-                stock=float(dr.get("stock") or 0.0),
-                price=float(dr.get("price") or 0.0)
-            )
-            db.add(item)
+            rc = int(dr.get("resharp_count") or 0)
+            make = (dr.get("make") or "").strip()
+            stock = float(dr.get("stock") or 0.0)
+            price = float(dr.get("price") or 0.0)
+            db.execute(text("""
+                INSERT INTO drill_masters (drill_size, sl_no, resharp_count, make, stock, price)
+                VALUES (:size, :sl, :rc, :make, :stock, :price);
+            """), {"size": size, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price})
             count += 1
     db.commit()
     return {"message": f"Successfully created {count} drill records"}
 
 @app.put("/api/drill_masters/{id}")
 def update_drill_master(id: int, data: dict, db: Session = Depends(get_db)):
-    item = db.query(models.DrillMaster).filter(models.DrillMaster.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Drill record not found")
-    if "drill_size" in data: item.drill_size = (data["drill_size"] or "").strip()
-    if "sl_no" in data: item.sl_no = (data["sl_no"] or "").strip()
-    if "resharp_count" in data: item.resharp_count = int(data["resharp_count"] or 0)
-    if "make" in data: item.make = (data["make"] or "").strip()
-    if "stock" in data: item.stock = float(data["stock"] or 0.0)
-    if "price" in data: item.price = float(data["price"] or 0.0)
+    size = (data.get("drill_size") or data.get("size_dia") or data.get("name") or "").strip()
+    sl = (data.get("sl_no") or "").strip()
+    rc = int(data.get("resharp_count") or 0)
+    make = (data.get("make") or "").strip()
+    stock = float(data.get("stock") or 0.0)
+    price = float(data.get("price") or 0.0)
+    db.execute(text("""
+        UPDATE drill_masters
+        SET drill_size = :size, sl_no = :sl, resharp_count = :rc, make = :make, stock = :stock, price = :price
+        WHERE id = :id;
+    """), {"id": id, "size": size, "sl": sl, "rc": rc, "make": make, "stock": stock, "price": price})
     db.commit()
     return {"message": "Updated successfully"}
 
 @app.delete("/api/drill_masters/all")
 def clear_all_drill_masters(db: Session = Depends(get_db)):
-    db.query(models.DrillMaster).delete()
+    db.execute(text("DELETE FROM drill_masters;"))
     db.commit()
     return {"message": "All drill records cleared successfully"}
 
 @app.delete("/api/drill_masters/{id}")
 def delete_drill_master(id: int, db: Session = Depends(get_db)):
-    item = db.query(models.DrillMaster).filter(models.DrillMaster.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Drill record not found")
-    db.delete(item)
+    db.execute(text("DELETE FROM drill_masters WHERE id = :id;"), {"id": id})
     db.commit()
     return {"message": "Deleted successfully"}
 
@@ -3768,16 +3762,20 @@ def delete_drill_master(id: int, db: Session = Depends(get_db)):
 @app.get("/api/tap_masters")
 def get_tap_masters(db: Session = Depends(get_db)):
     try:
-        rows = db.query(models.TapMaster).order_by(models.TapMaster.id.asc()).all()
-        return [{
-            "id": r.id,
-            "tap_spec": r.tap_spec,
-            "name": r.name,
-            "specification": r.specification,
-            "make": r.make,
-            "stock": r.stock,
-            "price": r.price
-        } for r in rows]
+        rows = db.execute(text("SELECT * FROM tap_masters ORDER BY id ASC;")).mappings().all()
+        result = []
+        for r in rows:
+            d = dict(r)
+            result.append({
+                "id": d.get("id"),
+                "tap_spec": d.get("tap_spec") or d.get("specification") or d.get("name") or "",
+                "name": d.get("name") or d.get("tap_spec") or "",
+                "specification": d.get("specification") or d.get("tap_spec") or "",
+                "make": d.get("make") or "",
+                "stock": float(d.get("stock") or 0.0),
+                "price": float(d.get("price") or 0.0)
+            })
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -3786,16 +3784,15 @@ def create_tap_master(data: dict, db: Session = Depends(get_db)):
     spec = (data.get("tap_spec") or data.get("specification") or data.get("name") or "").strip()
     if not spec:
         raise HTTPException(status_code=400, detail="Tap spec is required")
-    item = models.TapMaster(
-        tap_spec=spec,
-        make=(data.get("make") or "").strip(),
-        stock=float(data.get("stock") or 0.0),
-        price=float(data.get("price") or 0.0)
-    )
-    db.add(item)
+    make = (data.get("make") or "").strip()
+    stock = float(data.get("stock") or 0.0)
+    price = float(data.get("price") or 0.0)
+    db.execute(text("""
+        INSERT INTO tap_masters (tap_spec, make, stock, price)
+        VALUES (:spec, :make, :stock, :price);
+    """), {"spec": spec, "make": make, "stock": stock, "price": price})
     db.commit()
-    db.refresh(item)
-    return {"id": item.id}
+    return {"message": "Created successfully"}
 
 @app.post("/api/tap_masters/bulk")
 def bulk_create_tap_masters(data: dict, db: Session = Depends(get_db)):
@@ -3804,41 +3801,40 @@ def bulk_create_tap_masters(data: dict, db: Session = Depends(get_db)):
     for t in taps:
         spec = (t.get("tap_spec") or t.get("specification") or t.get("name") or "").strip()
         if spec:
-            item = models.TapMaster(
-                tap_spec=spec,
-                make=(t.get("make") or "").strip(),
-                stock=float(t.get("stock") or 0.0),
-                price=float(t.get("price") or 0.0)
-            )
-            db.add(item)
+            make = (t.get("make") or "").strip()
+            stock = float(t.get("stock") or 0.0)
+            price = float(t.get("price") or 0.0)
+            db.execute(text("""
+                INSERT INTO tap_masters (tap_spec, make, stock, price)
+                VALUES (:spec, :make, :stock, :price);
+            """), {"spec": spec, "make": make, "stock": stock, "price": price})
             count += 1
     db.commit()
     return {"message": f"Successfully created {count} tap records"}
 
 @app.put("/api/tap_masters/{id}")
 def update_tap_master(id: int, data: dict, db: Session = Depends(get_db)):
-    item = db.query(models.TapMaster).filter(models.TapMaster.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Tap record not found")
-    if "tap_spec" in data: item.tap_spec = (data["tap_spec"] or "").strip()
-    if "make" in data: item.make = (data["make"] or "").strip()
-    if "stock" in data: item.stock = float(data["stock"] or 0.0)
-    if "price" in data: item.price = float(data["price"] or 0.0)
+    spec = (data.get("tap_spec") or data.get("specification") or data.get("name") or "").strip()
+    make = (data.get("make") or "").strip()
+    stock = float(data.get("stock") or 0.0)
+    price = float(data.get("price") or 0.0)
+    db.execute(text("""
+        UPDATE tap_masters
+        SET tap_spec = :spec, make = :make, stock = :stock, price = :price
+        WHERE id = :id;
+    """), {"id": id, "spec": spec, "make": make, "stock": stock, "price": price})
     db.commit()
     return {"message": "Updated successfully"}
 
 @app.delete("/api/tap_masters/all")
 def clear_all_tap_masters(db: Session = Depends(get_db)):
-    db.query(models.TapMaster).delete()
+    db.execute(text("DELETE FROM tap_masters;"))
     db.commit()
     return {"message": "All tap records cleared successfully"}
 
 @app.delete("/api/tap_masters/{id}")
 def delete_tap_master(id: int, db: Session = Depends(get_db)):
-    item = db.query(models.TapMaster).filter(models.TapMaster.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Tap record not found")
-    db.delete(item)
+    db.execute(text("DELETE FROM tap_masters WHERE id = :id;"), {"id": id})
     db.commit()
     return {"message": "Deleted successfully"}
 
@@ -3846,79 +3842,83 @@ def delete_tap_master(id: int, db: Session = Depends(get_db)):
 @app.get("/api/insert_receipts")
 def get_insert_receipts(db: Session = Depends(get_db)):
     try:
-        rows = db.query(models.InsertReceipt).order_by(models.InsertReceipt.id.desc()).all()
-        return [{
-            "id": r.id,
-            "date": r.date,
-            "supplier": r.supplier,
-            "insert_spec": r.insert_spec,
-            "batch_no": r.batch_no,
-            "qty": r.qty,
-            "rate": r.rate,
-            "created_at": r.created_at.isoformat() if r.created_at else None
-        } for r in rows]
+        rows = db.execute(text("SELECT * FROM insert_receipts ORDER BY id DESC;")).mappings().all()
+        result = []
+        for r in rows:
+            d = dict(r)
+            result.append({
+                "id": d.get("id"),
+                "date": str(d.get("date") or ""),
+                "supplier": d.get("supplier") or "",
+                "insert_spec": d.get("insert_spec") or "",
+                "batch_no": d.get("batch_no") or "",
+                "qty": float(d.get("qty") or 0.0),
+                "rate": float(d.get("rate") or 0.0),
+                "created_at": d.get("created_at").isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at") or "")
+            })
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/insert_receipts")
 def create_insert_receipt(data: dict, db: Session = Depends(get_db)):
-    item = models.InsertReceipt(
-        date=(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")),
-        supplier=(data.get("supplier") or "").strip(),
-        insert_spec=(data.get("insert_spec") or "").strip(),
-        batch_no=(data.get("batch_no") or "").strip(),
-        qty=float(data.get("qty") or 0.0),
-        rate=float(data.get("rate") or 0.0)
-    )
-    db.add(item)
+    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    supp = (data.get("supplier") or "").strip()
+    spec = (data.get("insert_spec") or "").strip()
+    batch = (data.get("batch_no") or "").strip()
+    qty = float(data.get("qty") or 0.0)
+    rate = float(data.get("rate") or 0.0)
+    db.execute(text("""
+        INSERT INTO insert_receipts (date, supplier, insert_spec, batch_no, qty, rate)
+        VALUES (:date, :supp, :spec, :batch, :qty, :rate);
+    """), {"date": date_val, "supp": supp, "spec": spec, "batch": batch, "qty": qty, "rate": rate})
     db.commit()
-    db.refresh(item)
-    return {"id": item.id}
+    return {"message": "Created successfully"}
 
 @app.post("/api/insert_receipts/bulk")
 def bulk_create_insert_receipts(data: dict, db: Session = Depends(get_db)):
     receipts = data.get("receipts") or []
     count = 0
     for r in receipts:
-        item = models.InsertReceipt(
-            date=(r.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")),
-            supplier=(r.get("supplier") or "").strip(),
-            insert_spec=(r.get("insert_spec") or "").strip(),
-            batch_no=(r.get("batch_no") or "").strip(),
-            qty=float(r.get("qty") or 0.0),
-            rate=float(r.get("rate") or 0.0)
-        )
-        db.add(item)
+        date_val = r.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+        supp = (r.get("supplier") or "").strip()
+        spec = (r.get("insert_spec") or "").strip()
+        batch = (r.get("batch_no") or "").strip()
+        qty = float(r.get("qty") or 0.0)
+        rate = float(r.get("rate") or 0.0)
+        db.execute(text("""
+            INSERT INTO insert_receipts (date, supplier, insert_spec, batch_no, qty, rate)
+            VALUES (:date, :supp, :spec, :batch, :qty, :rate);
+        """), {"date": date_val, "supp": supp, "spec": spec, "batch": batch, "qty": qty, "rate": rate})
         count += 1
     db.commit()
     return {"message": f"Successfully created {count} insert receipt records"}
 
 @app.put("/api/insert_receipts/{id}")
 def update_insert_receipt(id: int, data: dict, db: Session = Depends(get_db)):
-    item = db.query(models.InsertReceipt).filter(models.InsertReceipt.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Insert receipt not found")
-    if "date" in data: item.date = str(data["date"])
-    if "supplier" in data: item.supplier = str(data["supplier"])
-    if "insert_spec" in data: item.insert_spec = str(data["insert_spec"])
-    if "batch_no" in data: item.batch_no = str(data["batch_no"])
-    if "qty" in data: item.qty = float(data["qty"] or 0.0)
-    if "rate" in data: item.rate = float(data["rate"] or 0.0)
+    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    supp = (data.get("supplier") or "").strip()
+    spec = (data.get("insert_spec") or "").strip()
+    batch = (data.get("batch_no") or "").strip()
+    qty = float(data.get("qty") or 0.0)
+    rate = float(data.get("rate") or 0.0)
+    db.execute(text("""
+        UPDATE insert_receipts
+        SET date = :date, supplier = :supp, insert_spec = :spec, batch_no = :batch, qty = :qty, rate = :rate
+        WHERE id = :id;
+    """), {"id": id, "date": date_val, "supp": supp, "spec": spec, "batch": batch, "qty": qty, "rate": rate})
     db.commit()
     return {"message": "Updated successfully"}
 
 @app.delete("/api/insert_receipts/all")
 def clear_all_insert_receipts(db: Session = Depends(get_db)):
-    db.query(models.InsertReceipt).delete()
+    db.execute(text("DELETE FROM insert_receipts;"))
     db.commit()
     return {"message": "All insert receipt records cleared successfully"}
 
 @app.delete("/api/insert_receipts/{id}")
 def delete_insert_receipt(id: int, db: Session = Depends(get_db)):
-    item = db.query(models.InsertReceipt).filter(models.InsertReceipt.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Insert receipt not found")
-    db.delete(item)
+    db.execute(text("DELETE FROM insert_receipts WHERE id = :id;"), {"id": id})
     db.commit()
     return {"message": "Deleted successfully"}
 
@@ -3926,75 +3926,79 @@ def delete_insert_receipt(id: int, db: Session = Depends(get_db)):
 @app.get("/api/tap_receipts")
 def get_tap_receipts(db: Session = Depends(get_db)):
     try:
-        rows = db.query(models.TapReceipt).order_by(models.TapReceipt.id.desc()).all()
-        return [{
-            "id": r.id,
-            "date": r.date,
-            "supplier": r.supplier,
-            "tap_spec": r.tap_spec,
-            "qty": r.qty,
-            "rate": r.rate,
-            "created_at": r.created_at.isoformat() if r.created_at else None
-        } for r in rows]
+        rows = db.execute(text("SELECT * FROM tap_receipts ORDER BY id DESC;")).mappings().all()
+        result = []
+        for r in rows:
+            d = dict(r)
+            result.append({
+                "id": d.get("id"),
+                "date": str(d.get("date") or ""),
+                "supplier": d.get("supplier") or "",
+                "tap_spec": d.get("tap_spec") or "",
+                "qty": float(d.get("qty") or 0.0),
+                "rate": float(d.get("rate") or 0.0),
+                "created_at": d.get("created_at").isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at") or "")
+            })
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/tap_receipts")
 def create_tap_receipt(data: dict, db: Session = Depends(get_db)):
-    item = models.TapReceipt(
-        date=(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")),
-        supplier=(data.get("supplier") or "").strip(),
-        tap_spec=(data.get("tap_spec") or "").strip(),
-        qty=float(data.get("qty") or 0.0),
-        rate=float(data.get("rate") or 0.0)
-    )
-    db.add(item)
+    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    supp = (data.get("supplier") or "").strip()
+    spec = (data.get("tap_spec") or "").strip()
+    qty = float(data.get("qty") or 0.0)
+    rate = float(data.get("rate") or 0.0)
+    db.execute(text("""
+        INSERT INTO tap_receipts (date, supplier, tap_spec, qty, rate)
+        VALUES (:date, :supp, :spec, :qty, :rate);
+    """), {"date": date_val, "supp": supp, "spec": spec, "qty": qty, "rate": rate})
     db.commit()
-    db.refresh(item)
-    return {"id": item.id}
+    return {"message": "Created successfully"}
 
 @app.post("/api/tap_receipts/bulk")
 def bulk_create_tap_receipts(data: dict, db: Session = Depends(get_db)):
     receipts = data.get("receipts") or []
     count = 0
     for r in receipts:
-        item = models.TapReceipt(
-            date=(r.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")),
-            supplier=(r.get("supplier") or "").strip(),
-            tap_spec=(r.get("tap_spec") or "").strip(),
-            qty=float(r.get("qty") or 0.0),
-            rate=float(r.get("rate") or 0.0)
-        )
-        db.add(item)
+        date_val = r.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+        supp = (r.get("supplier") or "").strip()
+        spec = (r.get("tap_spec") or "").strip()
+        qty = float(r.get("qty") or 0.0)
+        rate = float(r.get("rate") or 0.0)
+        db.execute(text("""
+            INSERT INTO tap_receipts (date, supplier, tap_spec, qty, rate)
+            VALUES (:date, :supp, :spec, :qty, :rate);
+        """), {"date": date_val, "supp": supp, "spec": spec, "qty": qty, "rate": rate})
         count += 1
     db.commit()
     return {"message": f"Successfully created {count} tap receipt records"}
 
 @app.put("/api/tap_receipts/{id}")
 def update_tap_receipt(id: int, data: dict, db: Session = Depends(get_db)):
-    item = db.query(models.TapReceipt).filter(models.TapReceipt.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Tap receipt not found")
-    if "date" in data: item.date = str(data["date"])
-    if "supplier" in data: item.supplier = str(data["supplier"])
-    if "tap_spec" in data: item.tap_spec = str(data["tap_spec"])
-    if "qty" in data: item.qty = float(data["qty"] or 0.0)
-    if "rate" in data: item.rate = float(data["rate"] or 0.0)
+    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    supp = (data.get("supplier") or "").strip()
+    spec = (data.get("tap_spec") or "").strip()
+    qty = float(data.get("qty") or 0.0)
+    rate = float(data.get("rate") or 0.0)
+    db.execute(text("""
+        UPDATE tap_receipts
+        SET date = :date, supplier = :supp, tap_spec = :spec, qty = :qty, rate = :rate
+        WHERE id = :id;
+    """), {"id": id, "date": date_val, "supp": supp, "spec": spec, "qty": qty, "rate": rate})
     db.commit()
     return {"message": "Updated successfully"}
 
 @app.delete("/api/tap_receipts/all")
 def clear_all_tap_receipts(db: Session = Depends(get_db)):
-    db.query(models.TapReceipt).delete()
+    db.execute(text("DELETE FROM tap_receipts;"))
     db.commit()
     return {"message": "All tap receipt records cleared successfully"}
 
 @app.delete("/api/tap_receipts/{id}")
 def delete_tap_receipt(id: int, db: Session = Depends(get_db)):
-    item = db.query(models.TapReceipt).filter(models.TapReceipt.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Tap receipt not found")
-    db.delete(item)
+    db.execute(text("DELETE FROM tap_receipts WHERE id = :id;"), {"id": id})
     db.commit()
     return {"message": "Deleted successfully"}
 
@@ -4002,51 +4006,56 @@ def delete_tap_receipt(id: int, db: Session = Depends(get_db)):
 @app.get("/api/insert_issues")
 def get_insert_issues(db: Session = Depends(get_db)):
     try:
-        rows = db.query(models.InsertIssue).order_by(models.InsertIssue.id.desc()).all()
-        return [{
-            "id": r.id,
-            "date": r.date,
-            "shift": r.shift,
-            "department": r.department,
-            "insert_spec": r.insert_spec,
-            "batch_no": r.batch_no,
-            "qty_issued": r.qty_issued,
-            "qty_received": r.qty_received,
-            "machine": r.machine,
-            "operator": r.operator,
-            "partno": r.partno,
-            "opn_no": r.opn_no,
-            "usages": r.usages,
-            "receipt_id": r.receipt_id,
-            "edge_data": r.edge_data,
-            "created_at": r.created_at.isoformat() if r.created_at else None
-        } for r in rows]
+        rows = db.execute(text("SELECT * FROM insert_issues ORDER BY id DESC;")).mappings().all()
+        result = []
+        for r in rows:
+            d = dict(r)
+            result.append({
+                "id": d.get("id"),
+                "date": str(d.get("date") or ""),
+                "shift": d.get("shift") or "First",
+                "department": d.get("department") or "WIPRO",
+                "insert_spec": d.get("insert_spec") or "",
+                "batch_no": d.get("batch_no") or "",
+                "qty_issued": float(d.get("qty_issued") or 0.0),
+                "qty_received": float(d.get("qty_received") or 0.0),
+                "machine": d.get("machine") or "",
+                "operator": d.get("operator") or "",
+                "partno": d.get("partno") or "",
+                "opn_no": str(d.get("opn_no") or ""),
+                "usages": str(d.get("usages") or ""),
+                "receipt_id": d.get("receipt_id"),
+                "edge_data": str(d.get("edge_data") or ""),
+                "created_at": d.get("created_at").isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at") or "")
+            })
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/insert_issues/{id}")
 def get_insert_issue(id: int, db: Session = Depends(get_db)):
     try:
-        r = db.query(models.InsertIssue).filter(models.InsertIssue.id == id).first()
-        if not r:
+        row = db.execute(text("SELECT * FROM insert_issues WHERE id = :id;"), {"id": id}).mappings().first()
+        if not row:
             raise HTTPException(status_code=404, detail="Insert issue record not found")
+        d = dict(row)
         return {
-            "id": r.id,
-            "date": r.date,
-            "shift": r.shift,
-            "department": r.department,
-            "insert_spec": r.insert_spec,
-            "batch_no": r.batch_no,
-            "qty_issued": r.qty_issued,
-            "qty_received": r.qty_received,
-            "machine": r.machine,
-            "operator": r.operator,
-            "partno": r.partno,
-            "opn_no": r.opn_no,
-            "usages": r.usages,
-            "receipt_id": r.receipt_id,
-            "edge_data": r.edge_data,
-            "created_at": r.created_at.isoformat() if r.created_at else None
+            "id": d.get("id"),
+            "date": str(d.get("date") or ""),
+            "shift": d.get("shift") or "First",
+            "department": d.get("department") or "WIPRO",
+            "insert_spec": d.get("insert_spec") or "",
+            "batch_no": d.get("batch_no") or "",
+            "qty_issued": float(d.get("qty_issued") or 0.0),
+            "qty_received": float(d.get("qty_received") or 0.0),
+            "machine": d.get("machine") or "",
+            "operator": d.get("operator") or "",
+            "partno": d.get("partno") or "",
+            "opn_no": str(d.get("opn_no") or ""),
+            "usages": str(d.get("usages") or ""),
+            "receipt_id": d.get("receipt_id"),
+            "edge_data": str(d.get("edge_data") or ""),
+            "created_at": d.get("created_at").isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at") or "")
         }
     except HTTPException:
         raise
@@ -4055,87 +4064,87 @@ def get_insert_issue(id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/insert_issues")
 def create_insert_issue(data: dict, db: Session = Depends(get_db)):
-    item = models.InsertIssue(
-        date=(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")),
-        shift=(data.get("shift") or "First").strip(),
-        department=(data.get("department") or "WIPRO").strip(),
-        insert_spec=(data.get("insert_spec") or "").strip(),
-        batch_no=(data.get("batch_no") or "").strip(),
-        qty_issued=float(data.get("qty_issued") or 0.0),
-        qty_received=float(data.get("qty_received") or 0.0),
-        machine=(data.get("machine") or "").strip(),
-        operator=(data.get("operator") or "").strip(),
-        partno=(data.get("partno") or "").strip(),
-        opn_no=str(data.get("opn_no") or "").strip(),
-        usages=str(data.get("usages") or ""),
-        receipt_id=int(data.get("receipt_id")) if data.get("receipt_id") else None,
-        edge_data=str(data.get("edge_data") or "")
-    )
-    db.add(item)
+    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    shift = (data.get("shift") or "First").strip()
+    dept = (data.get("department") or "WIPRO").strip()
+    spec = (data.get("insert_spec") or "").strip()
+    batch = (data.get("batch_no") or "").strip()
+    qty_iss = float(data.get("qty_issued") or 0.0)
+    qty_rec = float(data.get("qty_received") or 0.0)
+    mach = (data.get("machine") or "").strip()
+    op = (data.get("operator") or "").strip()
+    partno = (data.get("partno") or "").strip()
+    opn = str(data.get("opn_no") or "").strip()
+    usages = str(data.get("usages") or "")
+    rid = int(data.get("receipt_id")) if data.get("receipt_id") else None
+    edge = str(data.get("edge_data") or "")
+    db.execute(text("""
+        INSERT INTO insert_issues (date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
+        VALUES (:date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
+    """), {"date": date_val, "shift": shift, "dept": dept, "spec": spec, "batch": batch, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn, "usages": usages, "rid": rid, "edge": edge})
     db.commit()
-    db.refresh(item)
-    return {"id": item.id}
+    return {"message": "Created successfully"}
 
 @app.post("/api/insert_issues/bulk")
 def bulk_create_insert_issues(data: dict, db: Session = Depends(get_db)):
     issues = data.get("issues") or []
     count = 0
     for iss in issues:
-        item = models.InsertIssue(
-            date=(iss.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")),
-            shift=(iss.get("shift") or "First").strip(),
-            department=(iss.get("department") or "WIPRO").strip(),
-            insert_spec=(iss.get("insert_spec") or "").strip(),
-            batch_no=(iss.get("batch_no") or "").strip(),
-            qty_issued=float(iss.get("qty_issued") or 0.0),
-            qty_received=float(iss.get("qty_received") or 0.0),
-            machine=(iss.get("machine") or "").strip(),
-            operator=(iss.get("operator") or "").strip(),
-            partno=(iss.get("partno") or "").strip(),
-            opn_no=str(iss.get("opn_no") or "").strip(),
-            usages=str(iss.get("usages") or ""),
-            receipt_id=int(iss.get("receipt_id")) if iss.get("receipt_id") else None,
-            edge_data=str(iss.get("edge_data") or "")
-        )
-        db.add(item)
+        date_val = iss.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+        shift = (iss.get("shift") or "First").strip()
+        dept = (iss.get("department") or "WIPRO").strip()
+        spec = (iss.get("insert_spec") or "").strip()
+        batch = (iss.get("batch_no") or "").strip()
+        qty_iss = float(iss.get("qty_issued") or 0.0)
+        qty_rec = float(iss.get("qty_received") or 0.0)
+        mach = (iss.get("machine") or "").strip()
+        op = (iss.get("operator") or "").strip()
+        partno = (iss.get("partno") or "").strip()
+        opn = str(iss.get("opn_no") or "").strip()
+        usages = str(iss.get("usages") or "")
+        rid = int(iss.get("receipt_id")) if iss.get("receipt_id") else None
+        edge = str(iss.get("edge_data") or "")
+        db.execute(text("""
+            INSERT INTO insert_issues (date, shift, department, insert_spec, batch_no, qty_issued, qty_received, machine, operator, partno, opn_no, usages, receipt_id, edge_data)
+            VALUES (:date, :shift, :dept, :spec, :batch, :qty_iss, :qty_rec, :mach, :op, :partno, :opn, :usages, :rid, :edge);
+        """), {"date": date_val, "shift": shift, "dept": dept, "spec": spec, "batch": batch, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn, "usages": usages, "rid": rid, "edge": edge})
         count += 1
     db.commit()
     return {"message": f"Successfully created {count} insert issue records"}
 
 @app.put("/api/insert_issues/{id}")
 def update_insert_issue(id: int, data: dict, db: Session = Depends(get_db)):
-    item = db.query(models.InsertIssue).filter(models.InsertIssue.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Insert issue not found")
-    if "date" in data: item.date = str(data["date"])
-    if "shift" in data: item.shift = str(data["shift"])
-    if "department" in data: item.department = str(data["department"])
-    if "insert_spec" in data: item.insert_spec = str(data["insert_spec"])
-    if "batch_no" in data: item.batch_no = str(data["batch_no"])
-    if "qty_issued" in data: item.qty_issued = float(data["qty_issued"] or 0.0)
-    if "qty_received" in data: item.qty_received = float(data["qty_received"] or 0.0)
-    if "machine" in data: item.machine = str(data["machine"])
-    if "operator" in data: item.operator = str(data["operator"])
-    if "partno" in data: item.partno = str(data["partno"])
-    if "opn_no" in data: item.opn_no = str(data["opn_no"])
-    if "usages" in data: item.usages = str(data["usages"])
-    if "receipt_id" in data: item.receipt_id = int(data["receipt_id"]) if data["receipt_id"] else None
-    if "edge_data" in data: item.edge_data = str(data["edge_data"])
+    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    shift = (data.get("shift") or "First").strip()
+    dept = (data.get("department") or "WIPRO").strip()
+    spec = (data.get("insert_spec") or "").strip()
+    batch = (data.get("batch_no") or "").strip()
+    qty_iss = float(data.get("qty_issued") or 0.0)
+    qty_rec = float(data.get("qty_received") or 0.0)
+    mach = (data.get("machine") or "").strip()
+    op = (data.get("operator") or "").strip()
+    partno = (data.get("partno") or "").strip()
+    opn = str(data.get("opn_no") or "").strip()
+    usages = str(data.get("usages") or "")
+    rid = int(data.get("receipt_id")) if data.get("receipt_id") else None
+    edge = str(data.get("edge_data") or "")
+    db.execute(text("""
+        UPDATE insert_issues
+        SET date = :date, shift = :shift, department = :dept, insert_spec = :spec, batch_no = :batch, qty_issued = :qty_iss, qty_received = :qty_rec, machine = :mach, operator = :op, partno = :partno, opn_no = :opn, usages = :usages, receipt_id = :rid, edge_data = :edge
+        WHERE id = :id;
+    """), {"id": id, "date": date_val, "shift": shift, "dept": dept, "spec": spec, "batch": batch, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn, "usages": usages, "rid": rid, "edge": edge})
     db.commit()
     return {"message": "Updated successfully"}
 
 @app.delete("/api/insert_issues/all")
 def clear_all_insert_issues(db: Session = Depends(get_db)):
-    db.query(models.InsertIssue).delete()
+    db.execute(text("DELETE FROM insert_issues;"))
     db.commit()
     return {"message": "All insert issue records cleared successfully"}
 
 @app.delete("/api/insert_issues/{id}")
 def delete_insert_issue(id: int, db: Session = Depends(get_db)):
-    item = db.query(models.InsertIssue).filter(models.InsertIssue.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Insert issue record not found")
-    db.delete(item)
+    db.execute(text("DELETE FROM insert_issues WHERE id = :id;"), {"id": id})
     db.commit()
     return {"message": "Deleted successfully"}
 
@@ -4143,95 +4152,99 @@ def delete_insert_issue(id: int, db: Session = Depends(get_db)):
 @app.get("/api/tap_issues")
 def get_tap_issues(db: Session = Depends(get_db)):
     try:
-        rows = db.query(models.TapIssue).order_by(models.TapIssue.id.desc()).all()
-        return [{
-            "id": r.id,
-            "date": r.date,
-            "shift": r.shift,
-            "department": r.department,
-            "tap_spec": r.tap_spec,
-            "qty_issued": r.qty_issued,
-            "qty_received": r.qty_received,
-            "machine": r.machine,
-            "operator": r.operator,
-            "partno": r.partno,
-            "opn_no": r.opn_no,
-            "created_at": r.created_at.isoformat() if r.created_at else None
-        } for r in rows]
+        rows = db.execute(text("SELECT * FROM tap_issues ORDER BY id DESC;")).mappings().all()
+        result = []
+        for r in rows:
+            d = dict(r)
+            result.append({
+                "id": d.get("id"),
+                "date": str(d.get("date") or ""),
+                "shift": d.get("shift") or "First",
+                "department": d.get("department") or "WIPRO",
+                "tap_spec": d.get("tap_spec") or "",
+                "qty_issued": float(d.get("qty_issued") or 0.0),
+                "qty_received": float(d.get("qty_received") or 0.0),
+                "machine": d.get("machine") or "",
+                "operator": d.get("operator") or "",
+                "partno": d.get("partno") or "",
+                "opn_no": str(d.get("opn_no") or ""),
+                "created_at": d.get("created_at").isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at") or "")
+            })
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/tap_issues")
 def create_tap_issue(data: dict, db: Session = Depends(get_db)):
-    item = models.TapIssue(
-        date=(data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")),
-        shift=(data.get("shift") or "First").strip(),
-        department=(data.get("department") or "WIPRO").strip(),
-        tap_spec=(data.get("tap_spec") or "").strip(),
-        qty_issued=float(data.get("qty_issued") or 0.0),
-        qty_received=float(data.get("qty_received") or 0.0),
-        machine=(data.get("machine") or "").strip(),
-        operator=(data.get("operator") or "").strip(),
-        partno=(data.get("partno") or "").strip(),
-        opn_no=str(data.get("opn_no") or "").strip()
-    )
-    db.add(item)
+    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    shift = (data.get("shift") or "First").strip()
+    dept = (data.get("department") or "WIPRO").strip()
+    spec = (data.get("tap_spec") or "").strip()
+    qty_iss = float(data.get("qty_issued") or 0.0)
+    qty_rec = float(data.get("qty_received") or 0.0)
+    mach = (data.get("machine") or "").strip()
+    op = (data.get("operator") or "").strip()
+    partno = (data.get("partno") or "").strip()
+    opn = str(data.get("opn_no") or "").strip()
+    db.execute(text("""
+        INSERT INTO tap_issues (date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
+        VALUES (:date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
+    """), {"date": date_val, "shift": shift, "dept": dept, "spec": spec, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn})
     db.commit()
-    db.refresh(item)
-    return {"id": item.id}
+    return {"message": "Created successfully"}
 
 @app.post("/api/tap_issues/bulk")
 def bulk_create_tap_issues(data: dict, db: Session = Depends(get_db)):
     issues = data.get("issues") or []
     count = 0
     for iss in issues:
-        item = models.TapIssue(
-            date=(iss.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")),
-            shift=(iss.get("shift") or "First").strip(),
-            department=(iss.get("department") or "WIPRO").strip(),
-            tap_spec=(iss.get("tap_spec") or "").strip(),
-            qty_issued=float(iss.get("qty_issued") or 0.0),
-            qty_received=float(iss.get("qty_received") or 0.0),
-            machine=(iss.get("machine") or "").strip(),
-            operator=(iss.get("operator") or "").strip(),
-            partno=(iss.get("partno") or "").strip(),
-            opn_no=str(iss.get("opn_no") or "").strip()
-        )
-        db.add(item)
+        date_val = iss.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+        shift = (iss.get("shift") or "First").strip()
+        dept = (iss.get("department") or "WIPRO").strip()
+        spec = (iss.get("tap_spec") or "").strip()
+        qty_iss = float(iss.get("qty_issued") or 0.0)
+        qty_rec = float(iss.get("qty_received") or 0.0)
+        mach = (iss.get("machine") or "").strip()
+        op = (iss.get("operator") or "").strip()
+        partno = (iss.get("partno") or "").strip()
+        opn = str(iss.get("opn_no") or "").strip()
+        db.execute(text("""
+            INSERT INTO tap_issues (date, shift, department, tap_spec, qty_issued, qty_received, machine, operator, partno, opn_no)
+            VALUES (:date, :shift, :dept, :spec, :qty_iss, :qty_rec, :mach, :op, :partno, :opn);
+        """), {"date": date_val, "shift": shift, "dept": dept, "spec": spec, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn})
         count += 1
     db.commit()
     return {"message": f"Successfully created {count} tap issue records"}
 
 @app.put("/api/tap_issues/{id}")
 def update_tap_issue(id: int, data: dict, db: Session = Depends(get_db)):
-    item = db.query(models.TapIssue).filter(models.TapIssue.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Tap issue not found")
-    if "date" in data: item.date = str(data["date"])
-    if "shift" in data: item.shift = str(data["shift"])
-    if "department" in data: item.department = str(data["department"])
-    if "tap_spec" in data: item.tap_spec = str(data["tap_spec"])
-    if "qty_issued" in data: item.qty_issued = float(data["qty_issued"] or 0.0)
-    if "qty_received" in data: item.qty_received = float(data["qty_received"] or 0.0)
-    if "machine" in data: item.machine = str(data["machine"])
-    if "operator" in data: item.operator = str(data["operator"])
-    if "partno" in data: item.partno = str(data["partno"])
-    if "opn_no" in data: item.opn_no = str(data["opn_no"])
+    date_val = data.get("date") or datetime.datetime.now(IST).strftime("%Y-%m-%d")
+    shift = (data.get("shift") or "First").strip()
+    dept = (data.get("department") or "WIPRO").strip()
+    spec = (data.get("tap_spec") or "").strip()
+    qty_iss = float(data.get("qty_issued") or 0.0)
+    qty_rec = float(data.get("qty_received") or 0.0)
+    mach = (data.get("machine") or "").strip()
+    op = (data.get("operator") or "").strip()
+    partno = (data.get("partno") or "").strip()
+    opn = str(data.get("opn_no") or "").strip()
+    db.execute(text("""
+        UPDATE tap_issues
+        SET date = :date, shift = :shift, department = :dept, tap_spec = :spec, qty_issued = :qty_iss, qty_received = :qty_rec, machine = :mach, operator = :op, partno = :partno, opn_no = :opn
+        WHERE id = :id;
+    """), {"id": id, "date": date_val, "shift": shift, "dept": dept, "spec": spec, "qty_iss": qty_iss, "qty_rec": qty_rec, "mach": mach, "op": op, "partno": partno, "opn": opn})
     db.commit()
     return {"message": "Updated successfully"}
 
 @app.delete("/api/tap_issues/all")
 def clear_all_tap_issues(db: Session = Depends(get_db)):
-    db.query(models.TapIssue).delete()
+    db.execute(text("DELETE FROM tap_issues;"))
     db.commit()
     return {"message": "All tap issue records cleared successfully"}
 
 @app.delete("/api/tap_issues/{id}")
 def delete_tap_issue(id: int, db: Session = Depends(get_db)):
-    item = db.query(models.TapIssue).filter(models.TapIssue.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Tap issue record not found")
-    db.delete(item)
+    db.execute(text("DELETE FROM tap_issues WHERE id = :id;"), {"id": id})
     db.commit()
     return {"message": "Deleted successfully"}
 
