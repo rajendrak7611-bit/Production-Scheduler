@@ -1534,37 +1534,114 @@ def get_partmaster_operations(part_id: int, db: Session = Depends(get_db)):
 
     return []
 
+@app.put("/api/partmaster/{part_id}/operations")
 @app.post("/api/partmaster/{part_id}/operations")
 def save_partmaster_operations(part_id: int, ops: List[dict], db: Session = Depends(get_db)):
     try:
-        db.execute(text("DELETE FROM part_operations WHERE CAST(part_id AS TEXT) = :part_id_str"), {"part_id_str": str(part_id)})
+        # Create table part_operations if not exists
         try:
-            db.execute(text("DELETE FROM operations WHERE CAST(part_id AS TEXT) = :part_id_str"), {"part_id_str": str(part_id)})
+            db.execute(text("""
+                CREATE TABLE IF NOT EXISTS part_operations (
+                    id SERIAL PRIMARY KEY,
+                    part_id TEXT,
+                    opn_no TEXT,
+                    description TEXT,
+                    machine TEXT,
+                    cycle_time FLOAT DEFAULT 0.0
+                );
+            """))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        # Find matching partno and real parts.id
+        p_no = ""
+        real_pid = None
+        try:
+            pm_row = db.execute(text("SELECT * FROM part_masters WHERE id = :id"), {"id": part_id}).mappings().first()
+            if pm_row:
+                p_no = (pm_row.get("partno") or pm_row.get("part_no") or "").strip()
+            if p_no:
+                p_row = db.execute(text("SELECT id FROM parts WHERE part_no = :p_no"), {"p_no": p_no}).mappings().first()
+                if p_row:
+                    real_pid = p_row.get("id")
+        except Exception:
+            db.rollback()
+
+        # Delete existing operations for this part
+        try:
+            db.execute(text("DELETE FROM part_operations WHERE CAST(part_id AS TEXT) = :part_id_str"), {"part_id_str": str(part_id)})
         except Exception:
             pass
-        for op in ops:
-            db.execute(text("INSERT INTO part_operations (part_id, opn_no, description, machine, cycle_time) VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)"), {
-                "part_id": str(part_id),
-                "opn_no": str(op.get("opn_no") or ""),
-                "description": op.get("description") or "",
-                "machine": op.get("machine") or op.get("machine_name") or "",
-                "cycle_time": float(op.get("cycle_time") or 0)
-            })
+
+        if p_no:
             try:
-                db.execute(text("INSERT INTO operations (part_id, opn_no, description, machine_name, cycle_time) VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)"), {
-                    "part_id": part_id,
-                    "opn_no": str(op.get("opn_no") or ""),
-                    "description": op.get("description") or "",
-                    "machine": op.get("machine") or op.get("machine_name") or "",
-                    "cycle_time": float(op.get("cycle_time") or 0)
-                })
+                db.execute(text("DELETE FROM part_operations WHERE CAST(part_id AS TEXT) = :p_no"), {"p_no": p_no})
             except Exception:
                 pass
+
+        try:
+            db.execute(text("DELETE FROM operations WHERE part_id = :pid"), {"pid": part_id})
+        except Exception:
+            pass
+
+        if real_pid and real_pid != part_id:
+            try:
+                db.execute(text("DELETE FROM operations WHERE part_id = :pid"), {"pid": real_pid})
+            except Exception:
+                pass
+
         db.commit()
+
+        # Insert new operations
+        for op in ops:
+            opn = str(op.get("opn_no") or "").strip()
+            desc = (op.get("description") or "").strip()
+            mach = (op.get("machine") or op.get("machine_name") or "").strip()
+            cyc = float(op.get("cycle_time") or 0.0)
+
+            if not opn and not desc:
+                continue
+
+            try:
+                db.execute(text("""
+                    INSERT INTO part_operations (part_id, opn_no, description, machine, cycle_time)
+                    VALUES (:part_id, :opn_no, :description, :machine, :cycle_time)
+                """), {
+                    "part_id": str(part_id),
+                    "opn_no": opn,
+                    "description": desc,
+                    "machine": mach,
+                    "cycle_time": cyc
+                })
+                db.commit()
+            except Exception:
+                db.rollback()
+
+            target_pids = set([part_id])
+            if real_pid:
+                target_pids.add(real_pid)
+
+            for t_pid in target_pids:
+                try:
+                    db.execute(text("""
+                        INSERT INTO operations (part_id, opn_no, description, machine_name, cycle_time)
+                        VALUES (:part_id, :opn_no, :description, :machine_name, :cycle_time)
+                    """), {
+                        "part_id": t_pid,
+                        "opn_no": opn,
+                        "description": desc,
+                        "machine_name": mach,
+                        "cycle_time": cyc
+                    })
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
         return {"message": "Operations saved successfully"}
     except Exception as e:
         db.rollback()
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=f"Failed to save operations: {e}")
 
 @app.post("/api/partmaster")
 def create_partmaster(data: dict, db: Session = Depends(get_db)):
