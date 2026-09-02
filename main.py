@@ -2958,7 +2958,7 @@ def adjust_part_wip(data: dict, db: Session = Depends(get_db)):
         today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
 
         # Fetch operations for this part
-        part_row = db.execute(text("SELECT id FROM partmaster WHERE LOWER(partno) = LOWER(:p);"), {"p": partno}).mappings().first()
+        part_row = db.execute(text("SELECT id FROM parts WHERE LOWER(part_no) = LOWER(:p);"), {"p": partno}).mappings().first()
         operations = []
         if part_row:
             op_rows = db.execute(text("SELECT opn_no, description FROM operations WHERE part_id = :pid ORDER BY id ASC;"), {"pid": part_row["id"]}).mappings().all()
@@ -3060,10 +3060,10 @@ def autofix_wip(data: dict, db: Session = Depends(get_db)):
         dept = (data.get("department") or "").strip()
         today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
 
-        q = "SELECT id, partno, department FROM partmaster"
+        q = "SELECT id, part_no as partno, dept as department FROM parts"
         params = {}
         if dept:
-            q += " WHERE LOWER(department) = LOWER(:dept) OR LOWER(dept) = LOWER(:dept)"
+            q += " WHERE LOWER(dept) = LOWER(:dept)"
             params["dept"] = dept
         q += " ORDER BY id ASC;"
 
