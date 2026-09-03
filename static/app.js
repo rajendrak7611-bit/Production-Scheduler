@@ -4433,31 +4433,43 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (deburAllParts.length === 0) {
-                const partsRes = await fetch('/api/partmaster');
-                deburAllParts = await partsRes.json();
+                try {
+                    const partsRes = await fetch('/api/partmaster');
+                    deburAllParts = await partsRes.json();
+                } catch(e) { deburAllParts = []; }
             }
             if (!deburOperatorsLoaded) {
-                const opRes = await fetch('/api/operators');
-                const operators = await opRes.json();
-                operators.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-                const sel = document.getElementById('deburOperator');
-                if (sel) {
-                    sel.innerHTML = '<option value="">-- Select Operator --</option>';
-                    operators.forEach(o => {
-                        const opt = document.createElement('option');
-                        opt.value = o.name;
-                        opt.textContent = o.name;
-                        sel.appendChild(opt);
-                    });
-                }
-                deburOperatorsLoaded = true;
+                try {
+                    const opRes = await fetch('/api/operators');
+                    const operators = await opRes.json();
+                    operators.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    const sel = document.getElementById('deburOperator');
+                    if (sel) {
+                        sel.innerHTML = '<option value="">-- Select Operator --</option>';
+                        operators.forEach(o => {
+                            const opt = document.createElement('option');
+                            opt.value = o.name;
+                            opt.textContent = o.name;
+                            sel.appendChild(opt);
+                        });
+                    }
+                    deburOperatorsLoaded = true;
+                } catch(e) { console.error('Error loading debur operators', e); }
             }
             
             fetchDeburLogs();
             
             const deptSelect = document.getElementById('deburDeptSelect');
-            if (deptSelect.value) {
-                fetchDeburStatus();
+            if (deptSelect) {
+                if (!deptSelect.value) {
+                    const firstOption = Array.from(deptSelect.options).find(o => o.value && o.value.trim() !== '');
+                    if (firstOption) {
+                        deptSelect.value = firstOption.value;
+                    }
+                }
+                if (deptSelect.value) {
+                    fetchDeburStatus();
+                }
             }
         } catch (e) {
             console.error('Error init debur', e);
@@ -4467,59 +4479,100 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchDeburStatus() {
         const dept = document.getElementById('deburDeptSelect').value;
         const tbody = document.getElementById('deburPartsBody');
-        tbody.innerHTML = '';
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted); text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading pending parts...</td></tr>';
         if (!dept) {
             tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted); text-align:center;">Select a department</td></tr>';
             return;
         }
 
         try {
+            if (!deburAllParts || deburAllParts.length === 0) {
+                try {
+                    const partsRes = await fetch('/api/partmaster');
+                    deburAllParts = await partsRes.json();
+                } catch(e) { deburAllParts = []; }
+            }
+
             const [schedRes, logRes, pcReceiptRes, htReceiptRes] = await Promise.all([
-                fetch('/api/schedule'),
-                fetch('/api/prodlog'),
-                fetch('/api/pc_receipt_logs').catch(() => null),
-                fetch('/api/ht_receipt_logs').catch(() => null)
+                fetch('/api/schedule').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/prodlog').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/pc_receipt_logs').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/ht_receipt_logs').then(r => r.ok ? r.json() : []).catch(() => [])
             ]);
             
-            const allSchedules = await schedRes.json();
-            const allLogs = await logRes.json();
-            const allPcReceiptLogs = (pcReceiptRes && pcReceiptRes.ok) ? await pcReceiptRes.json() : [];
-            const allHtReceiptLogs = (htReceiptRes && htReceiptRes.ok) ? await htReceiptRes.json() : [];
-            
-            const deptSchedules = allSchedules.filter(s => (s.department || '').trim().toUpperCase() === dept.trim().toUpperCase() && (s.status === 'Pending' || !s.status));
-            const uniqueParts = [...new Set(deptSchedules.map(s => s.partno))];
+            const allSchedules = schedRes || [];
+            const allLogs = logRes || [];
+            const allPcReceiptLogs = pcReceiptRes || [];
+            const allHtReceiptLogs = htReceiptRes || [];
+
+            const masterDeptParts = (deburAllParts || [])
+                .filter(p => (p.department || '').trim().toUpperCase() === dept.trim().toUpperCase() || (p.dept || '').trim().toUpperCase() === dept.trim().toUpperCase())
+                .map(p => (p.partno || '').trim());
+
+            const schedDeptParts = allSchedules
+                .filter(s => (s.department || '').trim().toUpperCase() === dept.trim().toUpperCase())
+                .map(s => (s.partno || '').trim());
+
+            const prodLogDeptParts = allLogs
+                .filter(l => (l.department || '').trim().toUpperCase() === dept.trim().toUpperCase() || (l.dept || '').trim().toUpperCase() === dept.trim().toUpperCase())
+                .map(l => (l.partno || '').trim());
+
+            const uniqueParts = [...new Set([...masterDeptParts, ...schedDeptParts, ...prodLogDeptParts])].filter(Boolean);
+            uniqueParts.sort((a, b) => a.localeCompare(b));
             
             if (uniqueParts.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted); text-align:center;">No pending parts for this department</td></tr>';
                 return;
             }
-            
-            for (const partno of uniqueParts) {
+
+            // Fetch operations for all parts in parallel
+            const operationsMap = {};
+            await Promise.all(uniqueParts.map(async (partno) => {
                 const partObj = deburAllParts.find(p => (p.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase());
-                if (!partObj) continue;
-                
-                const opsRes = await fetch(`/api/partmaster/${partObj.id}/operations`);
-                const operations = await opsRes.json();
-                
-                if (operations.length === 0) continue;
-                
+                if (partObj && partObj.id) {
+                    try {
+                        const opsRes = await fetch(`/api/partmaster/${partObj.id}/operations`);
+                        operationsMap[partno] = await opsRes.json();
+                    } catch(e) { operationsMap[partno] = []; }
+                } else {
+                    operationsMap[partno] = [];
+                }
+            }));
+            
+            tbody.innerHTML = '';
+            for (const partno of uniqueParts) {
+                let operations = operationsMap[partno] || [];
                 operations.sort((a, b) => (parseInt(a.opn_no) || 0) - (parseInt(b.opn_no) || 0));
-                const lastOp = operations[operations.length - 1];
-                const lastOpnClean = (lastOp.opn_no || '').trim().toLowerCase();
-                const lastDescClean = (lastOp.description || '').trim().toLowerCase();
-                const lastMachClean = (lastOp.machine || '').trim().toLowerCase();
 
-                const isLastPc = lastOpnClean === 'pc' || lastDescClean === 'pc' || lastDescClean.includes('powder coat') || lastDescClean.includes('pc') || lastMachClean === 'pc';
-                const isLastHt = lastOpnClean === 'ht' || lastOpnClean === '50' || lastDescClean === 'ht' || lastDescClean.includes('heat treat') || lastMachClean === 'ht';
+                let lastOpProd = 0;
+                if (operations.length > 0) {
+                    const lastOp = operations[operations.length - 1];
+                    const lastOpnClean = (lastOp.opn_no || '').trim().toLowerCase();
+                    const lastDescClean = (lastOp.description || '').trim().toLowerCase();
+                    const lastMachClean = (lastOp.machine || '').trim().toLowerCase();
 
-                let lastOpProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').trim().toLowerCase() === lastOpnClean).reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+                    const isLastPc = lastOpnClean === 'pc' || lastDescClean === 'pc' || lastDescClean.includes('powder coat') || lastDescClean.includes('pc') || lastMachClean === 'pc';
+                    const isLastHt = lastOpnClean === 'ht' || lastOpnClean === '50' || lastDescClean === 'ht' || lastDescClean.includes('heat treat') || lastMachClean === 'ht';
 
-                if (isLastPc || lastOpnClean.includes('pc')) {
-                    const pcRec = allPcReceiptLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase()).reduce((sum, l) => sum + (l.qty || 0), 0);
-                    lastOpProd = Math.max(lastOpProd, pcRec);
-                } else if (isLastHt) {
-                    const htRec = allHtReceiptLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase()).reduce((sum, l) => sum + (l.qty || 0), 0);
-                    lastOpProd = Math.max(lastOpProd, htRec);
+                    lastOpProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').trim().toLowerCase() === lastOpnClean).reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+
+                    if (isLastPc || lastOpnClean.includes('pc')) {
+                        const pcRec = allPcReceiptLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase()).reduce((sum, l) => sum + (l.qty || 0), 0);
+                        lastOpProd = Math.max(lastOpProd, pcRec);
+                    } else if (isLastHt) {
+                        const htRec = allHtReceiptLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase()).reduce((sum, l) => sum + (l.qty || 0), 0);
+                        lastOpProd = Math.max(lastOpProd, htRec);
+                    }
+                } else {
+                    const partLogs = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() !== 'debur' && (l.opn_no || '').toLowerCase() !== 'for ins' && (l.opn_no || '').toLowerCase() !== 'rfd');
+                    if (partLogs.length > 0) {
+                        const numericOps = partLogs.map(l => parseInt(l.opn_no) || 0).filter(n => n > 0);
+                        if (numericOps.length > 0) {
+                            const maxOp = Math.max(...numericOps);
+                            lastOpProd = partLogs.filter(l => (parseInt(l.opn_no) || 0) === maxOp).reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+                        }
+                    }
                 }
 
                 const pcRecTotal = allPcReceiptLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase()).reduce((sum, l) => sum + (l.qty || 0), 0);
@@ -4535,12 +4588,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const tr = document.createElement('tr');
                 tr.style.cursor = 'pointer';
+                tr.style.transition = 'background-color 0.2s';
                 tr.innerHTML = `
-                    <td>${partno}</td>
-                    <td style="font-weight: 600; color: ${balance > 0 ? 'var(--primary-color)' : 'inherit'};">${balance}</td>
+                    <td style="padding: 0.6rem 0.75rem; font-weight: 500;">${escapeHtml(partno)}</td>
+                    <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--primary-color);">${balance}</td>
                 `;
                 tr.addEventListener('click', () => {
                     document.getElementById('deburPartNo').value = partno;
+                    const qtyInput = document.getElementById('deburQty');
+                    if (qtyInput) {
+                        qtyInput.placeholder = `Max: ${balance}`;
+                    }
+                    Array.from(tbody.children).forEach(r => r.style.background = '');
+                    tr.style.background = '#e0f2fe';
                 });
                 tbody.appendChild(tr);
             }
@@ -4550,6 +4610,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {
             console.error('Error fetching debur status', e);
+            tbody.innerHTML = '<tr><td colspan="2" style="color:#ef4444; text-align:center;">Error fetching pending debur parts</td></tr>';
         }
     }
     
@@ -4583,6 +4644,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 document.getElementById('deburHours').value = '';
                 document.getElementById('deburQty').value = '';
+                document.getElementById('deburQty').placeholder = '';
+                document.getElementById('deburPartNo').value = '';
                 fetchDeburStatus(); // Refresh left side
                 fetchDeburLogs();   // Refresh right side logs
             } else {
