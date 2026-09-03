@@ -80,9 +80,17 @@ class UserLogin(BaseModel):
     password: str
 
 @app.on_event("startup")
-def seed_default_users():
-    # Keep database state persistent and do not overwrite user deletions on restart
-    pass
+def run_startup_migrations():
+    try:
+        with engine.connect() as conn:
+            for tbl in ["ht_logs", "ht_receipt_logs", "pc_logs", "pc_receipt_logs"]:
+                try:
+                    conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+                    conn.commit()
+                except Exception:
+                    pass
+    except Exception as e:
+        print("Startup migration note:", e)
 
 @app.post("/api/restore-from-backup")
 @app.get("/api/restore-from-backup")
@@ -3035,48 +3043,81 @@ def get_ht_logs(db: Session = Depends(get_db)):
 @app.post("/api/ht_logs")
 def create_ht_log(data: dict, db: Session = Depends(get_db)):
     try:
-        db.execute(text("SELECT setval(pg_get_serial_sequence('ht_logs', 'id'), coalesce(max(id),0) + 1, false) FROM ht_logs;"))
-        db.commit()
-    except Exception:
-        db.rollback()
+        try:
+            db.execute(text("ALTER TABLE ht_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
 
-    try:
-        db.execute(text("""
-            INSERT INTO ht_logs (date, dc_no, vendor, partno, qty)
-            VALUES (:date, :dc_no, :vendor, :partno, :qty)
-        """), {
-            "date": (data.get("date") or "").strip(),
-            "dc_no": (data.get("dc_no") or "").strip(),
-            "vendor": (data.get("vendor") or "").strip(),
-            "partno": (data.get("partno") or "").strip(),
-            "qty": int(data.get("qty") or 0)
-        })
-        db.commit()
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('ht_logs', 'id'), coalesce(max(id),0) + 1, false) FROM ht_logs;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        date_val = normalize_date_str((data.get("date") or "").strip())
+        dc_no_val = (data.get("dc_no") or "").strip()
+        vendor_val = (data.get("vendor") or "").strip()
+        partno_val = (data.get("partno") or "").strip()
+        qty_val = int(data.get("qty") or 0)
+
+        max_id_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ht_logs;")).mappings().first()
+        next_id = int(max_id_row["next_id"]) if max_id_row else 1
+
+        try:
+            db.execute(text("""
+                INSERT INTO ht_logs (id, date, dc_no, vendor, partno, qty)
+                VALUES (:id, :date, :dc_no, :vendor, :partno, :qty)
+            """), {"id": next_id, "date": date_val, "dc_no": dc_no_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO ht_logs (date, vendor, partno, qty)
+                VALUES (:date, :vendor, :partno, :qty)
+            """), {"date": date_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+
+        return {"message": "HT Log saved successfully"}
     except Exception as ex:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
-    return {"message": "HT Log saved successfully"}
 
 @app.put("/api/ht_logs/{log_id}")
 def update_ht_log(log_id: int, data: dict, db: Session = Depends(get_db)):
     try:
-        db.execute(text("""
-            UPDATE ht_logs
-            SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
-            WHERE id = :id
-        """), {
-            "id": log_id,
-            "date": normalize_date_str((data.get("date") or "").strip()),
-            "dc_no": (data.get("dc_no") or "").strip(),
-            "vendor": (data.get("vendor") or "").strip(),
-            "partno": (data.get("partno") or "").strip(),
-            "qty": int(data.get("qty") or 0)
-        })
-        db.commit()
+        try:
+            db.execute(text("ALTER TABLE ht_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        date_val = normalize_date_str((data.get("date") or "").strip())
+        dc_no_val = (data.get("dc_no") or "").strip()
+        vendor_val = (data.get("vendor") or "").strip()
+        partno_val = (data.get("partno") or "").strip()
+        qty_val = int(data.get("qty") or 0)
+
+        try:
+            db.execute(text("""
+                UPDATE ht_logs
+                SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
+                WHERE id = :id
+            """), {"id": log_id, "date": date_val, "dc_no": dc_no_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                UPDATE ht_logs
+                SET date = :date, vendor = :vendor, partno = :partno, qty = :qty
+                WHERE id = :id
+            """), {"id": log_id, "date": date_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+
+        return {"message": "HT Log updated successfully"}
     except Exception as ex:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
-    return {"message": "HT Log updated successfully"}
 
 @app.delete("/api/ht_logs/{log_id}")
 def delete_ht_log(log_id: int, db: Session = Depends(get_db)):
@@ -3100,6 +3141,12 @@ def clear_all_ht_logs(db: Session = Depends(get_db)):
 @app.get("/api/ht_receipt_logs")
 def get_ht_receipt_logs(db: Session = Depends(get_db)):
     try:
+        try:
+            db.execute(text("ALTER TABLE ht_receipt_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
         rows = db.execute(text("SELECT * FROM ht_receipt_logs ORDER BY id DESC;")).mappings().all()
         return [{
             "id": r.get("id"),
@@ -3117,48 +3164,81 @@ def get_ht_receipt_logs(db: Session = Depends(get_db)):
 @app.post("/api/ht_receipt_logs")
 def create_ht_receipt_log(data: dict, db: Session = Depends(get_db)):
     try:
-        db.execute(text("SELECT setval(pg_get_serial_sequence('ht_receipt_logs', 'id'), coalesce(max(id),0) + 1, false) FROM ht_receipt_logs;"))
-        db.commit()
-    except Exception:
-        db.rollback()
+        try:
+            db.execute(text("ALTER TABLE ht_receipt_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
 
-    try:
-        db.execute(text("""
-            INSERT INTO ht_receipt_logs (date, dc_no, vendor, partno, qty)
-            VALUES (:date, :dc_no, :vendor, :partno, :qty)
-        """), {
-            "date": normalize_date_str((data.get("date") or "").strip()),
-            "dc_no": (data.get("dc_no") or "").strip(),
-            "vendor": (data.get("vendor") or "").strip(),
-            "partno": (data.get("partno") or "").strip(),
-            "qty": int(data.get("qty") or 0)
-        })
-        db.commit()
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('ht_receipt_logs', 'id'), coalesce(max(id),0) + 1, false) FROM ht_receipt_logs;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        date_val = normalize_date_str((data.get("date") or "").strip())
+        dc_no_val = (data.get("dc_no") or "").strip()
+        vendor_val = (data.get("vendor") or "").strip()
+        partno_val = (data.get("partno") or "").strip()
+        qty_val = int(data.get("qty") or 0)
+
+        max_id_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ht_receipt_logs;")).mappings().first()
+        next_id = int(max_id_row["next_id"]) if max_id_row else 1
+
+        try:
+            db.execute(text("""
+                INSERT INTO ht_receipt_logs (id, date, dc_no, vendor, partno, qty)
+                VALUES (:id, :date, :dc_no, :vendor, :partno, :qty)
+            """), {"id": next_id, "date": date_val, "dc_no": dc_no_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO ht_receipt_logs (date, vendor, partno, qty)
+                VALUES (:date, :vendor, :partno, :qty)
+            """), {"date": date_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+
+        return {"message": "HT Receipt Log saved successfully"}
     except Exception as ex:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
-    return {"message": "HT Receipt Log saved successfully"}
 
 @app.put("/api/ht_receipt_logs/{log_id}")
 def update_ht_receipt_log(log_id: int, data: dict, db: Session = Depends(get_db)):
     try:
-        db.execute(text("""
-            UPDATE ht_receipt_logs
-            SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
-            WHERE id = :id
-        """), {
-            "id": log_id,
-            "date": normalize_date_str((data.get("date") or "").strip()),
-            "dc_no": (data.get("dc_no") or "").strip(),
-            "vendor": (data.get("vendor") or "").strip(),
-            "partno": (data.get("partno") or "").strip(),
-            "qty": int(data.get("qty") or 0)
-        })
-        db.commit()
+        try:
+            db.execute(text("ALTER TABLE ht_receipt_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        date_val = normalize_date_str((data.get("date") or "").strip())
+        dc_no_val = (data.get("dc_no") or "").strip()
+        vendor_val = (data.get("vendor") or "").strip()
+        partno_val = (data.get("partno") or "").strip()
+        qty_val = int(data.get("qty") or 0)
+
+        try:
+            db.execute(text("""
+                UPDATE ht_receipt_logs
+                SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
+                WHERE id = :id
+            """), {"id": log_id, "date": date_val, "dc_no": dc_no_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                UPDATE ht_receipt_logs
+                SET date = :date, vendor = :vendor, partno = :partno, qty = :qty
+                WHERE id = :id
+            """), {"id": log_id, "date": date_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+
+        return {"message": "HT Receipt Log updated successfully"}
     except Exception as ex:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
-    return {"message": "HT Receipt Log updated successfully"}
 
 @app.delete("/api/ht_receipt_logs/{log_id}")
 def delete_ht_receipt_log(log_id: int, db: Session = Depends(get_db)):
@@ -3182,6 +3262,12 @@ def clear_all_ht_receipt_logs(db: Session = Depends(get_db)):
 @app.get("/api/pc_logs")
 def get_pc_logs(db: Session = Depends(get_db)):
     try:
+        try:
+            db.execute(text("ALTER TABLE pc_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
         rows = db.execute(text("SELECT * FROM pc_logs ORDER BY id DESC;")).mappings().all()
         return [{
             "id": r.get("id"),
@@ -3199,48 +3285,81 @@ def get_pc_logs(db: Session = Depends(get_db)):
 @app.post("/api/pc_logs")
 def create_pc_log(data: dict, db: Session = Depends(get_db)):
     try:
-        db.execute(text("SELECT setval(pg_get_serial_sequence('pc_logs', 'id'), coalesce(max(id),0) + 1, false) FROM pc_logs;"))
-        db.commit()
-    except Exception:
-        db.rollback()
+        try:
+            db.execute(text("ALTER TABLE pc_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
 
-    try:
-        db.execute(text("""
-            INSERT INTO pc_logs (date, dc_no, vendor, partno, qty)
-            VALUES (:date, :dc_no, :vendor, :partno, :qty)
-        """), {
-            "date": normalize_date_str((data.get("date") or "").strip()),
-            "dc_no": (data.get("dc_no") or "").strip(),
-            "vendor": (data.get("vendor") or "").strip(),
-            "partno": (data.get("partno") or "").strip(),
-            "qty": int(data.get("qty") or 0)
-        })
-        db.commit()
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('pc_logs', 'id'), coalesce(max(id),0) + 1, false) FROM pc_logs;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        date_val = normalize_date_str((data.get("date") or "").strip())
+        dc_no_val = (data.get("dc_no") or "").strip()
+        vendor_val = (data.get("vendor") or "").strip()
+        partno_val = (data.get("partno") or "").strip()
+        qty_val = int(data.get("qty") or 0)
+
+        max_id_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM pc_logs;")).mappings().first()
+        next_id = int(max_id_row["next_id"]) if max_id_row else 1
+
+        try:
+            db.execute(text("""
+                INSERT INTO pc_logs (id, date, dc_no, vendor, partno, qty)
+                VALUES (:id, :date, :dc_no, :vendor, :partno, :qty)
+            """), {"id": next_id, "date": date_val, "dc_no": dc_no_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO pc_logs (date, vendor, partno, qty)
+                VALUES (:date, :vendor, :partno, :qty)
+            """), {"date": date_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+
+        return {"message": "PC Log saved successfully"}
     except Exception as ex:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
-    return {"message": "PC Log saved successfully"}
 
 @app.put("/api/pc_logs/{log_id}")
 def update_pc_log(log_id: int, data: dict, db: Session = Depends(get_db)):
     try:
-        db.execute(text("""
-            UPDATE pc_logs
-            SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
-            WHERE id = :id
-        """), {
-            "id": log_id,
-            "date": normalize_date_str((data.get("date") or "").strip()),
-            "dc_no": (data.get("dc_no") or "").strip(),
-            "vendor": (data.get("vendor") or "").strip(),
-            "partno": (data.get("partno") or "").strip(),
-            "qty": int(data.get("qty") or 0)
-        })
-        db.commit()
+        try:
+            db.execute(text("ALTER TABLE pc_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        date_val = normalize_date_str((data.get("date") or "").strip())
+        dc_no_val = (data.get("dc_no") or "").strip()
+        vendor_val = (data.get("vendor") or "").strip()
+        partno_val = (data.get("partno") or "").strip()
+        qty_val = int(data.get("qty") or 0)
+
+        try:
+            db.execute(text("""
+                UPDATE pc_logs
+                SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
+                WHERE id = :id
+            """), {"id": log_id, "date": date_val, "dc_no": dc_no_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                UPDATE pc_logs
+                SET date = :date, vendor = :vendor, partno = :partno, qty = :qty
+                WHERE id = :id
+            """), {"id": log_id, "date": date_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+
+        return {"message": "PC Log updated successfully"}
     except Exception as ex:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
-    return {"message": "PC Log updated successfully"}
 
 @app.delete("/api/pc_logs/{log_id}")
 def delete_pc_log(log_id: int, db: Session = Depends(get_db)):
@@ -3264,6 +3383,12 @@ def clear_all_pc_logs(db: Session = Depends(get_db)):
 @app.get("/api/pc_receipt_logs")
 def get_pc_receipt_logs(db: Session = Depends(get_db)):
     try:
+        try:
+            db.execute(text("ALTER TABLE pc_receipt_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
         rows = db.execute(text("SELECT * FROM pc_receipt_logs ORDER BY id DESC;")).mappings().all()
         return [{
             "id": r.get("id"),
@@ -3281,44 +3406,78 @@ def get_pc_receipt_logs(db: Session = Depends(get_db)):
 @app.post("/api/pc_receipt_logs")
 def create_pc_receipt_log(data: dict, db: Session = Depends(get_db)):
     try:
-        db.execute(text("SELECT setval(pg_get_serial_sequence('pc_receipt_logs', 'id'), coalesce(max(id),0) + 1, false) FROM pc_receipt_logs;"))
-        db.commit()
-    except Exception:
-        db.rollback()
+        try:
+            db.execute(text("ALTER TABLE pc_receipt_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
 
-    try:
-        db.execute(text("""
-            INSERT INTO pc_receipt_logs (date, dc_no, vendor, partno, qty)
-            VALUES (:date, :dc_no, :vendor, :partno, :qty)
-        """), {
-            "date": normalize_date_str((data.get("date") or "").strip()),
-            "dc_no": (data.get("dc_no") or "").strip(),
-            "vendor": (data.get("vendor") or "").strip(),
-            "partno": (data.get("partno") or "").strip(),
-            "qty": int(data.get("qty") or 0)
-        })
-        db.commit()
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('pc_receipt_logs', 'id'), coalesce(max(id),0) + 1, false) FROM pc_receipt_logs;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        date_val = normalize_date_str((data.get("date") or "").strip())
+        dc_no_val = (data.get("dc_no") or "").strip()
+        vendor_val = (data.get("vendor") or "").strip()
+        partno_val = (data.get("partno") or "").strip()
+        qty_val = int(data.get("qty") or 0)
+
+        max_id_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM pc_receipt_logs;")).mappings().first()
+        next_id = int(max_id_row["next_id"]) if max_id_row else 1
+
+        try:
+            db.execute(text("""
+                INSERT INTO pc_receipt_logs (id, date, dc_no, vendor, partno, qty)
+                VALUES (:id, :date, :dc_no, :vendor, :partno, :qty)
+            """), {"id": next_id, "date": date_val, "dc_no": dc_no_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                INSERT INTO pc_receipt_logs (date, vendor, partno, qty)
+                VALUES (:date, :vendor, :partno, :qty)
+            """), {"date": date_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+
+        return {"message": "PC Receipt Log saved successfully"}
     except Exception as ex:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
-    return {"message": "PC Receipt Log saved successfully"}
 
 @app.put("/api/pc_receipt_logs/{log_id}")
 def update_pc_receipt_log(log_id: int, data: dict, db: Session = Depends(get_db)):
     try:
-        db.execute(text("""
-            UPDATE pc_receipt_logs
-            SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
-            WHERE id = :id
-        """), {
-            "id": log_id,
-            "date": normalize_date_str((data.get("date") or "").strip()),
-            "dc_no": (data.get("dc_no") or "").strip(),
-            "vendor": (data.get("vendor") or "").strip(),
-            "partno": (data.get("partno") or "").strip(),
-            "qty": int(data.get("qty") or 0)
-        })
-        db.commit()
+        try:
+            db.execute(text("ALTER TABLE pc_receipt_logs ADD COLUMN IF NOT EXISTS dc_no VARCHAR(100) DEFAULT '';"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        date_val = normalize_date_str((data.get("date") or "").strip())
+        dc_no_val = (data.get("dc_no") or "").strip()
+        vendor_val = (data.get("vendor") or "").strip()
+        partno_val = (data.get("partno") or "").strip()
+        qty_val = int(data.get("qty") or 0)
+
+        try:
+            db.execute(text("""
+                UPDATE pc_receipt_logs
+                SET date = :date, dc_no = :dc_no, vendor = :vendor, partno = :partno, qty = :qty
+                WHERE id = :id
+            """), {"id": log_id, "date": date_val, "dc_no": dc_no_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.execute(text("""
+                UPDATE pc_receipt_logs
+                SET date = :date, vendor = :vendor, partno = :partno, qty = :qty
+                WHERE id = :id
+            """), {"id": log_id, "date": date_val, "vendor": vendor_val, "partno": partno_val, "qty": qty_val})
+            db.commit()
+
+        return {"message": "PC Receipt Log updated successfully"}
     except Exception as ex:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(ex))
