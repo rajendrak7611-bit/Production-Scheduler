@@ -10,6 +10,8 @@ import io
 import zipfile
 import xml.etree.ElementTree as ET
 import re
+import os
+import json
 
 from database import engine, get_db, Base
 import models
@@ -79,6 +81,119 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+def import_breakdown_excel():
+    excel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "breakdown.xlsx")
+    if not os.path.exists(excel_path):
+        return {"message": "breakdown.xlsx not found"}
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(excel_path, data_only=True)
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS breakdown_slips (
+                    id SERIAL PRIMARY KEY,
+                    date_time TEXT,
+                    department TEXT,
+                    shift TEXT,
+                    maint_type TEXT,
+                    request_by TEXT,
+                    machine TEXT,
+                    problem TEXT,
+                    signoff_date_time TEXT,
+                    status TEXT,
+                    created_at TEXT
+                );
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS service_details (
+                    id SERIAL PRIMARY KEY,
+                    breakdown_slip_id INTEGER,
+                    machine TEXT,
+                    spares_data TEXT,
+                    service_data TEXT,
+                    spares_cost NUMERIC DEFAULT 0,
+                    service_cost NUMERIC DEFAULT 0,
+                    total_cost NUMERIC DEFAULT 0,
+                    remarks TEXT,
+                    created_at TEXT
+                );
+            """))
+            conn.commit()
+
+            if "breakdown_slips" in wb.sheetnames:
+                sheet = wb["breakdown_slips"]
+                headers = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
+                conn.execute(text("DELETE FROM breakdown_slips;"))
+                conn.commit()
+                for r in range(2, sheet.max_row + 1):
+                    row_data = {headers[c-1]: sheet.cell(r, c).value for c in range(1, len(headers)+1) if headers[c-1]}
+                    if not any(v is not None for v in row_data.values()):
+                        continue
+                    try:
+                        conn.execute(text("""
+                            INSERT INTO breakdown_slips (id, date_time, department, shift, maint_type, request_by, machine, problem, signoff_date_time, status, created_at)
+                            VALUES (:id, :date_time, :department, :shift, :maint_type, :request_by, :machine, :problem, :signoff_date_time, :status, :created_at)
+                        """), {
+                            "id": int(row_data.get("id")) if row_data.get("id") else None,
+                            "date_time": str(row_data.get("date_time") or ""),
+                            "department": str(row_data.get("department") or ""),
+                            "shift": str(row_data.get("shift") or ""),
+                            "maint_type": str(row_data.get("maint_type") or "Breakdown"),
+                            "request_by": str(row_data.get("request_by") or ""),
+                            "machine": str(row_data.get("machine") or ""),
+                            "problem": str(row_data.get("problem") or ""),
+                            "signoff_date_time": str(row_data.get("signoff_date_time") or ""),
+                            "status": str(row_data.get("status") or "Open"),
+                            "created_at": str(row_data.get("created_at") or "")
+                        })
+                    except Exception as e:
+                        pass
+                conn.commit()
+                try:
+                    conn.execute(text("SELECT setval(pg_get_serial_sequence('breakdown_slips', 'id'), coalesce(max(id),0) + 1, false) FROM breakdown_slips;"))
+                    conn.commit()
+                except Exception:
+                    pass
+
+            if "service_details" in wb.sheetnames:
+                sheet = wb["service_details"]
+                headers = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
+                conn.execute(text("DELETE FROM service_details;"))
+                conn.commit()
+                for r in range(2, sheet.max_row + 1):
+                    row_data = {headers[c-1]: sheet.cell(r, c).value for c in range(1, len(headers)+1) if headers[c-1]}
+                    if not any(v is not None for v in row_data.values()):
+                        continue
+                    try:
+                        bd_id = int(row_data.get("breakdown_slip_id")) if row_data.get("breakdown_slip_id") is not None and str(row_data.get("breakdown_slip_id")).strip() != "" else None
+                        conn.execute(text("""
+                            INSERT INTO service_details (id, breakdown_slip_id, machine, spares_data, service_data, spares_cost, service_cost, total_cost, remarks, created_at)
+                            VALUES (:id, :breakdown_slip_id, :machine, :spares_data, :service_data, :spares_cost, :service_cost, :total_cost, :remarks, :created_at)
+                        """), {
+                            "id": int(row_data.get("id")) if row_data.get("id") else None,
+                            "breakdown_slip_id": bd_id,
+                            "machine": str(row_data.get("machine") or ""),
+                            "spares_data": str(row_data.get("spares_data") or "[]"),
+                            "service_data": str(row_data.get("service_data") or "[]"),
+                            "spares_cost": float(row_data.get("spares_cost") or 0),
+                            "service_cost": float(row_data.get("service_cost") or 0),
+                            "total_cost": float(row_data.get("total_cost") or 0),
+                            "remarks": str(row_data.get("remarks") or ""),
+                            "created_at": str(row_data.get("created_at") or "")
+                        })
+                    except Exception as e:
+                        pass
+                conn.commit()
+                try:
+                    conn.execute(text("SELECT setval(pg_get_serial_sequence('service_details', 'id'), coalesce(max(id),0) + 1, false) FROM service_details;"))
+                    conn.commit()
+                except Exception:
+                    pass
+
+        return {"message": "Breakdown excel imported successfully"}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.on_event("startup")
 def run_startup_migrations():
     try:
@@ -91,6 +206,15 @@ def run_startup_migrations():
                     pass
     except Exception as e:
         print("Startup migration note:", e)
+    try:
+        import_breakdown_excel()
+    except Exception as e:
+        print("Startup breakdown import note:", e)
+
+@app.post("/api/import-breakdown-excel")
+@app.get("/api/import-breakdown-excel")
+def trigger_import_breakdown_excel():
+    return import_breakdown_excel()
 
 @app.post("/api/restore-from-backup")
 @app.get("/api/restore-from-backup")
@@ -3491,6 +3615,205 @@ def delete_pc_receipt_log(log_id: int, db: Session = Depends(get_db)):
     except Exception:
         db.rollback()
     return {"message": "PC Receipt Log deleted"}
+
+# --- BREAKDOWN SLIPS & SERVICE DETAILS CRUD ---
+@app.get("/api/breakdown_slips")
+def get_breakdown_slips(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM breakdown_slips ORDER BY date_time DESC, id DESC;")).mappings().all()
+        return [{
+            "id": r.get("id"),
+            "date_time": r.get("date_time") or "",
+            "department": r.get("department") or "",
+            "shift": r.get("shift") or "",
+            "maint_type": r.get("maint_type") or "Breakdown",
+            "request_by": r.get("request_by") or "",
+            "machine": r.get("machine") or "",
+            "problem": r.get("problem") or "",
+            "signoff_date_time": r.get("signoff_date_time") or "",
+            "status": r.get("status") or "Open",
+            "created_at": str(r.get("created_at") or "")
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/breakdown_slips")
+def create_breakdown_slip(data: dict, db: Session = Depends(get_db)):
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('breakdown_slips', 'id'), coalesce(max(id),0) + 1, false) FROM breakdown_slips;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        max_id_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM breakdown_slips;")).mappings().first()
+        next_id = int(max_id_row["next_id"]) if max_id_row else 1
+
+        db.execute(text("""
+            INSERT INTO breakdown_slips (id, date_time, department, shift, maint_type, request_by, machine, problem, signoff_date_time, status, created_at)
+            VALUES (:id, :date_time, :department, :shift, :maint_type, :request_by, :machine, :problem, :signoff_date_time, :status, :created_at)
+        """), {
+            "id": next_id,
+            "date_time": (data.get("date_time") or "").strip(),
+            "department": (data.get("department") or "").strip(),
+            "shift": (data.get("shift") or "").strip(),
+            "maint_type": (data.get("maint_type") or "Breakdown").strip(),
+            "request_by": (data.get("request_by") or "").strip(),
+            "machine": (data.get("machine") or "").strip(),
+            "problem": (data.get("problem") or "").strip(),
+            "signoff_date_time": (data.get("signoff_date_time") or "").strip(),
+            "status": (data.get("status") or "Open").strip(),
+            "created_at": datetime.datetime.now(IST).isoformat()
+        })
+        db.commit()
+        return {"message": "Breakdown Slip created successfully", "id": next_id}
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+
+@app.put("/api/breakdown_slips/{slip_id}")
+def update_breakdown_slip(slip_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            UPDATE breakdown_slips
+            SET date_time = :date_time, department = :department, shift = :shift,
+                maint_type = :maint_type, request_by = :request_by, machine = :machine,
+                problem = :problem, signoff_date_time = :signoff_date_time, status = :status
+            WHERE id = :id
+        """), {
+            "id": slip_id,
+            "date_time": (data.get("date_time") or "").strip(),
+            "department": (data.get("department") or "").strip(),
+            "shift": (data.get("shift") or "").strip(),
+            "maint_type": (data.get("maint_type") or "Breakdown").strip(),
+            "request_by": (data.get("request_by") or "").strip(),
+            "machine": (data.get("machine") or "").strip(),
+            "problem": (data.get("problem") or "").strip(),
+            "signoff_date_time": (data.get("signoff_date_time") or "").strip(),
+            "status": (data.get("status") or "Open").strip()
+        })
+        db.commit()
+        return {"message": "Breakdown Slip updated successfully"}
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+
+@app.delete("/api/breakdown_slips/{slip_id}")
+def delete_breakdown_slip(slip_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM breakdown_slips WHERE id = :id"), {"id": slip_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "Breakdown Slip deleted"}
+
+@app.get("/api/service_details")
+def get_service_details(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(text("SELECT * FROM service_details ORDER BY id DESC;")).mappings().all()
+        return [{
+            "id": r.get("id"),
+            "breakdown_slip_id": r.get("breakdown_slip_id"),
+            "machine": r.get("machine") or "",
+            "spares_data": r.get("spares_data") or "[]",
+            "service_data": r.get("service_data") or "[]",
+            "spares_cost": float(r.get("spares_cost") or 0),
+            "service_cost": float(r.get("service_cost") or 0),
+            "total_cost": float(r.get("total_cost") or 0),
+            "remarks": r.get("remarks") or "",
+            "created_at": str(r.get("created_at") or "")
+        } for r in rows]
+    except Exception:
+        db.rollback()
+        return []
+
+@app.post("/api/service_details")
+def create_service_detail(data: dict, db: Session = Depends(get_db)):
+    try:
+        try:
+            db.execute(text("SELECT setval(pg_get_serial_sequence('service_details', 'id'), coalesce(max(id),0) + 1, false) FROM service_details;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        max_id_row = db.execute(text("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM service_details;")).mappings().first()
+        next_id = int(max_id_row["next_id"]) if max_id_row else 1
+
+        bd_id = data.get("breakdown_slip_id")
+        if bd_id is not None and str(bd_id).strip() != "":
+            try:
+                bd_id = int(bd_id)
+            except Exception:
+                bd_id = None
+        else:
+            bd_id = None
+
+        db.execute(text("""
+            INSERT INTO service_details (id, breakdown_slip_id, machine, spares_data, service_data, spares_cost, service_cost, total_cost, remarks, created_at)
+            VALUES (:id, :breakdown_slip_id, :machine, :spares_data, :service_data, :spares_cost, :service_cost, :total_cost, :remarks, :created_at)
+        """), {
+            "id": next_id,
+            "breakdown_slip_id": bd_id,
+            "machine": (data.get("machine") or "").strip(),
+            "spares_data": json.dumps(data.get("spares_data")) if isinstance(data.get("spares_data"), list) else str(data.get("spares_data") or "[]"),
+            "service_data": json.dumps(data.get("service_data")) if isinstance(data.get("service_data"), list) else str(data.get("service_data") or "[]"),
+            "spares_cost": float(data.get("spares_cost") or 0),
+            "service_cost": float(data.get("service_cost") or 0),
+            "total_cost": float(data.get("total_cost") or 0),
+            "remarks": (data.get("remarks") or "").strip(),
+            "created_at": datetime.datetime.now(IST).isoformat()
+        })
+        db.commit()
+        return {"message": "Service Detail created successfully", "id": next_id}
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+
+@app.put("/api/service_details/{detail_id}")
+def update_service_detail(detail_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        bd_id = data.get("breakdown_slip_id")
+        if bd_id is not None and str(bd_id).strip() != "":
+            try:
+                bd_id = int(bd_id)
+            except Exception:
+                bd_id = None
+        else:
+            bd_id = None
+
+        db.execute(text("""
+            UPDATE service_details
+            SET breakdown_slip_id = :breakdown_slip_id, machine = :machine,
+                spares_data = :spares_data, service_data = :service_data,
+                spares_cost = :spares_cost, service_cost = :service_cost,
+                total_cost = :total_cost, remarks = :remarks
+            WHERE id = :id
+        """), {
+            "id": detail_id,
+            "breakdown_slip_id": bd_id,
+            "machine": (data.get("machine") or "").strip(),
+            "spares_data": json.dumps(data.get("spares_data")) if isinstance(data.get("spares_data"), list) else str(data.get("spares_data") or "[]"),
+            "service_data": json.dumps(data.get("service_data")) if isinstance(data.get("service_data"), list) else str(data.get("service_data") or "[]"),
+            "spares_cost": float(data.get("spares_cost") or 0),
+            "service_cost": float(data.get("service_cost") or 0),
+            "total_cost": float(data.get("total_cost") or 0),
+            "remarks": (data.get("remarks") or "").strip()
+        })
+        db.commit()
+        return {"message": "Service Detail updated successfully"}
+    except Exception as ex:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(ex))
+
+@app.delete("/api/service_details/{detail_id}")
+def delete_service_detail(detail_id: int, db: Session = Depends(get_db)):
+    try:
+        db.execute(text("DELETE FROM service_details WHERE id = :id"), {"id": detail_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"message": "Service Detail deleted"}
 
 # --- SCHEDULE STATUS WIP ADJUSTMENTS ---
 @app.post("/api/schedule_status/adjust_part_wip")
