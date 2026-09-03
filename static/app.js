@@ -4772,24 +4772,28 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (inspAllParts.length === 0) {
-                const partsRes = await fetch('/api/partmaster');
-                inspAllParts = await partsRes.json();
+                try {
+                    const partsRes = await fetch('/api/partmaster');
+                    inspAllParts = await partsRes.json();
+                } catch(e) { inspAllParts = []; }
             }
             if (!inspOperatorsLoaded) {
-                const opRes = await fetch('/api/operators');
-                const operators = await opRes.json();
-                operators.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-                const sel = document.getElementById('inspOperator');
-                if (sel) {
-                    sel.innerHTML = '<option value="">-- Select Operator --</option>';
-                    operators.forEach(o => {
-                        const opt = document.createElement('option');
-                        opt.value = o.name;
-                        opt.textContent = o.name;
-                        sel.appendChild(opt);
-                    });
-                }
-                inspOperatorsLoaded = true;
+                try {
+                    const opRes = await fetch('/api/operators');
+                    const operators = await opRes.json();
+                    operators.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    const sel = document.getElementById('inspOperator');
+                    if (sel) {
+                        sel.innerHTML = '<option value="">-- Select Operator --</option>';
+                        operators.forEach(o => {
+                            const opt = document.createElement('option');
+                            opt.value = o.name;
+                            opt.textContent = o.name;
+                            sel.appendChild(opt);
+                        });
+                    }
+                    inspOperatorsLoaded = true;
+                } catch(e) { console.error('Error loading insp operators', e); }
             }
             
             loadPastInspectionReasons();
@@ -4797,8 +4801,16 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchInspectionLogs();
             
             const deptSelect = document.getElementById('inspDeptSelect');
-            if (deptSelect.value) {
-                fetchInspectionStatus();
+            if (deptSelect) {
+                if (!deptSelect.value) {
+                    const firstOption = Array.from(deptSelect.options).find(o => o.value && o.value.trim() !== '');
+                    if (firstOption) {
+                        deptSelect.value = firstOption.value;
+                    }
+                }
+                if (deptSelect.value) {
+                    fetchInspectionStatus();
+                }
             }
         } catch (e) {
             console.error('Error init inspection', e);
@@ -4808,68 +4820,80 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchInspectionStatus() {
         const dept = document.getElementById('inspDeptSelect').value;
         const tbody = document.getElementById('inspPartsBody');
-        tbody.innerHTML = '';
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted); text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading pending parts...</td></tr>';
         if (!dept) {
             tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted); text-align:center;">Select a department</td></tr>';
             return;
         }
 
         try {
-            const [schedRes, logRes, pmRes] = await Promise.all([
-                fetch('/api/schedule'),
-                fetch('/api/prodlog'),
-                fetch('/api/partmaster')
+            if (!inspAllParts || inspAllParts.length === 0) {
+                try {
+                    const partsRes = await fetch('/api/partmaster');
+                    inspAllParts = await partsRes.json();
+                } catch(e) { inspAllParts = []; }
+            }
+
+            const [schedRes, logRes] = await Promise.all([
+                fetch('/api/schedule').then(r => r.ok ? r.json() : []).catch(() => []),
+                fetch('/api/prodlog').then(r => r.ok ? r.json() : []).catch(() => [])
             ]);
             
-            const allSchedules = await schedRes.json();
-            const allLogs = await logRes.json();
-            const allPartMasters = await pmRes.json();
-            
-            const deptSchedules = allSchedules.filter(s => (s.department || '').trim().toUpperCase() === dept.trim().toUpperCase() && (s.status === 'Pending' || !s.status));
-            const uniqueParts = [...new Set(deptSchedules.map(s => s.partno))];
+            const allSchedules = schedRes || [];
+            const allLogs = logRes || [];
+
+            const masterDeptParts = (inspAllParts || [])
+                .filter(p => (p.department || '').trim().toUpperCase() === dept.trim().toUpperCase() || (p.dept || '').trim().toUpperCase() === dept.trim().toUpperCase())
+                .map(p => (p.partno || '').trim());
+
+            const schedDeptParts = allSchedules
+                .filter(s => (s.department || '').trim().toUpperCase() === dept.trim().toUpperCase())
+                .map(s => (s.partno || '').trim());
+
+            const prodLogDeptParts = allLogs
+                .filter(l => (l.department || '').trim().toUpperCase() === dept.trim().toUpperCase() || (l.dept || '').trim().toUpperCase() === dept.trim().toUpperCase())
+                .map(l => (l.partno || '').trim());
+
+            const uniqueParts = [...new Set([...masterDeptParts, ...schedDeptParts, ...prodLogDeptParts])].filter(Boolean);
+            uniqueParts.sort((a, b) => a.localeCompare(b));
             
             if (uniqueParts.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted); text-align:center;">No pending parts for this department</td></tr>';
                 return;
             }
             
+            tbody.innerHTML = '';
             for (const partno of uniqueParts) {
-                const partObj = allPartMasters.find(p => (p.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase());
-                let lastOpnNo = '';
-                if (partObj) {
-                    const opsRes = await fetch(`/api/partmaster/${partObj.id}/operations`);
-                    const operations = await opsRes.json();
-                    if (operations.length > 0) {
-                        operations.sort((a, b) => (parseInt(a.opn_no) || 0) - (parseInt(b.opn_no) || 0));
-                        lastOpnNo = (operations[operations.length - 1].opn_no || '').trim().toLowerCase();
-                    }
-                }
-
-                const deburredTotal = allLogs.filter(l => l.partno === partno && (l.opn_no || '').toLowerCase() === 'debur').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
-                const forInsLogTotal = allLogs.filter(l => l.partno === partno && (l.opn_no || '').toLowerCase() === 'for ins').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
-                const lastOpProd = lastOpnNo ? allLogs.filter(l => l.partno === partno && (l.opn_no || '').trim().toLowerCase() === lastOpnNo).reduce((sum, l) => sum + (l.prod_qty || 0), 0) : 0;
-
+                const deburredTotal = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'debur').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+                const forInsLogTotal = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'for ins').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
                 const effectiveForIns = deburredTotal > 0 ? deburredTotal : forInsLogTotal;
 
-                const rfdProd = allLogs.filter(l => l.partno === partno && (l.opn_no || '').toLowerCase() === 'rfd').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
-                const reworkProd = allLogs.filter(l => l.partno === partno && (l.opn_no || '').toLowerCase() === 'rework').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
-                const ncProd = allLogs.filter(l => l.partno === partno && (l.opn_no || '').toLowerCase() === 'nc').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
-                const rejectionProd = allLogs.filter(l => l.partno === partno && (l.opn_no || '').toLowerCase() === 'rejection').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+                const rfdProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'rfd').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+                const reworkProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'rework').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+                const ncProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'nc').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
+                const rejectionProd = allLogs.filter(l => (l.partno || '').trim().toUpperCase() === (partno || '').trim().toUpperCase() && (l.opn_no || '').toLowerCase() === 'rejection').reduce((sum, l) => sum + (l.prod_qty || 0), 0);
 
                 const totalInspected = Math.max(forInsLogTotal, rfdProd + reworkProd + ncProd + rejectionProd);
-
                 const balance = Math.max(0, effectiveForIns - totalInspected);
                 
-                if (balance <= 0) continue; // Only show parts with positive balance for inspection
+                if (balance <= 0) continue;
                 
                 const tr = document.createElement('tr');
                 tr.style.cursor = 'pointer';
+                tr.style.transition = 'background-color 0.2s';
                 tr.innerHTML = `
-                    <td>${partno}</td>
-                    <td style="font-weight: 600; color: var(--primary-color);">${balance}</td>
+                    <td style="padding: 0.6rem 0.75rem; font-weight: 500;">${escapeHtml(partno)}</td>
+                    <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--primary-color);">${balance}</td>
                 `;
                 tr.addEventListener('click', () => {
                     document.getElementById('inspPartNo').value = partno;
+                    const rfdInput = document.getElementById('inspRFD');
+                    if (rfdInput) {
+                        rfdInput.placeholder = `Max: ${balance}`;
+                    }
+                    Array.from(tbody.children).forEach(r => r.style.background = '');
+                    tr.style.background = '#e0f2fe';
                 });
                 tbody.appendChild(tr);
             }
@@ -4879,6 +4903,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {
             console.error('Error fetching inspection status', e);
+            tbody.innerHTML = '<tr><td colspan="2" style="color:#ef4444; text-align:center;">Error fetching pending inspection parts</td></tr>';
         }
     }
     
